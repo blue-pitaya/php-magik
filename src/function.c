@@ -36,6 +36,47 @@ static char *node_text(TSNode node, const char *src)
 	return s;
 }
 
+static enum php_type resolve_expr_type(TSNode expr, const char *src)
+{
+	const char *type = ts_node_type(expr);
+	if (!strcmp(type, "integer")) {
+		return PHP_TYPE_INT;
+	}
+	if (!strcmp(type, "float")) {
+		return PHP_TYPE_FLOAT;
+	}
+	if (!strcmp(type, "string")) {
+		return PHP_TYPE_STRING;
+	}
+	if (!strcmp(type, "boolean")) {
+		return PHP_TYPE_BOOL;
+	}
+	if (!strcmp(type, "null")) {
+		return PHP_TYPE_NULL;
+	}
+	if (!strcmp(type, "binary_expression")) {
+		TSNode left = ts_node_child_by_field_name(expr, "left",
+							  sizeof("left") - 1);
+		TSNode right = ts_node_child_by_field_name(expr, "right",
+							   sizeof("right") - 1);
+		enum php_type lt = resolve_expr_type(left, src);
+		enum php_type rt = resolve_expr_type(right, src);
+		if (lt == rt) {
+			return lt;
+		}
+		if ((lt == PHP_TYPE_INT && rt == PHP_TYPE_FLOAT) ||
+		    (lt == PHP_TYPE_FLOAT && rt == PHP_TYPE_INT)) {
+			return PHP_TYPE_FLOAT;
+		}
+		return PHP_TYPE_MIXED;
+	}
+	if (!strcmp(type, "parenthesized_expression")) {
+		return resolve_expr_type(ts_node_child(expr, 1), src);
+	}
+
+	return PHP_TYPE_MIXED;
+}
+
 static enum php_type parse_type(TSNode node, const char *src)
 {
 	if (ts_node_is_null(node)) {
@@ -105,31 +146,16 @@ static int build_function_def_args(TSNode node, const char *src,
 	return 0;
 }
 
-static int parse_return_statement_type(TSNode node, const char *src,
+static int parse_return_statement_type(TSNode ret_smt_node, const char *src,
 				       enum php_type *out)
 {
-	TSNode expr = ts_node_child(node, 1);
+	TSNode expr = ts_node_child(ret_smt_node, 1);
 	if (ts_node_is_null(expr)) {
 		*out = PHP_TYPE_VOID; // bare "return;"
 		return 0;
 	}
 
-	const char *type = ts_node_type(expr);
-	if (!strcmp(type, "integer")) {
-		*out = PHP_TYPE_INT;
-	} else if (!strcmp(type, "float")) {
-		*out = PHP_TYPE_FLOAT;
-	} else if (!strcmp(type, "string")) {
-		*out = PHP_TYPE_STRING;
-	} else if (!strcmp(type, "boolean")) {
-		*out = PHP_TYPE_BOOL;
-	} else if (!strcmp(type, "null")) {
-		*out = PHP_TYPE_NULL;
-	} else {
-		*out = PHP_TYPE_MIXED;
-	}
-
-	//TODO: complicated statemets
+	*out = resolve_expr_type(expr, src);
 
 	return 0;
 }

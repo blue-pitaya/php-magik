@@ -1,25 +1,16 @@
 <?php
 
-function zero()
+function add()
 {
-    return 0;
+    return 1 + 2 + 3 + 4 + 5;
 }
 
-function add(int $a, int $b)
+function add2()
 {
-    return $a + $b;
+    return 1 + (2 + 3) * (4 + 5) + (1);
 }
 
-function addf(float $a, float $b)
+function add3()
 {
-    return $a + $b;
-}
-
-function combined()
-{
-    $a = zero() + 5;
-    $b = 10;
-    $c = add($a, $b);
-
-    return $c;
+    return ((1 + 2) * (3 * (3 + 4) / 5)) * 2;
 }
