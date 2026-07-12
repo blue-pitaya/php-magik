@@ -1,7 +1,7 @@
 #include "function.h"
+#include <stdlib.h>
 #include <string.h>
 #include <tree_sitter/api.h>
-#include "debug.h"
 
 const char *php_type_str[] = {
 	[PHP_TYPE_BOOL] = "bool",
@@ -20,6 +20,42 @@ const char *php_type_str[] = {
 	[PHP_TYPE_USER_DEFINED] = "user_defined",
 };
 
+static int var_table_add(struct var_table *t, enum php_type type,
+			 const char *name)
+{
+	if (t->len == t->cap) {
+		int new_cap = t->cap ? t->cap * 2 : 16;
+		struct var_entry *tmp =
+			realloc(t->entries, new_cap * sizeof(*tmp));
+		if (!tmp) {
+			return -1;
+		}
+		t->entries = tmp;
+		t->cap = new_cap;
+	}
+
+	t->entries[t->len].name = strdup(name);
+	if (!t->entries[t->len].name) {
+		return -1;
+	}
+	t->entries[t->len].type = type;
+	t->len++;
+
+	return 0;
+}
+
+static enum php_type var_table_lookup_type(struct var_table *t,
+					   const char *name)
+{
+	for (int i = 0; i < t->len; i++) {
+		if (!strcmp(t->entries[i].name, name)) {
+			return t->entries[i].type;
+		}
+	}
+
+	return PHP_TYPE_MIXED;
+}
+
 static char *node_text(TSNode node, const char *src)
 {
 	uint32_t start = ts_node_start_byte(node);
@@ -36,7 +72,8 @@ static char *node_text(TSNode node, const char *src)
 	return s;
 }
 
-static enum php_type resolve_expr_type(TSNode expr, const char *src)
+static enum php_type resolve_expr_type(TSNode expr, const char *src,
+				       struct function_def *def)
 {
 	const char *type = ts_node_type(expr);
 	if (!strcmp(type, "integer")) {
@@ -59,8 +96,8 @@ static enum php_type resolve_expr_type(TSNode expr, const char *src)
 							  sizeof("left") - 1);
 		TSNode right = ts_node_child_by_field_name(expr, "right",
 							   sizeof("right") - 1);
-		enum php_type lt = resolve_expr_type(left, src);
-		enum php_type rt = resolve_expr_type(right, src);
+		enum php_type lt = resolve_expr_type(left, src, def);
+		enum php_type rt = resolve_expr_type(right, src, def);
 		if (lt == rt) {
 			return lt;
 		}
@@ -71,7 +108,16 @@ static enum php_type resolve_expr_type(TSNode expr, const char *src)
 		return PHP_TYPE_MIXED;
 	}
 	if (!strcmp(type, "parenthesized_expression")) {
-		return resolve_expr_type(ts_node_child(expr, 1), src);
+		return resolve_expr_type(ts_node_child(expr, 1), src, def);
+	}
+	if (!strcmp(type, "variable_name")) {
+		char *name = node_text(expr, src);
+		if (!name) {
+			return PHP_TYPE_MIXED;
+		}
+		enum php_type t = var_table_lookup_type(&def->var_table, name);
+		free(name);
+		return t;
 	}
 
 	return PHP_TYPE_MIXED;
@@ -147,15 +193,15 @@ static int build_function_def_args(TSNode node, const char *src,
 }
 
 static int parse_return_statement_type(TSNode ret_smt_node, const char *src,
-				       enum php_type *out)
+				       struct function_def *def)
 {
 	TSNode expr = ts_node_child(ret_smt_node, 1);
 	if (ts_node_is_null(expr)) {
-		*out = PHP_TYPE_VOID; // bare "return;"
+		def->return_type = PHP_TYPE_VOID; // bare "return;"
 		return 0;
 	}
 
-	*out = resolve_expr_type(expr, src);
+	def->return_type = resolve_expr_type(expr, src, def);
 
 	return 0;
 }
@@ -170,11 +216,11 @@ static int build_function_def_return(TSNode node, const char *src,
 	}
 
 	TSTreeCursor cursor = ts_tree_cursor_new(body);
-	enum php_type ret_type = PHP_TYPE_VOID;
+	def->return_type = PHP_TYPE_VOID;
 	do {
 		TSNode node = ts_tree_cursor_current_node(&cursor);
 		if (!strcmp(ts_node_type(node), "return_statement")) {
-			parse_return_statement_type(node, src, &ret_type);
+			parse_return_statement_type(node, src, def);
 			goto done;
 		}
 		if (ts_tree_cursor_goto_first_child(&cursor)) {
@@ -190,8 +236,6 @@ static int build_function_def_return(TSNode node, const char *src,
 done:
 	ts_tree_cursor_delete(&cursor);
 
-	def->return_type = ret_type;
-
 	return 0;
 }
 
@@ -201,7 +245,7 @@ int build_function_def(TSNode node, const char *src, struct function_def *def)
 	TSNode name_node =
 		ts_node_child_by_field_name(node, "name", sizeof("name") - 1);
 	if (ts_node_is_null(name_node)) {
-		return -1;
+		goto error;
 	}
 
 	def->name = node_text(name_node, src);
@@ -211,6 +255,14 @@ int build_function_def(TSNode node, const char *src, struct function_def *def)
 
 	if (build_function_def_args(node, src, def)) {
 		goto free_name;
+	}
+
+	for (int i = 0; i < def->args_len; i++) {
+		char *name = strdup(def->args[i].name);
+		if (!name) {
+			return -1;
+		}
+		var_table_add(&def->var_table, def->args[i].type, name);
 	}
 
 	if (build_function_def_return(node, src, def)) {

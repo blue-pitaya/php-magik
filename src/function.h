@@ -27,6 +27,17 @@ enum php_type {
 
 extern const char *php_type_str[];
 
+struct var_entry {
+	enum php_type type;
+	char *name;
+};
+
+struct var_table {
+	struct var_entry *entries;
+	int len;
+	int cap;
+};
+
 struct function_argument_def {
 	enum php_type type;
 	char *name;
@@ -37,6 +48,7 @@ struct function_def {
 	struct function_argument_def *args;
 	size_t args_len;
 	enum php_type return_type;
+	struct var_table var_table;
 };
 
 int build_function_def(TSNode node, const char *src, struct function_def *def);
