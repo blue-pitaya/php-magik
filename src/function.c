@@ -216,13 +216,26 @@ static int build_function_def_return(TSNode node, const char *src,
 	}
 
 	TSTreeCursor cursor = ts_tree_cursor_new(body);
-	def->return_type = PHP_TYPE_VOID;
 	do {
-		TSNode node = ts_tree_cursor_current_node(&cursor);
-		if (!strcmp(ts_node_type(node), "return_statement")) {
-			parse_return_statement_type(node, src, def);
-			goto done;
+		TSNode n = ts_tree_cursor_current_node(&cursor);
+		const char *type = ts_node_type(n);
+
+		if (!strcmp(type, "assignment_expression")) {
+			TSNode left = ts_node_child_by_field_name(
+				n, "left", sizeof("left") - 1);
+			TSNode right = ts_node_child_by_field_name(
+				n, "right", sizeof("right") - 1);
+			char *name = node_text(left, src);
+			if (name) {
+				enum php_type t =
+					resolve_expr_type(right, src, def);
+				var_table_add(&def->var_table, t, name);
+				free(name);
+			}
+		} else if (!strcmp(type, "return_statement")) {
+			parse_return_statement_type(n, src, def);
 		}
+
 		if (ts_tree_cursor_goto_first_child(&cursor)) {
 			continue;
 		}
