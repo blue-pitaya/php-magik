@@ -1,11 +1,11 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
-#include <stddef.h>
+#include "vector.h"
 #include <tree_sitter/api.h>
 
 // https://www.php.net/manual/en/language.types.type-system.php
-enum php_type {
+enum php_native_type {
 	// Scalar
 	PHP_TYPE_BOOL,
 	PHP_TYPE_INT,
@@ -25,32 +25,21 @@ enum php_type {
 	PHP_TYPE_USER_DEFINED
 };
 
-extern const char *php_type_str[];
+extern const char *php_native_type_str[];
 
-struct var_entry {
-	enum php_type type;
+struct php_var {
 	char *name;
+	enum php_native_type type;
 };
 
-struct var_table {
-	struct var_entry *entries;
-	int len;
-	int cap;
-};
-
-struct function_argument_def {
-	enum php_type type;
+struct php_function {
 	char *name;
+	struct vec args; /**< of: struct php_var */
+	enum php_native_type return_type;
 };
 
-struct function_def {
-	char *name;
-	struct function_argument_def *args;
-	size_t args_len;
-	enum php_type return_type;
-	struct var_table var_table;
-};
+//FIXME: init and free
 
-int build_function_def(TSNode node, const char *src, struct function_def *def);
+int parse_function(TSNode node, const char *src, struct php_function *def);
 
 #endif

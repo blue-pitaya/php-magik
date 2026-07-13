@@ -1,4 +1,5 @@
 #include "debug.h"
+#include "vector.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <stddef.h>
@@ -13,70 +14,42 @@
 const TSLanguage *tree_sitter_php_only(void);
 
 struct ctx {
-	struct function_def *function_defs;
-	size_t function_defs_len;
-	size_t function_defs_capacity;
+	struct vec php_functions;
+};
+
+enum scan_mode {
+	scan_file,
+	scan_dir,
 };
 
 int ctx_init(struct ctx *ctx)
 {
-	ctx->function_defs_len = 0;
-	ctx->function_defs_capacity = 64;
-	ctx->function_defs = malloc(ctx->function_defs_capacity *
-				    sizeof(*ctx->function_defs));
-	if (!ctx->function_defs) {
+	if (vec_init(&ctx->php_functions, sizeof(struct php_function))) {
 		return -1;
 	}
 
 	return 0;
 }
 
+//FIXME:
 void ctx_free(struct ctx *ctx)
 {
-	for (size_t i = 0; i < ctx->function_defs_len; i++) {
-		struct function_def *f = &ctx->function_defs[i];
-		for (size_t j = 0; j < f->args_len; j++) {
-			free(f->args[j].name);
-		}
-		free(f->args);
-	}
-	free(ctx->function_defs);
-}
-
-int ctx_add_function_def(struct ctx *ctx, const struct function_def *def)
-{
-	if (ctx->function_defs_len == ctx->function_defs_capacity) {
-		size_t new_cap = ctx->function_defs_capacity * 2;
-		struct function_def *tmp =
-			realloc(ctx->function_defs, new_cap * sizeof(*tmp));
-		if (!tmp) {
-			return -1;
-		}
-		ctx->function_defs = tmp;
-		ctx->function_defs_capacity = new_cap;
-	}
-	ctx->function_defs[ctx->function_defs_len++] = *def;
-
-	return 0;
+	vec_free(&ctx->php_functions);
 }
 
 void ctx_print(struct ctx *ctx)
 {
-	for (int i = 0; i < ctx->function_defs_len; i++) {
-		const struct function_def def = ctx->function_defs[i];
-		printf("%s: ", def.name);
-		for (int j = 0; j < def.args_len; j++) {
-			const struct function_argument_def arg = def.args[j];
-			printf("(%s %s) ", php_type_str[arg.type], arg.name);
+	for (int i = 0; i < ctx->php_functions.len; i++) {
+		struct php_function *def = vec_get(&ctx->php_functions, i);
+		printf("%s: ", def->name);
+		for (int j = 0; j < def->args.len; j++) {
+			struct php_var *arg = vec_get(&def->args, i);
+			printf("(%s %s) ", php_native_type_str[arg->type],
+			       arg->name);
 		}
-		printf("-> (%s)\n", php_type_str[def.return_type]);
+		printf("-> (%s)\n", php_native_type_str[def->return_type]);
 	}
 }
-
-enum scan_mode {
-	scan_file,
-	scan_dir,
-};
 
 char *read_file(const char *path, size_t *len)
 {
@@ -140,14 +113,11 @@ int walk(TSTreeCursor *cursor, const char *src, struct ctx *ctx)
 		const char *type = ts_node_type(node);
 		if (!strcmp(type, "function_definition") ||
 		    !strcmp(type, "method_declaration")) {
-			struct function_def def = { 0 };
-			if (build_function_def(node, src, &def)) {
+			struct php_function def = { 0 };
+			if (parse_function(node, src, &def)) {
 				return -1;
 			}
-			if (ctx_add_function_def(ctx, &def)) {
-				//TODO: free def!
-				return -1;
-			}
+			vec_push(&ctx->php_functions, &def);
 		}
 		if (ts_tree_cursor_goto_first_child(cursor)) {
 			continue;

@@ -1,9 +1,10 @@
 #include "function.h"
+#include "vector.h"
 #include <stdlib.h>
 #include <string.h>
 #include <tree_sitter/api.h>
 
-const char *php_type_str[] = {
+const char *php_native_type_str[] = {
 	[PHP_TYPE_BOOL] = "bool",
 	[PHP_TYPE_INT] = "int",
 	[PHP_TYPE_FLOAT] = "float",
@@ -20,62 +21,58 @@ const char *php_type_str[] = {
 	[PHP_TYPE_USER_DEFINED] = "user_defined",
 };
 
-static int var_table_add(struct var_table *t, enum php_type type,
-			 const char *name)
+static void node_span(TSNode node, const char *src, const char **out_text,
+		      uint32_t *out_len)
 {
-	if (t->len == t->cap) {
-		int new_cap = t->cap ? t->cap * 2 : 16;
-		struct var_entry *tmp =
-			realloc(t->entries, new_cap * sizeof(*tmp));
-		if (!tmp) {
-			return -1;
-		}
-		t->entries = tmp;
-		t->cap = new_cap;
-	}
-
-	t->entries[t->len].name = strdup(name);
-	if (!t->entries[t->len].name) {
-		return -1;
-	}
-	t->entries[t->len].type = type;
-	t->len++;
-
-	return 0;
+	uint32_t start = ts_node_start_byte(node);
+	*out_len = ts_node_end_byte(node) - start;
+	*out_text = src + start;
 }
 
-static enum php_type var_table_lookup_type(struct var_table *t,
-					   const char *name)
+static char *node_text(TSNode node, const char *src)
 {
-	for (int i = 0; i < t->len; i++) {
-		if (!strcmp(t->entries[i].name, name)) {
-			return t->entries[i].type;
+	const char *text;
+	uint32_t len;
+	node_span(node, src, &text, &len);
+	char *s = malloc(len + 1);
+	if (!s) {
+		return NULL;
+	}
+	memcpy(s, text, len);
+	s[len] = '\0';
+	return s;
+}
+
+static enum php_native_type parse_literal_type(TSNode literal_type_node,
+					       const char *src)
+{
+	if (ts_node_is_null(literal_type_node)) {
+		return PHP_TYPE_MIXED;
+	}
+
+	const char *text;
+	uint32_t len;
+	node_span(literal_type_node, src, &text, &len);
+	for (size_t i = 0;
+	     i < sizeof(php_native_type_str) / sizeof(*php_native_type_str);
+	     i++) {
+		if (strlen(php_native_type_str[i]) == len &&
+		    !memcmp(php_native_type_str[i], text, len)) {
+			return (enum php_native_type)i;
 		}
 	}
 
 	return PHP_TYPE_MIXED;
 }
 
-static char *node_text(TSNode node, const char *src)
+static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
+					      struct vec *vars)
 {
-	uint32_t start = ts_node_start_byte(node);
-	uint32_t end = ts_node_end_byte(node);
-	uint32_t len = end - start;
-
-	char *s = malloc(len + 1);
-	if (!s) {
-		return NULL;
+	if (ts_node_is_null(expr_node)) {
+		return PHP_TYPE_MIXED;
 	}
 
-	memcpy(s, src + start, len);
-	s[len] = '\0';
-	return s;
-}
-
-static enum php_type resolve_expr_type(TSNode expr, const char *src,
-				       struct function_def *def)
-{
-	const char *type = ts_node_type(expr);
+	const char *type = ts_node_type(expr_node);
 	if (!strcmp(type, "integer")) {
 		return PHP_TYPE_INT;
 	}
@@ -92,12 +89,12 @@ static enum php_type resolve_expr_type(TSNode expr, const char *src,
 		return PHP_TYPE_NULL;
 	}
 	if (!strcmp(type, "binary_expression")) {
-		TSNode left = ts_node_child_by_field_name(expr, "left",
+		TSNode left = ts_node_child_by_field_name(expr_node, "left",
 							  sizeof("left") - 1);
-		TSNode right = ts_node_child_by_field_name(expr, "right",
+		TSNode right = ts_node_child_by_field_name(expr_node, "right",
 							   sizeof("right") - 1);
-		enum php_type lt = resolve_expr_type(left, src, def);
-		enum php_type rt = resolve_expr_type(right, src, def);
+		enum php_native_type lt = resolve_expr_type(left, src, vars);
+		enum php_native_type rt = resolve_expr_type(right, src, vars);
 		if (lt == rt) {
 			return lt;
 		}
@@ -108,68 +105,49 @@ static enum php_type resolve_expr_type(TSNode expr, const char *src,
 		return PHP_TYPE_MIXED;
 	}
 	if (!strcmp(type, "parenthesized_expression")) {
-		return resolve_expr_type(ts_node_child(expr, 1), src, def);
+		return resolve_expr_type(ts_node_child(expr_node, 1), src,
+					 vars);
 	}
 	if (!strcmp(type, "variable_name")) {
-		char *name = node_text(expr, src);
+		char *name = node_text(expr_node, src);
 		if (!name) {
 			return PHP_TYPE_MIXED;
 		}
-		enum php_type t = var_table_lookup_type(&def->var_table, name);
+
+		struct php_var var;
+		for (int i = 0; i < vars->len; i++) {
+			var = *(struct php_var *)vec_get(vars, i);
+			if (!strcmp(var.name, name)) {
+				free(name);
+				return var.type;
+			}
+		}
+
 		free(name);
-		return t;
-	}
-
-	return PHP_TYPE_MIXED;
-}
-
-static enum php_type parse_type(TSNode node, const char *src)
-{
-	if (ts_node_is_null(node)) {
 		return PHP_TYPE_MIXED;
 	}
 
-	const char *t = ts_node_type(node);
-
-	uint32_t start = ts_node_start_byte(node);
-	uint32_t end = ts_node_end_byte(node);
-	uint32_t len = end - start;
-	const char *text = src + start;
-
-	for (size_t i = 0; i < sizeof(php_type_str) / sizeof(*php_type_str);
-	     i++) {
-		if (strlen(php_type_str[i]) == len &&
-		    !memcmp(php_type_str[i], text, len)) {
-			return (enum php_type)i;
-		}
-	}
-
 	return PHP_TYPE_MIXED;
 }
 
-static int build_function_def_args(TSNode node, const char *src,
-				   struct function_def *def)
+static int parse_function_args(TSNode function_node, const char *src,
+			       struct php_function *def)
 {
-	TSNode params = ts_node_child_by_field_name(node, "parameters",
+	if (vec_init(&def->args, sizeof(struct php_var))) {
+		return -1;
+	}
+
+	TSNode params = ts_node_child_by_field_name(function_node, "parameters",
 						    sizeof("parameters") - 1);
 	if (ts_node_is_null(params)) {
 		return -1;
 	}
 
 	uint32_t count = ts_node_named_child_count(params);
-	if (count == 0) {
-		return 0;
-	}
-
-	def->args = malloc(count * sizeof(*def->args));
-	if (!def->args) {
-		return -1;
-	}
-
 	for (uint32_t i = 0; i < count; i++) {
 		TSNode param = ts_node_named_child(params, i);
 		if (strcmp(ts_node_type(param), "simple_parameter")) {
-			return -1;
+			goto fail;
 		}
 
 		TSNode type_node = ts_node_child_by_field_name(
@@ -177,23 +155,36 @@ static int build_function_def_args(TSNode node, const char *src,
 		TSNode param_name = ts_node_child_by_field_name(
 			param, "name", sizeof("name") - 1);
 		if (ts_node_is_null(param_name)) {
-			return -1;
+			goto fail;
 		}
 
-		def->args[def->args_len].type = parse_type(type_node, src);
-		def->args[def->args_len].name = node_text(param_name, src);
-		if (!def->args[def->args_len].name) {
-			return -1;
+		struct php_var arg = {
+			.type = parse_literal_type(type_node, src),
+			.name = node_text(param_name, src),
+		};
+		if (!arg.name) {
+			goto fail;
 		}
 
-		def->args_len++;
+		if (vec_push(&def->args, &arg)) {
+			free(arg.name);
+			goto fail;
+		}
 	}
 
 	return 0;
+fail:
+	for (int i = 0; i < def->args.len; i++) {
+		struct php_var *v = vec_get(&def->args, i);
+		free(v->name);
+	}
+	vec_free(&def->args);
+	return -1;
 }
 
 static int parse_return_statement_type(TSNode ret_smt_node, const char *src,
-				       struct function_def *def)
+				       struct php_function *def,
+				       struct vec *vars)
 {
 	TSNode expr = ts_node_child(ret_smt_node, 1);
 	if (ts_node_is_null(expr)) {
@@ -201,16 +192,17 @@ static int parse_return_statement_type(TSNode ret_smt_node, const char *src,
 		return 0;
 	}
 
-	def->return_type = resolve_expr_type(expr, src, def);
+	def->return_type = resolve_expr_type(expr, src, vars);
 
 	return 0;
 }
 
-static int build_function_def_return(TSNode node, const char *src,
-				     struct function_def *def)
+static int parse_function_return_type(TSNode function_node, const char *src,
+				      struct php_function *def,
+				      struct vec *vars)
 {
-	TSNode body =
-		ts_node_child_by_field_name(node, "body", sizeof("body") - 1);
+	TSNode body = ts_node_child_by_field_name(function_node, "body",
+						  sizeof("body") - 1);
 	if (ts_node_is_null(body)) {
 		return -1;
 	}
@@ -227,13 +219,16 @@ static int build_function_def_return(TSNode node, const char *src,
 				n, "right", sizeof("right") - 1);
 			char *name = node_text(left, src);
 			if (name) {
-				enum php_type t =
-					resolve_expr_type(right, src, def);
-				var_table_add(&def->var_table, t, name);
+				struct php_var var = {
+					.name = name,
+					.type = resolve_expr_type(right, src,
+								  vars),
+				};
+				vec_push(vars, &var);
 				free(name);
 			}
 		} else if (!strcmp(type, "return_statement")) {
-			parse_return_statement_type(n, src, def);
+			parse_return_statement_type(n, src, def, vars);
 		}
 
 		if (ts_tree_cursor_goto_first_child(&cursor)) {
@@ -252,8 +247,7 @@ done:
 	return 0;
 }
 
-//TODO: not all is free on error
-int build_function_def(TSNode node, const char *src, struct function_def *def)
+int parse_function(TSNode node, const char *src, struct php_function *def)
 {
 	TSNode name_node =
 		ts_node_child_by_field_name(node, "name", sizeof("name") - 1);
@@ -266,21 +260,22 @@ int build_function_def(TSNode node, const char *src, struct function_def *def)
 		goto error;
 	}
 
-	if (build_function_def_args(node, src, def)) {
+	if (parse_function_args(node, src, def)) {
 		goto free_name;
 	}
 
-	for (int i = 0; i < def->args_len; i++) {
-		char *name = strdup(def->args[i].name);
-		if (!name) {
-			return -1;
-		}
-		var_table_add(&def->var_table, def->args[i].type, name);
+	struct vec vars;
+	vec_init(&vars, sizeof(struct php_var));
+	for (int i = 0; i < def->args.len; i++) {
+		struct php_var *var = vec_get(&def->args, i);
+		vec_push(&vars, var);
 	}
 
-	if (build_function_def_return(node, src, def)) {
+	if (parse_function_return_type(node, src, def, &vars)) {
 		goto free_name;
 	}
+
+	vec_free(&vars);
 
 	return 0;
 
