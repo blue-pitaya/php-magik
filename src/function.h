@@ -2,6 +2,7 @@
 #define FUNCTION_H
 
 #include "vector.h"
+#include "parser.h"
 #include <tree_sitter/api.h>
 
 // https://www.php.net/manual/en/language.types.type-system.php
@@ -33,13 +34,17 @@ struct php_var {
 };
 
 struct php_function {
+	char *ns; /**< Can be null */
+	char *class_name; /**< Can be null */
 	char *name;
 	struct vec args; /**< of: struct php_var */
 	enum php_native_type return_type;
 };
 
-//FIXME: init and free
+int php_function_init(struct php_function *f);
+void php_function_free(struct php_function *f);
 
-int parse_function(TSNode node, const char *src, struct php_function *def);
+int parse_function(TSNode node, const char *src, struct php_function *def,
+		   struct parser_ctx p_ctx);
 
 #endif

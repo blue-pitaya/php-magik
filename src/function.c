@@ -1,4 +1,5 @@
 #include "function.h"
+#include "parser.h"
 #include "vector.h"
 #include <stdlib.h>
 #include <string.h>
@@ -21,26 +22,29 @@ const char *php_native_type_str[] = {
 	[PHP_TYPE_USER_DEFINED] = "user_defined",
 };
 
-static void node_span(TSNode node, const char *src, const char **out_text,
-		      uint32_t *out_len)
+int php_function_init(struct php_function *f)
 {
-	uint32_t start = ts_node_start_byte(node);
-	*out_len = ts_node_end_byte(node) - start;
-	*out_text = src + start;
+	f->ns = NULL;
+	f->class_name = NULL;
+	f->name = NULL;
+	if (vec_init(&f->args, sizeof(struct php_var))) {
+		return -1;
+	}
+	f->return_type = PHP_TYPE_MIXED;
+
+	return 0;
 }
 
-static char *node_text(TSNode node, const char *src)
+void php_function_free(struct php_function *f)
 {
-	const char *text;
-	uint32_t len;
-	node_span(node, src, &text, &len);
-	char *s = malloc(len + 1);
-	if (!s) {
-		return NULL;
+	free(f->ns);
+	free(f->class_name);
+	free(f->name);
+	for (int i = 0; i < f->args.len; i++) {
+		struct php_var *v = vec_get(&f->args, i);
+		free(v->name);
 	}
-	memcpy(s, text, len);
-	s[len] = '\0';
-	return s;
+	vec_free(&f->args);
 }
 
 static enum php_native_type parse_literal_type(TSNode literal_type_node,
@@ -133,6 +137,7 @@ static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
 static int parse_function_args(TSNode function_node, const char *src,
 			       struct php_function *def)
 {
+	//FIXME:
 	if (vec_init(&def->args, sizeof(struct php_var))) {
 		return -1;
 	}
@@ -247,8 +252,13 @@ done:
 	return 0;
 }
 
-int parse_function(TSNode node, const char *src, struct php_function *def)
+int parse_function(TSNode node, const char *src, struct php_function *def,
+		   struct parser_ctx p_ctx)
 {
+	def->ns = p_ctx.ns ? strdup(p_ctx.ns) : NULL;
+	def->class_name = p_ctx.current_class ? strdup(p_ctx.current_class) :
+						NULL;
+
 	TSNode name_node =
 		ts_node_child_by_field_name(node, "name", sizeof("name") - 1);
 	if (ts_node_is_null(name_node)) {

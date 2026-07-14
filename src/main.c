@@ -1,4 +1,5 @@
 #include "debug.h"
+#include "parser.h"
 #include "vector.h"
 #include <dirent.h>
 #include <fcntl.h>
@@ -41,6 +42,11 @@ void ctx_print(struct ctx *ctx)
 {
 	for (int i = 0; i < ctx->php_functions.len; i++) {
 		struct php_function *def = vec_get(&ctx->php_functions, i);
+
+		if (def->ns) {
+			printf("%s::", def->ns);
+		}
+
 		printf("%s: ", def->name);
 		for (int j = 0; j < def->args.len; j++) {
 			struct php_var *arg = vec_get(&def->args, i);
@@ -106,19 +112,48 @@ char *parse_args(int args, char **argv, enum scan_mode *sm)
 	return path;
 }
 
+int parse_namespace_definition(TSNode node, const char *src, char **out_name)
+{
+	TSNode name_node =
+		ts_node_child_by_field_name(node, "name", sizeof("name") - 1);
+	if (ts_node_is_null(name_node)) {
+		return -1;
+	}
+
+	char *text = node_text(name_node, src);
+	if (!text) {
+		return -1;
+	}
+
+	*out_name = text;
+
+	return 0;
+}
+
 int walk(TSTreeCursor *cursor, const char *src, struct ctx *ctx)
 {
+	struct php_function def;
+	struct parser_ctx p_ctx = { 0 }; //FIXME: remove {0}
+
 	do {
 		TSNode node = ts_tree_cursor_current_node(cursor);
 		const char *type = ts_node_type(node);
+
+		if (!strcmp(type, "namespace_definition")) {
+			if (parse_namespace_definition(node, src, &p_ctx.ns)) {
+				return -1;
+			}
+		}
+
 		if (!strcmp(type, "function_definition") ||
 		    !strcmp(type, "method_declaration")) {
-			struct php_function def = { 0 };
-			if (parse_function(node, src, &def)) {
+			php_function_init(&def);
+			if (parse_function(node, src, &def, p_ctx)) {
 				return -1;
 			}
 			vec_push(&ctx->php_functions, &def);
 		}
+
 		if (ts_tree_cursor_goto_first_child(cursor)) {
 			continue;
 		}
@@ -170,7 +205,7 @@ int scan(const char *path, struct ctx *ctx)
 
 	TSNode root = ts_tree_root_node(tree);
 
-	//debug_node(root);
+	debug_node(root);
 
 	TSTreeCursor cursor = ts_tree_cursor_new(root);
 	walk(&cursor, content, ctx);
