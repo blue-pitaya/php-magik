@@ -170,7 +170,7 @@ int scan(const char *path, struct ctx *ctx)
 
 	TSNode root = ts_tree_root_node(tree);
 
-	debug_node(root);
+	//debug_node(root);
 
 	TSTreeCursor cursor = ts_tree_cursor_new(root);
 	walk(&cursor, content, ctx);

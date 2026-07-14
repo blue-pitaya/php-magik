@@ -1,0 +1,3 @@
+zero: -> (int)
+zerof: -> (float)
+empty_string: -> (string)
