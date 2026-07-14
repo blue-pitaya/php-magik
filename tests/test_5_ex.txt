@@ -1,1 +1,3 @@
-\App\Example\Foo::print (int $a) -> (int)
+App\Example\Foo::print: (int $a) -> (int)
+App\Example\Foo::bar: -> (string)
+App\Example\Baz::ok: -> (float)

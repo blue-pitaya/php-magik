@@ -42,9 +42,22 @@ void ctx_print(struct ctx *ctx)
 {
 	for (int i = 0; i < ctx->php_functions.len; i++) {
 		struct php_function *def = vec_get(&ctx->php_functions, i);
+		bool has_ns_prefix = false;
+		bool has_cls_prefix = false;
 
 		if (def->ns) {
-			printf("%s::", def->ns);
+			printf("%s", def->ns);
+			has_ns_prefix = true;
+		}
+		if (def->class_name) {
+			if (has_ns_prefix) {
+				printf("\\");
+			}
+			printf("%s", def->class_name);
+			bool has_cls_prefix = true;
+		}
+		if (has_ns_prefix || has_cls_prefix) {
+			printf("::");
 		}
 
 		printf("%s: ", def->name);
@@ -130,6 +143,24 @@ int parse_namespace_definition(TSNode node, const char *src, char **out_name)
 	return 0;
 }
 
+int parse_class_declaration(TSNode node, const char *src, char **out_name)
+{
+	TSNode name_node =
+		ts_node_child_by_field_name(node, "name", sizeof("name") - 1);
+	if (ts_node_is_null(name_node)) {
+		return -1;
+	}
+
+	char *text = node_text(name_node, src);
+	if (!text) {
+		return -1;
+	}
+
+	*out_name = text;
+
+	return 0;
+}
+
 int walk(TSTreeCursor *cursor, const char *src, struct ctx *ctx)
 {
 	struct php_function def;
@@ -141,6 +172,12 @@ int walk(TSTreeCursor *cursor, const char *src, struct ctx *ctx)
 
 		if (!strcmp(type, "namespace_definition")) {
 			if (parse_namespace_definition(node, src, &p_ctx.ns)) {
+				return -1;
+			}
+		}
+		if (!strcmp(type, "class_declaration")) {
+			if (parse_class_declaration(node, src,
+						    &p_ctx.current_class)) {
 				return -1;
 			}
 		}
@@ -205,7 +242,7 @@ int scan(const char *path, struct ctx *ctx)
 
 	TSNode root = ts_tree_root_node(tree);
 
-	debug_node(root);
+	//debug_node(root);
 
 	TSTreeCursor cursor = ts_tree_cursor_new(root);
 	walk(&cursor, content, ctx);

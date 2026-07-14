@@ -10,4 +10,17 @@ class Foo
 
         return $b;
     }
+
+    public function bar()
+    {
+        return 'ok';
+    }
+}
+
+class Baz
+{
+    private function ok()
+    {
+        return 1.2;
+    }
 }
