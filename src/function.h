@@ -40,6 +40,6 @@ int php_function_init(struct php_function *f);
 void php_function_free(struct php_function *f);
 
 int parse_function(TSNode node, const char *src, struct php_function *def,
-		   struct owner_class p_ctx, struct app_ctx *app_ctx);
+		   struct app_ctx *app_ctx);
 
 #endif

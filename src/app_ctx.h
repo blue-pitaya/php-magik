@@ -23,6 +23,10 @@
 struct app_ctx {
 	struct vec php_functions; /**< of: struct php_function */
 	struct vec php_vars; /**< of: struct php_var_refdef */
+	// Parsing
+	char *parsing_file_path;
+	char *parsing_ns;
+	char *parsing_class_name;
 };
 
 int app_ctx_init(struct app_ctx *ctx);

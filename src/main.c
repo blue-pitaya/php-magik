@@ -102,24 +102,23 @@ int parse_class_declaration(TSNode node, const char *src, char **out_name)
 	return 0;
 }
 
-int walk(TSTreeCursor *cursor, const char *src, struct vec *php_functions,
-	 struct app_ctx *app_ctx)
+int walk(TSTreeCursor *cursor, const char *src, struct app_ctx *app_ctx)
 {
 	struct php_function def;
-	struct owner_class p_ctx = { 0 }; //FIXME: remove {0}
 
 	do {
 		TSNode node = ts_tree_cursor_current_node(cursor);
 		const char *type = ts_node_type(node);
 
 		if (!strcmp(type, "namespace_definition")) {
-			if (parse_namespace_definition(node, src, &p_ctx.ns)) {
+			if (parse_namespace_definition(node, src,
+						       &app_ctx->parsing_ns)) {
 				return -1;
 			}
 		}
 		if (!strcmp(type, "class_declaration")) {
-			if (parse_class_declaration(node, src,
-						    &p_ctx.class_name)) {
+			if (parse_class_declaration(
+				    node, src, &app_ctx->parsing_class_name)) {
 				return -1;
 			}
 		}
@@ -127,10 +126,10 @@ int walk(TSTreeCursor *cursor, const char *src, struct vec *php_functions,
 		if (!strcmp(type, "function_definition") ||
 		    !strcmp(type, "method_declaration")) {
 			php_function_init(&def);
-			if (parse_function(node, src, &def, p_ctx, app_ctx)) {
+			if (parse_function(node, src, &def, app_ctx)) {
 				return -1;
 			}
-			vec_push(php_functions, &def);
+			vec_push(&app_ctx->php_functions, &def);
 		}
 
 		if (ts_tree_cursor_goto_first_child(cursor)) {
@@ -174,43 +173,43 @@ int load_tree(const char *path, struct TSTree **out_tree, char **out_content)
 	return 0;
 }
 
-int scan(const char *path, struct app_ctx *app_ctx)
+int scan(struct app_ctx *app_ctx)
 {
 	TSTree *tree;
 	char *content;
-	if (load_tree(path, &tree, &content)) {
+	if (load_tree(app_ctx->parsing_file_path, &tree, &content)) {
 		return -1;
 	}
 
 	TSNode root = ts_tree_root_node(tree);
 
-	//debug_node(root);
-
 	TSTreeCursor cursor = ts_tree_cursor_new(root);
-	walk(&cursor, content, &app_ctx->php_functions, app_ctx);
+	walk(&cursor, content, app_ctx);
 
 	app_ctx_print(app_ctx);
 
 	ts_tree_cursor_delete(&cursor);
 	ts_tree_delete(tree);
 	free(content);
-
 	return 0;
 }
 
 int main(int argc, char *argv[])
 {
-	char *scan_file = NULL;
-
 	static struct option long_opts[] = {
 		{ "scan-file", required_argument, 0, 's' }, { 0, 0, 0, 0 }
 	};
+
+	struct app_ctx app_ctx;
+	if (app_ctx_init(&app_ctx)) {
+		return 1;
+	}
 
 	int c;
 	while ((c = getopt_long(argc, argv, "", long_opts, NULL)) != -1) {
 		switch (c) {
 		case 's':
-			scan_file = optarg;
+			app_ctx.parsing_file_path = optarg;
 			break;
 		default:
 			fprintf(stderr, "usage: %s --scan-file <filename>\n",
@@ -219,21 +218,12 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (!scan_file) {
+	if (!app_ctx.parsing_file_path) {
 		fprintf(stderr, "error: --scan-file is required\n");
 		return 1;
 	}
 
-	struct app_ctx *app_ctx = malloc(sizeof(*app_ctx));
-	if (!app_ctx) {
-		return 1;
-	}
-
-	if (app_ctx_init(app_ctx)) {
-		return 1;
-	}
-
-	if (scan(scan_file, app_ctx)) {
+	if (scan(&app_ctx)) {
 		fprintf(stderr, "scan error\n");
 		return 1;
 	}

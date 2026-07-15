@@ -30,6 +30,10 @@ int app_ctx_init(struct app_ctx *ctx)
 		return -1;
 	}
 
+	ctx->parsing_file_path = NULL;
+	ctx->parsing_ns = NULL;
+	ctx->parsing_class_name = NULL;
+
 	return 0;
 }
 
@@ -43,6 +47,10 @@ void app_ctx_free(struct app_ctx *ctx)
 		php_function_free(&ctx->php_vars.data[i]);
 	}
 	vec_free(&ctx->php_vars);
+
+	free(ctx->parsing_file_path);
+	free(ctx->parsing_ns);
+	free(ctx->parsing_class_name);
 }
 
 void app_ctx_print(struct app_ctx *ctx)

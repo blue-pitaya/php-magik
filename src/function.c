@@ -70,6 +70,7 @@ static enum php_native_type parse_literal_type(TSNode literal_type_node,
 	return PHP_TYPE_MIXED;
 }
 
+//FIXME: maybe move it to var.c and handle ud_* fields
 static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
 					      struct app_ctx *app_ctx)
 {
@@ -211,37 +212,56 @@ static int parse_return_statement_type(TSNode ret_smt_node, const char *src,
 	return 0;
 }
 
-static int parse_function_return_type(TSNode function_node, const char *src,
-				      struct php_function *def,
-				      struct app_ctx *app_ctx)
+static int parse_assignment_expression(TSNode node, const char *src,
+				       struct php_function *def,
+				       struct app_ctx *app_ctx)
 {
-	TSNode body = ts_node_child_by_field_name(function_node, "body",
-						  sizeof("body") - 1);
+	TSNode l_node = get_ts_node_child_by_field_name(node, "left");
+	TSNode r_node = get_ts_node_child_by_field_name(node, "right");
+
+	struct php_var_refdef var;
+	php_var_refdef_init(&var);
+	var.name = node_text(l_node, src);
+	if (!var.name) {
+		return -1;
+	}
+	var.kind = PHP_VAR_KIND_LOCAL_DEF;
+	var.type = resolve_expr_type(r_node, src, app_ctx);
+	vec_push(&app_ctx->php_vars, &var);
+
+	return 0;
+}
+
+static int parse_function_body(TSNode function_node, const char *src,
+			       struct php_function *def,
+			       struct app_ctx *app_ctx)
+{
+	TSNode body;
+	TSTreeCursor cursor;
+	TSNode curr_node;
+	const char *node_type;
+
+	body = get_ts_node_child_by_field_name(function_node, "body");
 	if (ts_node_is_null(body)) {
 		return -1;
 	}
 
-	TSTreeCursor cursor = ts_tree_cursor_new(body);
+	cursor = ts_tree_cursor_new(body);
 	do {
-		TSNode n = ts_tree_cursor_current_node(&cursor);
-		const char *type = ts_node_type(n);
+		curr_node = ts_tree_cursor_current_node(&cursor);
+		node_type = ts_node_type(curr_node);
 
-		if (!strcmp(type, "assignment_expression")) {
-			TSNode left =
-				get_ts_node_child_by_field_name(n, "left");
-			TSNode right =
-				get_ts_node_child_by_field_name(n, "right");
-			char *name = node_text(left, src);
-			if (name) {
-				struct php_var_refdef var;
-				php_var_refdef_init(&var);
-				var.name = name;
-				var.type =
-					resolve_expr_type(right, src, app_ctx);
-				vec_push(&app_ctx->php_vars, &var);
+		if (!strcmp(node_type, "assignment_expression")) {
+			if (parse_assignment_expression(curr_node, src, def,
+							app_ctx)) {
+				goto error;
 			}
-		} else if (!strcmp(type, "return_statement")) {
-			parse_return_statement_type(n, src, def, app_ctx);
+		}
+		if (!strcmp(node_type, "return_statement")) {
+			if (parse_return_statement_type(curr_node, src, def,
+							app_ctx)) {
+				goto error;
+			}
 		}
 
 		if (ts_tree_cursor_goto_first_child(&cursor)) {
@@ -254,17 +274,21 @@ static int parse_function_return_type(TSNode function_node, const char *src,
 		}
 	} while (1);
 
+error:
+	ts_tree_cursor_delete(&cursor);
+	return -1;
 done:
 	ts_tree_cursor_delete(&cursor);
-
 	return 0;
 }
 
 int parse_function(TSNode node, const char *src, struct php_function *f,
-		   struct owner_class p_ctx, struct app_ctx *app_ctx)
+		   struct app_ctx *app_ctx)
 {
-	f->ns = p_ctx.ns ? strdup(p_ctx.ns) : NULL;
-	f->class_name = p_ctx.class_name ? strdup(p_ctx.class_name) : NULL;
+	f->ns = app_ctx->parsing_ns ? strdup(app_ctx->parsing_ns) : NULL;
+	f->class_name = app_ctx->parsing_class_name ?
+				strdup(app_ctx->parsing_class_name) :
+				NULL;
 
 	TSNode name_node = get_ts_node_child_by_field_name(node, "name");
 	if (ts_node_is_null(name_node)) {
@@ -281,7 +305,7 @@ int parse_function(TSNode node, const char *src, struct php_function *f,
 		return -1;
 	}
 
-	if (parse_function_return_type(node, src, f, app_ctx)) {
+	if (parse_function_body(node, src, f, app_ctx)) {
 		free(f->name);
 		return -1;
 	}
