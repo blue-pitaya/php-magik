@@ -19,6 +19,6 @@ if __name__ == "__main__":
             print(f"{test}: ERROR")
             print("Expected:")
             print(expected)
-            print("Result:")
+            print("Actual:")
             print(result)
             print("--------")

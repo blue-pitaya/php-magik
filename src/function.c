@@ -1,50 +1,35 @@
 #include "function.h"
+#include "app_ctx.h"
 #include "parser.h"
+#include "var.h"
 #include "vector.h"
 #include <stdlib.h>
 #include <string.h>
 #include <tree_sitter/api.h>
 
-const char *php_native_type_str[] = {
-	[PHP_TYPE_BOOL] = "bool",
-	[PHP_TYPE_INT] = "int",
-	[PHP_TYPE_FLOAT] = "float",
-	[PHP_TYPE_STRING] = "string",
-	[PHP_TYPE_ARRAY] = "array",
-	[PHP_TYPE_OBJECT] = "object",
-	[PHP_TYPE_RESOURCE] = "resource",
-	[PHP_TYPE_NEVER] = "never",
-	[PHP_TYPE_VOID] = "void",
-	[PHP_TYPE_FALSE] = "false",
-	[PHP_TYPE_TRUE] = "true",
-	[PHP_TYPE_NULL] = "null",
-	[PHP_TYPE_MIXED] = "mixed",
-	[PHP_TYPE_USER_DEFINED] = "user_defined",
-};
-
 int php_function_init(struct php_function *f)
 {
-	f->ns = NULL;
-	f->class_name = NULL;
 	f->name = NULL;
-	if (vec_init(&f->args, sizeof(struct php_var))) {
+	if (vec_init(&f->args, sizeof(struct php_var_refdef))) {
 		return -1;
 	}
 	f->return_type = PHP_TYPE_MIXED;
+	f->ud_type_ns = NULL;
+	f->ud_type_cls_name = NULL;
+	f->ns = NULL;
+	f->class_name = NULL;
 
 	return 0;
 }
 
 void php_function_free(struct php_function *f)
 {
+	free(f->name);
+	vec_free(&f->args);
+	free(f->ud_type_ns);
+	free(f->ud_type_cls_name);
 	free(f->ns);
 	free(f->class_name);
-	free(f->name);
-	for (int i = 0; i < f->args.len; i++) {
-		struct php_var *v = vec_get(&f->args, i);
-		free(v->name);
-	}
-	vec_free(&f->args);
 }
 
 static enum php_native_type parse_literal_type(TSNode literal_type_node,
@@ -57,9 +42,7 @@ static enum php_native_type parse_literal_type(TSNode literal_type_node,
 	const char *text;
 	uint32_t len;
 	node_span(literal_type_node, src, &text, &len);
-	for (size_t i = 0;
-	     i < sizeof(php_native_type_str) / sizeof(*php_native_type_str);
-	     i++) {
+	for (size_t i = 0; i < PHP_TYPE_COUNT; i++) {
 		if (strlen(php_native_type_str[i]) == len &&
 		    !memcmp(php_native_type_str[i], text, len)) {
 			return (enum php_native_type)i;
@@ -118,9 +101,9 @@ static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
 			return PHP_TYPE_MIXED;
 		}
 
-		struct php_var var;
+		struct php_var_refdef var;
 		for (int i = 0; i < vars->len; i++) {
-			var = *(struct php_var *)vec_get(vars, i);
+			var = *(struct php_var_refdef *)vec_get(vars, i);
 			if (!strcmp(var.name, name)) {
 				free(name);
 				return var.type;
@@ -135,13 +118,8 @@ static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
 }
 
 static int parse_function_args(TSNode function_node, const char *src,
-			       struct php_function *def)
+			       struct php_function *def, struct app_ctx *ctx)
 {
-	//FIXME:
-	if (vec_init(&def->args, sizeof(struct php_var))) {
-		return -1;
-	}
-
 	TSNode params = ts_node_child_by_field_name(function_node, "parameters",
 						    sizeof("parameters") - 1);
 	if (ts_node_is_null(params)) {
@@ -163,10 +141,11 @@ static int parse_function_args(TSNode function_node, const char *src,
 			goto fail;
 		}
 
-		struct php_var arg = {
-			.type = parse_literal_type(type_node, src),
-			.name = node_text(param_name, src),
-		};
+		struct php_var_refdef arg;
+		php_var_refdef_init(&arg);
+		arg.type = parse_literal_type(type_node, src);
+		arg.name = node_text(param_name, src);
+
 		if (!arg.name) {
 			goto fail;
 		}
@@ -180,7 +159,7 @@ static int parse_function_args(TSNode function_node, const char *src,
 	return 0;
 fail:
 	for (int i = 0; i < def->args.len; i++) {
-		struct php_var *v = vec_get(&def->args, i);
+		struct php_var_refdef *v = vec_get(&def->args, i);
 		free(v->name);
 	}
 	vec_free(&def->args);
@@ -224,11 +203,10 @@ static int parse_function_return_type(TSNode function_node, const char *src,
 				n, "right", sizeof("right") - 1);
 			char *name = node_text(left, src);
 			if (name) {
-				struct php_var var = {
-					.name = name,
-					.type = resolve_expr_type(right, src,
-								  vars),
-				};
+				struct php_var_refdef var;
+				php_var_refdef_init(&var);
+				var.name = name;
+				var.type = resolve_expr_type(right, src, vars);
 				vec_push(vars, &var);
 				free(name);
 			}
@@ -253,11 +231,10 @@ done:
 }
 
 int parse_function(TSNode node, const char *src, struct php_function *def,
-		   struct parser_ctx p_ctx)
+		   struct owner_class p_ctx, struct app_ctx *app_ctx)
 {
 	def->ns = p_ctx.ns ? strdup(p_ctx.ns) : NULL;
-	def->class_name = p_ctx.current_class ? strdup(p_ctx.current_class) :
-						NULL;
+	def->class_name = p_ctx.class_name ? strdup(p_ctx.class_name) : NULL;
 
 	TSNode name_node =
 		ts_node_child_by_field_name(node, "name", sizeof("name") - 1);
@@ -270,12 +247,12 @@ int parse_function(TSNode node, const char *src, struct php_function *def,
 		goto error;
 	}
 
-	if (parse_function_args(node, src, def)) {
+	if (parse_function_args(node, src, def, app_ctx)) {
 		goto free_name;
 	}
 
 	struct vec vars;
-	vec_init(&vars, sizeof(struct php_var));
+	vec_init(&vars, sizeof(struct php_var_refdef));
 	for (int i = 0; i < def->args.len; i++) {
 		struct php_var *var = vec_get(&def->args, i);
 		vec_push(&vars, var);

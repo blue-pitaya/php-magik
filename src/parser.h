@@ -3,9 +3,9 @@
 
 #include <tree_sitter/api.h>
 
-struct parser_ctx {
+struct owner_class {
 	char *ns;
-	char *current_class;
+	char *class_name;
 };
 
 //FIXME: add init free

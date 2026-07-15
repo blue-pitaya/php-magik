@@ -1,4 +1,4 @@
-#include "debug.h"
+#include "app_ctx.h"
 #include "parser.h"
 #include "vector.h"
 #include <dirent.h>
@@ -14,61 +14,10 @@
 
 const TSLanguage *tree_sitter_php_only(void);
 
-struct ctx {
-	struct vec php_functions;
-};
-
 enum scan_mode {
 	scan_file,
 	scan_dir,
 };
-
-int ctx_init(struct ctx *ctx)
-{
-	if (vec_init(&ctx->php_functions, sizeof(struct php_function))) {
-		return -1;
-	}
-
-	return 0;
-}
-
-//FIXME:
-void ctx_free(struct ctx *ctx)
-{
-	vec_free(&ctx->php_functions);
-}
-
-void ctx_print(struct ctx *ctx)
-{
-	for (int i = 0; i < ctx->php_functions.len; i++) {
-		struct php_function *def = vec_get(&ctx->php_functions, i);
-		bool has_ns_prefix = false;
-		bool has_cls_prefix = false;
-
-		if (def->ns) {
-			printf("%s", def->ns);
-			has_ns_prefix = true;
-		}
-		if (def->class_name) {
-			if (has_ns_prefix) {
-				printf("\\");
-			}
-			printf("%s", def->class_name);
-			bool has_cls_prefix = true;
-		}
-		if (has_ns_prefix || has_cls_prefix) {
-			printf("::");
-		}
-
-		printf("%s: ", def->name);
-		for (int j = 0; j < def->args.len; j++) {
-			struct php_var *arg = vec_get(&def->args, i);
-			printf("(%s %s) ", php_native_type_str[arg->type],
-			       arg->name);
-		}
-		printf("-> (%s)\n", php_native_type_str[def->return_type]);
-	}
-}
 
 char *read_file(const char *path, size_t *len)
 {
@@ -161,10 +110,11 @@ int parse_class_declaration(TSNode node, const char *src, char **out_name)
 	return 0;
 }
 
-int walk(TSTreeCursor *cursor, const char *src, struct ctx *ctx)
+int walk(TSTreeCursor *cursor, const char *src, struct vec *php_functions,
+	 struct app_ctx *app_ctx)
 {
 	struct php_function def;
-	struct parser_ctx p_ctx = { 0 }; //FIXME: remove {0}
+	struct owner_class p_ctx = { 0 }; //FIXME: remove {0}
 
 	do {
 		TSNode node = ts_tree_cursor_current_node(cursor);
@@ -177,7 +127,7 @@ int walk(TSTreeCursor *cursor, const char *src, struct ctx *ctx)
 		}
 		if (!strcmp(type, "class_declaration")) {
 			if (parse_class_declaration(node, src,
-						    &p_ctx.current_class)) {
+						    &p_ctx.class_name)) {
 				return -1;
 			}
 		}
@@ -185,10 +135,10 @@ int walk(TSTreeCursor *cursor, const char *src, struct ctx *ctx)
 		if (!strcmp(type, "function_definition") ||
 		    !strcmp(type, "method_declaration")) {
 			php_function_init(&def);
-			if (parse_function(node, src, &def, p_ctx)) {
+			if (parse_function(node, src, &def, p_ctx, app_ctx)) {
 				return -1;
 			}
-			vec_push(&ctx->php_functions, &def);
+			vec_push(php_functions, &def);
 		}
 
 		if (ts_tree_cursor_goto_first_child(cursor)) {
@@ -232,7 +182,7 @@ int load_tree(const char *path, struct TSTree **out_tree, char **out_content)
 	return 0;
 }
 
-int scan(const char *path, struct ctx *ctx)
+int scan(const char *path, struct app_ctx *app_ctx)
 {
 	TSTree *tree;
 	char *content;
@@ -245,9 +195,9 @@ int scan(const char *path, struct ctx *ctx)
 	//debug_node(root);
 
 	TSTreeCursor cursor = ts_tree_cursor_new(root);
-	walk(&cursor, content, ctx);
+	walk(&cursor, content, &app_ctx->php_functions, app_ctx);
 
-	ctx_print(ctx);
+	app_ctx_print(app_ctx);
 
 	ts_tree_cursor_delete(&cursor);
 	ts_tree_delete(tree);
@@ -265,27 +215,23 @@ int main(int args, char **argv)
 		return 1;
 	}
 
-	struct ctx *ctx = malloc(sizeof(*ctx));
-	if (!ctx) {
+	struct app_ctx *app_ctx = malloc(sizeof(*app_ctx));
+	if (!app_ctx) {
 		return 1;
 	}
-	if (ctx_init(ctx)) {
-		free(ctx);
+	if (app_ctx_init(app_ctx)) {
 		return 1;
 	}
 
 	if (sm == scan_file) {
-		if (scan(path, ctx)) {
+		if (scan(path, app_ctx)) {
 			fprintf(stderr, "scan error\n");
-			ctx_free(ctx);
 			return 1;
 		}
 	} else {
 		fprintf(stderr, "not implemented\n");
-		ctx_free(ctx);
 		return 1;
 	}
 
-	ctx_free(ctx);
 	return 0;
 }
