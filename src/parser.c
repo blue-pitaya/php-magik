@@ -18,8 +18,10 @@
 #include "app_ctx.h"
 #include "function.h"
 #include "var.h"
+#include "vector.h"
 #include <fcntl.h>
 #include "parser.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -147,37 +149,57 @@ static int parse_class_declaration(TSNode node, struct app_ctx *ctx)
 
 static int parse_property_declaration(TSNode node, struct app_ctx *ctx)
 {
-	TSNode name_node = get_ts_node_child_by_field_name(node, "name");
-	if (ts_node_is_null(name_node)) {
-		return -1;
-	}
-
-	TSNode type_node = get_ts_node_child_by_field_name(node, "type");
-	if (ts_node_is_null(type_node)) {
-		return -1;
-	}
-
-	char *type_text = node_text_ctx(name_node, ctx);
-	if (!type_text) {
-		return -1;
-	}
+	TSTreeCursor cursor = ts_tree_cursor_new(node);
+	const char *node_type;
+	char *type_text = NULL;
 
 	struct php_var_refdef rd;
 	php_var_refdef_init(&rd, ctx);
-
-	rd.name = node_text_ctx(name_node, ctx);
 	rd.kind = PHP_VAR_KIND_PROPERTY;
 
-	for (size_t i = 0; i < PHP_TYPE_COUNT; i++) {
-		if (!strcmp(php_native_type_str[i], type_text)) {
-			rd.type = (enum php_native_type)i;
-			break;
+	do {
+		TSNode curr = ts_tree_cursor_current_node(&cursor);
+		node_type = ts_node_type(curr);
+
+		if (!strcmp(node_type, "primitive_type")) {
+			type_text = node_text_ctx(curr, ctx);
+			if (!type_text) {
+				goto err;
+			}
+			for (size_t i = 0; i < PHP_TYPE_COUNT; i++) {
+				if (!strcmp(php_native_type_str[i],
+					    type_text)) {
+					rd.type = (enum php_native_type)i;
+					break;
+				}
+			}
 		}
-	}
 
+		if (!strcmp(node_type, "variable_name")) {
+			rd.name = node_text_ctx(curr, ctx);
+			if (!rd.name) {
+				goto err;
+			}
+		}
+
+		if (ts_tree_cursor_goto_first_child(&cursor)) {
+			continue;
+		}
+		while (!ts_tree_cursor_goto_next_sibling(&cursor)) {
+			if (!ts_tree_cursor_goto_parent(&cursor)) {
+				goto done;
+			}
+		}
+	} while (1);
+done:
+	vec_push(&ctx->php_vars, &rd);
+	ts_tree_cursor_delete(&cursor);
 	free(type_text);
-
 	return 0;
+err:
+	ts_tree_cursor_delete(&cursor);
+	free(type_text);
+	return -1;
 }
 
 int scan(struct app_ctx *app_ctx)
@@ -211,7 +233,6 @@ int scan(struct app_ctx *app_ctx)
 
 		if (!strcmp(type, "property_declaration")) {
 			if (parse_property_declaration(node, app_ctx)) {
-				return -1;
 			}
 		}
 
@@ -236,7 +257,7 @@ int scan(struct app_ctx *app_ctx)
 	} while (1);
 
 done:
-	app_ctx_print(app_ctx);
+	app_ctx_print_verbose(app_ctx);
 
 	ts_tree_cursor_delete(&cursor);
 	ts_tree_delete(tree);

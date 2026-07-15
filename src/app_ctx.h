@@ -33,5 +33,6 @@ struct app_ctx {
 int app_ctx_init(struct app_ctx *ctx);
 void app_ctx_free(struct app_ctx *ctx);
 void app_ctx_print(struct app_ctx *ctx);
+void app_ctx_print_verbose(struct app_ctx *ctx);
 
 #endif

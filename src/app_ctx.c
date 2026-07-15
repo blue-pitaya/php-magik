@@ -31,6 +31,7 @@ int app_ctx_init(struct app_ctx *ctx)
 	}
 
 	ctx->parsing_file_path = NULL;
+	ctx->parsing_file_content = NULL;
 	ctx->parsing_ns = NULL;
 	ctx->parsing_class_name = NULL;
 
@@ -85,5 +86,28 @@ void app_ctx_print(struct app_ctx *ctx)
 			       arg->name);
 		}
 		printf("-> (%s)\n", php_native_type_str[def->return_type]);
+	}
+}
+
+void app_ctx_print_verbose(struct app_ctx *ctx)
+{
+	app_ctx_print(ctx);
+
+	for (int i = 0; i < ctx->php_vars.len; i++) {
+		struct php_var_refdef *rd = vec_get(&ctx->php_vars, i);
+
+		if (rd->ns) {
+			printf("NS: %s, ", rd->ns);
+		}
+		if (rd->owner_class_name) {
+			printf("CLS: %s, ", rd->owner_class_name);
+		}
+		if (rd->owner_func_name) {
+			printf("FUNC: %s, ", rd->owner_func_name);
+		}
+		if (rd->name) {
+			printf("NAME %s", rd->name);
+		}
+		printf("\n");
 	}
 }
