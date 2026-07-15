@@ -1,6 +1,9 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#define get_ts_node_child_by_field_name(node, field) \
+	ts_node_child_by_field_name(node, field, sizeof(field) - 1)
+
 #include <tree_sitter/api.h>
 
 struct owner_class {

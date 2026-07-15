@@ -44,7 +44,7 @@ void app_ctx_print(struct app_ctx *ctx)
 				printf("\\");
 			}
 			printf("%s", def->class_name);
-			bool has_cls_prefix = true;
+			has_cls_prefix = true;
 		}
 		if (has_ns_prefix || has_cls_prefix) {
 			printf("::");
