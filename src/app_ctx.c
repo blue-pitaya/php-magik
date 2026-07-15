@@ -39,12 +39,15 @@ int app_ctx_init(struct app_ctx *ctx)
 
 void app_ctx_free(struct app_ctx *ctx)
 {
+	struct php_function *fs = ctx->php_functions.data;
 	for (int i = 0; i < ctx->php_functions.len; i++) {
-		php_function_free(&ctx->php_functions.data[i]);
+		php_function_free(&fs[i]);
 	}
 	vec_free(&ctx->php_functions);
+
+	struct php_var_refdef *vs = ctx->php_vars.data;
 	for (int i = 0; i < ctx->php_vars.len; i++) {
-		php_function_free(&ctx->php_vars.data[i]);
+		php_var_refdef_free(&vs[i]);
 	}
 	vec_free(&ctx->php_vars);
 

@@ -17,6 +17,7 @@
 
 #include "var.h"
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 const char *php_native_type_str[] = {
@@ -36,7 +37,7 @@ const char *php_native_type_str[] = {
 	[PHP_TYPE_USER_DEFINED] = "user_defined",
 };
 
-int php_var_refdef_init(struct php_var_refdef *rd)
+int php_var_refdef_init(struct php_var_refdef *rd, struct app_ctx *ctx)
 {
 	rd->name = NULL;
 	rd->kind = PHP_VAR_KIND_MISC;
@@ -44,8 +45,10 @@ int php_var_refdef_init(struct php_var_refdef *rd)
 	rd->ud_type_ns = NULL;
 	rd->ud_type_cls_name = NULL;
 
-	rd->ns = NULL;
-	rd->owner_class_name = NULL;
+	rd->ns = ctx->parsing_ns ? strdup(ctx->parsing_ns) : NULL;
+	rd->owner_class_name = ctx->parsing_class_name ?
+				       strdup(ctx->parsing_class_name) :
+				       NULL;
 	rd->owner_func_name = NULL;
 
 	rd->file_path = NULL;

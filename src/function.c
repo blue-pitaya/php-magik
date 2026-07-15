@@ -70,8 +70,7 @@ static enum php_native_type parse_literal_type(TSNode literal_type_node,
 	return PHP_TYPE_MIXED;
 }
 
-//FIXME: maybe move it to var.c and handle ud_* fields
-static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
+static enum php_native_type resolve_expr_type(TSNode expr_node,
 					      struct app_ctx *app_ctx)
 {
 	if (ts_node_is_null(expr_node)) {
@@ -99,9 +98,8 @@ static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
 			get_ts_node_child_by_field_name(expr_node, "left");
 		TSNode right =
 			get_ts_node_child_by_field_name(expr_node, "right");
-		enum php_native_type lt = resolve_expr_type(left, src, app_ctx);
-		enum php_native_type rt =
-			resolve_expr_type(right, src, app_ctx);
+		enum php_native_type lt = resolve_expr_type(left, app_ctx);
+		enum php_native_type rt = resolve_expr_type(right, app_ctx);
 		if (lt == rt) {
 			return lt;
 		}
@@ -112,22 +110,20 @@ static enum php_native_type resolve_expr_type(TSNode expr_node, const char *src,
 		return PHP_TYPE_MIXED;
 	}
 	if (!strcmp(type, "parenthesized_expression")) {
-		return resolve_expr_type(ts_node_child(expr_node, 1), src,
-					 app_ctx);
+		return resolve_expr_type(ts_node_child(expr_node, 1), app_ctx);
 	}
 	if (!strcmp(type, "variable_name")) {
-		char *name = node_text(expr_node, src);
+		char *name =
+			node_text(expr_node, app_ctx->parsing_file_content);
 		if (!name) {
 			return PHP_TYPE_MIXED;
 		}
 
-		struct php_var_refdef var;
+		struct php_var_refdef *vars = app_ctx->php_vars.data;
 		for (int i = 0; i < app_ctx->php_vars.len; i++) {
-			var = *(struct php_var_refdef *)vec_get(
-				&app_ctx->php_vars, i);
-			if (!strcmp(var.name, name)) {
+			if (!strcmp(vars[i].name, name)) {
 				free(name);
-				return var.type;
+				return vars[i].type;
 			}
 		}
 
@@ -173,13 +169,10 @@ static int parse_function_args(TSNode function_node, const char *src,
 		}
 
 		struct php_var_refdef arg;
-		php_var_refdef_init(&arg);
+		php_var_refdef_init(&arg, app_ctx);
 		arg.name = name;
 		arg.kind = PHP_VAR_KIND_FUNC_PARAM;
 		arg.type = parse_literal_type(type_node, src);
-		arg.ns = def->ns ? strdup(def->ns) : NULL;
-		arg.owner_class_name =
-			def->class_name ? strdup(def->class_name) : NULL;
 		arg.owner_func_name = def->name ? strdup(def->name) : NULL;
 
 		if (vec_push(&app_ctx->php_vars, &arg)) {
@@ -187,9 +180,8 @@ static int parse_function_args(TSNode function_node, const char *src,
 			return -1;
 		}
 
-		if (vec_push(&def->args,
-			     &app_ctx->php_vars
-				      .data[app_ctx->php_vars.len - 1])) {
+		struct php_var_refdef *vars = app_ctx->php_vars.data;
+		if (vec_push(&def->args, &vars[app_ctx->php_vars.len - 1])) {
 			return -1;
 		}
 	}
@@ -197,7 +189,7 @@ static int parse_function_args(TSNode function_node, const char *src,
 	return 0;
 }
 
-static int parse_return_statement_type(TSNode ret_smt_node, const char *src,
+static int parse_return_statement_type(TSNode ret_smt_node,
 				       struct php_function *def,
 				       struct app_ctx *app_ctx)
 {
@@ -207,26 +199,25 @@ static int parse_return_statement_type(TSNode ret_smt_node, const char *src,
 		return 0;
 	}
 
-	def->return_type = resolve_expr_type(expr, src, app_ctx);
+	def->return_type = resolve_expr_type(expr, app_ctx);
 
 	return 0;
 }
 
 static int parse_assignment_expression(TSNode node, const char *src,
-				       struct php_function *def,
 				       struct app_ctx *app_ctx)
 {
 	TSNode l_node = get_ts_node_child_by_field_name(node, "left");
 	TSNode r_node = get_ts_node_child_by_field_name(node, "right");
 
 	struct php_var_refdef var;
-	php_var_refdef_init(&var);
+	php_var_refdef_init(&var, app_ctx);
 	var.name = node_text(l_node, src);
 	if (!var.name) {
 		return -1;
 	}
 	var.kind = PHP_VAR_KIND_LOCAL_DEF;
-	var.type = resolve_expr_type(r_node, src, app_ctx);
+	var.type = resolve_expr_type(r_node, app_ctx);
 	vec_push(&app_ctx->php_vars, &var);
 
 	return 0;
@@ -252,13 +243,13 @@ static int parse_function_body(TSNode function_node, const char *src,
 		node_type = ts_node_type(curr_node);
 
 		if (!strcmp(node_type, "assignment_expression")) {
-			if (parse_assignment_expression(curr_node, src, def,
+			if (parse_assignment_expression(curr_node, src,
 							app_ctx)) {
 				goto error;
 			}
 		}
 		if (!strcmp(node_type, "return_statement")) {
-			if (parse_return_statement_type(curr_node, src, def,
+			if (parse_return_statement_type(curr_node, def,
 							app_ctx)) {
 				goto error;
 			}

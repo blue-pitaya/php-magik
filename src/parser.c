@@ -17,8 +17,10 @@
 
 #include "app_ctx.h"
 #include "function.h"
+#include "var.h"
 #include <fcntl.h>
 #include "parser.h"
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <tree_sitter/api.h>
@@ -43,6 +45,22 @@ char *node_text(TSNode node, const char *src)
 	if (!s) {
 		return NULL;
 	}
+	memcpy(s, text, len);
+	s[len] = '\0';
+	return s;
+}
+
+static char *node_text_ctx(TSNode node, struct app_ctx *ctx)
+{
+	const char *text;
+	uint32_t len;
+	node_span(node, ctx->parsing_file_content, &text, &len);
+
+	char *s = malloc(len + 1);
+	if (!s) {
+		return NULL;
+	}
+
 	memcpy(s, text, len);
 	s[len] = '\0';
 	return s;
@@ -127,6 +145,41 @@ static int parse_class_declaration(TSNode node, struct app_ctx *ctx)
 	return 0;
 }
 
+static int parse_property_declaration(TSNode node, struct app_ctx *ctx)
+{
+	TSNode name_node = get_ts_node_child_by_field_name(node, "name");
+	if (ts_node_is_null(name_node)) {
+		return -1;
+	}
+
+	TSNode type_node = get_ts_node_child_by_field_name(node, "type");
+	if (ts_node_is_null(type_node)) {
+		return -1;
+	}
+
+	char *type_text = node_text_ctx(name_node, ctx);
+	if (!type_text) {
+		return -1;
+	}
+
+	struct php_var_refdef rd;
+	php_var_refdef_init(&rd, ctx);
+
+	rd.name = node_text_ctx(name_node, ctx);
+	rd.kind = PHP_VAR_KIND_PROPERTY;
+
+	for (size_t i = 0; i < PHP_TYPE_COUNT; i++) {
+		if (!strcmp(php_native_type_str[i], type_text)) {
+			rd.type = (enum php_native_type)i;
+			break;
+		}
+	}
+
+	free(type_text);
+
+	return 0;
+}
+
 int scan(struct app_ctx *app_ctx)
 {
 	TSTree *tree;
@@ -152,6 +205,12 @@ int scan(struct app_ctx *app_ctx)
 
 		if (!strcmp(type, "class_declaration")) {
 			if (parse_class_declaration(node, app_ctx)) {
+				return -1;
+			}
+		}
+
+		if (!strcmp(type, "property_declaration")) {
+			if (parse_property_declaration(node, app_ctx)) {
 				return -1;
 			}
 		}

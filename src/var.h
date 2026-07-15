@@ -18,6 +18,7 @@
 #ifndef VAR_H
 #define VAR_H
 
+#include "app_ctx.h"
 #include <stdbool.h>
 
 // https://www.php.net/manual/en/language.types.type-system.php
@@ -71,7 +72,7 @@ struct php_var_refdef {
 	int col_end;
 };
 
-int php_var_refdef_init(struct php_var_refdef *rd);
+int php_var_refdef_init(struct php_var_refdef *rd, struct app_ctx *ctx);
 void php_var_refdef_free(struct php_var_refdef *rd);
 
 #endif
