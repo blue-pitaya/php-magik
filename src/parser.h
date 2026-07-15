@@ -18,6 +18,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "app_ctx.h"
 #define get_ts_node_child_by_field_name(node, field) \
 	ts_node_child_by_field_name(node, field, sizeof(field) - 1)
 
@@ -26,5 +27,6 @@
 void node_span(TSNode node, const char *src, const char **out_text,
 	       uint32_t *out_len);
 char *node_text(TSNode node, const char *src);
+int scan(struct app_ctx *app_ctx);
 
 #endif

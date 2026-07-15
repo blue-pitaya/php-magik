@@ -25,6 +25,7 @@ struct app_ctx {
 	struct vec php_vars; /**< of: struct php_var_refdef */
 	// Parsing
 	char *parsing_file_path;
+	char *parsing_file_content;
 	char *parsing_ns;
 	char *parsing_class_name;
 };

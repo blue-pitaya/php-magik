@@ -15,8 +15,16 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
+#include "app_ctx.h"
+#include "function.h"
+#include <fcntl.h>
 #include "parser.h"
 #include <string.h>
+#include <sys/stat.h>
+#include <tree_sitter/api.h>
+#include <unistd.h>
+
+const TSLanguage *tree_sitter_php_only(void);
 
 void node_span(TSNode node, const char *src, const char **out_text,
 	       uint32_t *out_len)
@@ -38,4 +46,140 @@ char *node_text(TSNode node, const char *src)
 	memcpy(s, text, len);
 	s[len] = '\0';
 	return s;
+}
+
+static int load_tree(const char *path, struct TSTree **out_tree,
+		     struct app_ctx *app_ctx)
+{
+	struct stat sb;
+	if (stat(path, &sb) == -1) {
+		return -1;
+	}
+
+	char *buf = malloc(sb.st_size + 1);
+	if (!buf) {
+		return -1;
+	}
+
+	int fd = open(path, O_RDONLY);
+	if (fd == -1) {
+		free(buf);
+		return -1;
+	}
+
+	ssize_t len = read(fd, buf, sb.st_size);
+	if (len < 0) {
+		free(buf);
+		close(fd);
+		return -1;
+	}
+
+	buf[len] = '\0';
+	app_ctx->parsing_file_content = buf;
+	close(fd);
+
+	TSParser *parser = ts_parser_new();
+	if (!parser) {
+		return -1;
+	}
+	ts_parser_set_language(parser, tree_sitter_php_only());
+
+	TSTree *tree = ts_parser_parse_string(
+		parser, NULL, app_ctx->parsing_file_content, len);
+	if (!tree) {
+		return -1;
+	}
+
+	*out_tree = tree;
+
+	ts_parser_delete(parser);
+	return 0;
+}
+
+static int parse_namespace_definition(TSNode node, struct app_ctx *ctx)
+{
+	TSNode name_node = get_ts_node_child_by_field_name(node, "name");
+	if (ts_node_is_null(name_node)) {
+		return -1;
+	}
+
+	ctx->parsing_ns = node_text(name_node, ctx->parsing_file_content);
+	if (!ctx->parsing_ns) {
+		return -1;
+	}
+
+	return 0;
+}
+
+static int parse_class_declaration(TSNode node, struct app_ctx *ctx)
+{
+	TSNode name_node = get_ts_node_child_by_field_name(node, "name");
+	if (ts_node_is_null(name_node)) {
+		return -1;
+	}
+
+	ctx->parsing_class_name =
+		node_text(name_node, ctx->parsing_file_content);
+	if (!ctx->parsing_class_name) {
+		return -1;
+	}
+
+	return 0;
+}
+
+int scan(struct app_ctx *app_ctx)
+{
+	TSTree *tree;
+	if (load_tree(app_ctx->parsing_file_path, &tree, app_ctx)) {
+		return -1;
+	}
+
+	TSNode root = ts_tree_root_node(tree);
+	TSTreeCursor cursor = ts_tree_cursor_new(root);
+
+	struct php_function func_def;
+	TSNode node;
+	const char *type;
+	do {
+		node = ts_tree_cursor_current_node(&cursor);
+		type = ts_node_type(node);
+
+		if (!strcmp(type, "namespace_definition")) {
+			if (parse_namespace_definition(node, app_ctx)) {
+				return -1;
+			}
+		}
+
+		if (!strcmp(type, "class_declaration")) {
+			if (parse_class_declaration(node, app_ctx)) {
+				return -1;
+			}
+		}
+
+		if (!strcmp(type, "function_definition") ||
+		    !strcmp(type, "method_declaration")) {
+			php_function_init(&func_def);
+			if (parse_function(node, app_ctx->parsing_file_content,
+					   &func_def, app_ctx)) {
+				return -1;
+			}
+			vec_push(&app_ctx->php_functions, &func_def);
+		}
+
+		if (ts_tree_cursor_goto_first_child(&cursor)) {
+			continue;
+		}
+		while (!ts_tree_cursor_goto_next_sibling(&cursor)) {
+			if (!ts_tree_cursor_goto_parent(&cursor)) {
+				goto done;
+			}
+		}
+	} while (1);
+
+done:
+	app_ctx_print(app_ctx);
+
+	ts_tree_cursor_delete(&cursor);
+	ts_tree_delete(tree);
+	return 0;
 }
