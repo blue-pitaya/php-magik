@@ -1,4 +1,4 @@
-# php-lsp
+# php-magik
 
 ## Test
 
