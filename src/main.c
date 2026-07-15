@@ -15,11 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
+#define _GNU_SOURCE
 #include "app_ctx.h"
-#include "parser.h"
-#include "vector.h"
 #include <dirent.h>
 #include <fcntl.h>
+#include "function.h"
+#include <getopt.h>
+#include "parser.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,14 +29,9 @@
 #include <sys/stat.h>
 #include <tree_sitter/api.h>
 #include <unistd.h>
-#include "function.h"
+#include "vector.h"
 
 const TSLanguage *tree_sitter_php_only(void);
-
-enum scan_mode {
-	scan_file,
-	scan_dir,
-};
 
 char *read_file(const char *path, size_t *len)
 {
@@ -67,28 +64,6 @@ char *read_file(const char *path, size_t *len)
 
 	close(fd);
 	return buf;
-}
-
-char *parse_args(int args, char **argv, enum scan_mode *sm)
-{
-	if (args < 2) {
-		return NULL;
-	}
-
-	struct stat sb;
-	char *path = argv[1];
-	if (stat(path, &sb)) {
-		fprintf(stderr, "invalid path\n");
-		return NULL;
-	}
-	if (S_ISREG(sb.st_mode)) {
-		*sm = scan_file;
-	}
-	if (S_ISDIR(sb.st_mode)) {
-		*sm = scan_dir;
-	}
-
-	return path;
 }
 
 int parse_namespace_definition(TSNode node, const char *src, char **out_name)
@@ -223,12 +198,29 @@ int scan(const char *path, struct app_ctx *app_ctx)
 	return 0;
 }
 
-int main(int args, char **argv)
+int main(int argc, char *argv[])
 {
-	enum scan_mode sm;
-	char *path = parse_args(args, argv, &sm);
-	if (!path) {
-		fprintf(stderr, "wrong args\n");
+	char *scan_file = NULL;
+
+	static struct option long_opts[] = {
+		{ "scan-file", required_argument, 0, 's' }, { 0, 0, 0, 0 }
+	};
+
+	int c;
+	while ((c = getopt_long(argc, argv, "", long_opts, NULL)) != -1) {
+		switch (c) {
+		case 's':
+			scan_file = optarg;
+			break;
+		default:
+			fprintf(stderr, "usage: %s --scan-file <filename>\n",
+				argv[0]);
+			return 1;
+		}
+	}
+
+	if (!scan_file) {
+		fprintf(stderr, "error: --scan-file is required\n");
 		return 1;
 	}
 
@@ -236,17 +228,13 @@ int main(int args, char **argv)
 	if (!app_ctx) {
 		return 1;
 	}
+
 	if (app_ctx_init(app_ctx)) {
 		return 1;
 	}
 
-	if (sm == scan_file) {
-		if (scan(path, app_ctx)) {
-			fprintf(stderr, "scan error\n");
-			return 1;
-		}
-	} else {
-		fprintf(stderr, "not implemented\n");
+	if (scan(scan_file, app_ctx)) {
+		fprintf(stderr, "scan error\n");
 		return 1;
 	}
 
