@@ -20,6 +20,9 @@
 
 #include "vector.h"
 
+#define PRINT_MODE_FUNCTIONS 0
+#define PRINT_MODE_VARS 1
+
 struct app_ctx {
 	struct vec php_functions; /**< of: struct php_function */
 	struct vec php_vars; /**< of: struct php_var_refdef */
@@ -28,6 +31,8 @@ struct app_ctx {
 	char *parsing_file_content;
 	char *parsing_ns;
 	char *parsing_class_name;
+	// Output config
+	int print_mode;
 };
 
 int app_ctx_init(struct app_ctx *ctx);

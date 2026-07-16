@@ -257,7 +257,12 @@ int scan(struct app_ctx *app_ctx)
 	} while (1);
 
 done:
-	app_ctx_print_verbose(app_ctx);
+	if (app_ctx->print_mode == PRINT_MODE_FUNCTIONS) {
+		app_ctx_print(app_ctx);
+	}
+	if (app_ctx->print_mode == PRINT_MODE_VARS) {
+		app_ctx_print_verbose(app_ctx);
+	}
 
 	ts_tree_cursor_delete(&cursor);
 	ts_tree_delete(tree);

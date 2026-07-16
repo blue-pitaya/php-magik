@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
+#include <string.h>
 #define _GNU_SOURCE
 #include "app_ctx.h"
 #include <dirent.h>
@@ -30,10 +31,12 @@
 int main(int argc, char *argv[])
 {
 	static struct option long_opts[] = {
-		{ "scan-file", required_argument, 0, 's' }, { 0, 0, 0, 0 }
+		{ "scan-file", required_argument, 0, 's' },
+		{ "print", required_argument, 0, 'p' },
+		{ 0, 0, 0, 0 }
 	};
 
-	struct app_ctx app_ctx;
+	struct app_ctx app_ctx = { 0 };
 	if (app_ctx_init(&app_ctx)) {
 		return 1;
 	}
@@ -42,17 +45,24 @@ int main(int argc, char *argv[])
 	while ((c = getopt_long(argc, argv, "", long_opts, NULL)) != -1) {
 		switch (c) {
 		case 's':
-			app_ctx.parsing_file_path = optarg;
+			app_ctx.parsing_file_path = strdup(optarg);
+			break;
+		case 'p':
+			if (!strcmp("functions", optarg)) {
+				app_ctx.print_mode = PRINT_MODE_FUNCTIONS;
+			}
+			if (!strcmp("vars", optarg)) {
+				app_ctx.print_mode = PRINT_MODE_VARS;
+			}
 			break;
 		default:
-			fprintf(stderr, "usage: %s --scan-file <filename>\n",
-				argv[0]);
+			fprintf(stderr, "wrong args\n");
 			return 1;
 		}
 	}
 
 	if (!app_ctx.parsing_file_path) {
-		fprintf(stderr, "error: --scan-file is required\n");
+		fprintf(stderr, "wrong args\n");
 		return 1;
 	}
 

@@ -53,6 +53,7 @@ enum php_var_kind {
 };
 
 extern const char *php_native_type_str[];
+extern const char *php_var_kind_str[];
 
 struct php_var_refdef {
 	// General
@@ -74,5 +75,6 @@ struct php_var_refdef {
 
 int php_var_refdef_init(struct php_var_refdef *rd, struct app_ctx *ctx);
 void php_var_refdef_free(struct php_var_refdef *rd);
+void php_var_refdef_print(struct php_var_refdef *rd);
 
 #endif

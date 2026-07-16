@@ -16,6 +16,7 @@
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
 #include "var.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -35,6 +36,14 @@ const char *php_native_type_str[] = {
 	[PHP_TYPE_NULL] = "null",
 	[PHP_TYPE_MIXED] = "mixed",
 	[PHP_TYPE_USER_DEFINED] = "user_defined",
+};
+
+const char *php_var_kind_str[] = {
+	[PHP_VAR_KIND_MISC] = "misc",
+	[PHP_VAR_KIND_FUNC_PARAM] = "func param",
+	[PHP_VAR_KIND_LOCAL_DEF] = "local def",
+	[PHP_VAR_KIND_PROPERTY] = "property",
+	[PHP_VAR_KIND_USAGE] = "usage",
 };
 
 int php_var_refdef_init(struct php_var_refdef *rd, struct app_ctx *ctx)
@@ -69,4 +78,14 @@ void php_var_refdef_free(struct php_var_refdef *rd)
 	free(rd->owner_func_name);
 	free(rd->file_path);
 	free(rd);
+}
+
+void php_var_refdef_print(struct php_var_refdef *rd)
+{
+	printf("[ns: %s, cls: %s, func: %s, kind: %s, type: %s, name: %s]\n",
+	       rd->ns ? rd->ns : NULL,
+	       rd->owner_class_name ? rd->owner_class_name : NULL,
+	       rd->owner_func_name ? rd->owner_func_name : NULL,
+	       php_var_kind_str[rd->kind], php_native_type_str[rd->type],
+	       rd->name ? rd->name : NULL);
 }
