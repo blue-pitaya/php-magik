@@ -18,15 +18,49 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "app_ctx.h"
-#define get_ts_node_child_by_field_name(node, field) \
-	ts_node_child_by_field_name(node, field, sizeof(field) - 1)
-
 #include <tree_sitter/api.h>
+#include "vector.h"
 
-void node_span(TSNode node, const char *src, const char **out_text,
-	       uint32_t *out_len);
-char *node_text(TSNode node, const char *src);
-int scan(struct app_ctx *app_ctx);
+enum php_var_kind { VAR_PROPERTY, VAR_PARAM, VAR_USE, VAR_THIS, VAR_OBJ };
+
+struct php_var {
+	char *name; /* without leading $ is not stripped: "$foo" */
+	char *ns; /* owned copies, NULL if not in scope */
+	char *class_name;
+	char *function_name;
+	char *type;
+	enum php_var_kind kind;
+	uint32_t line, col; /* 0-based */
+};
+
+enum php_func_kind { FUNC_DEF, FUNC_CALL, FUNC_METHOD };
+
+struct php_function {
+	char *name;
+	char *ns; /* enclosing scope / owning class */
+	char *class_name;
+	char *function_name; /* enclosing function for calls, self for defs */
+	enum php_func_kind kind;
+	char *return_type; /* defs only, NULL if unknown */
+	uint32_t line, col;
+};
+
+struct parser_ctx {
+	char *file_content;
+	char *ns;
+	char *class_name;
+	char *function_name;
+	struct vec vars; /**< struct php_var */
+	struct vec funcs; /**< struct php_function */
+};
+
+void php_vars_free(struct vec *v);
+void php_funcs_free(struct vec *v);
+
+void parser_print_php_vars(struct parser_ctx *ctx);
+void parser_print_php_funcs(struct parser_ctx *ctx);
+
+/** root is (program) node */
+int parse_program(TSNode root, struct parser_ctx *ctx);
 
 #endif

@@ -24,20 +24,10 @@
 #define PRINT_MODE_VARS 1
 
 struct app_ctx {
-	struct vec php_functions; /**< of: struct php_function */
-	struct vec php_vars; /**< of: struct php_var_refdef */
-	// Parsing
 	char *parsing_file_path;
 	char *parsing_file_content;
-	char *parsing_ns;
-	char *parsing_class_name;
-	// Output config
-	int print_mode;
 };
 
-int app_ctx_init(struct app_ctx *ctx);
 void app_ctx_free(struct app_ctx *ctx);
-void app_ctx_print(struct app_ctx *ctx);
-void app_ctx_print_verbose(struct app_ctx *ctx);
 
 #endif

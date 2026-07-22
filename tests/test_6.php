@@ -4,10 +4,23 @@ namespace App\Example;
 
 class Foo
 {
-    public string $a;
+    public int $bar;
 
-    public function print()
+    public string $x1;
+
+    public string $x2;
+
+    public function print(int $a = 10)
     {
-        return $this->a;
+        $this->bar = 30;
+        $b = 20;
+        $c = $a + $b;
+
+        return $this->bar + $c;
+    }
+
+    public function xd()
+    {
+        return $this->x1.' '.$this->x2;
     }
 }
