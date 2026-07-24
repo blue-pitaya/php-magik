@@ -15,24 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef APP_CTX_H
-#define APP_CTX_H
+#ifndef FS_H
+#define FS_H
 
-#include "vector.h"
+#include <stddef.h>
+#include <sys/types.h>
+#include <tree_sitter/api.h>
+#include "app_ctx.h"
 
-enum fs_mode {
-	FS_MODE_SINGLE_FILE,
-	FS_MODE_ROOT_DIR,
-};
+typedef int (*fs_parser_fn)(const char *path, const char *content, size_t size,
+			    void *ctx);
 
-struct app_ctx {
-	enum fs_mode fs_mode;
-	char *root_path;
-	// dynamic
-	char *parsing_file_path;
-	char *parsing_file_content;
-};
-
-void app_ctx_free(struct app_ctx *ctx);
+int fs_walk(const char *root, const char *ext, fs_parser_fn parser, void *ctx);
+int fs_load_tree(const char *path, TSTree **out_tree, struct app_ctx *app_ctx);
 
 #endif

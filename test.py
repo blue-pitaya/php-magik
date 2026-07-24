@@ -11,7 +11,9 @@ if __name__ == "__main__":
     exs = sorted(test_dir.glob("test_*_ex.txt"))
     subprocess.run(["make"], check=True, cwd=script_dir)
     for test, ex in zip(tests, exs):
-        result = subprocess.run([binary, '--scan-file', test], capture_output=True, text=True).stdout
+        result = subprocess.run(
+            [binary, "--path", test], capture_output=True, text=True
+        ).stdout
         expected = ex.read_text()
         if result == expected:
             print(f"{test}: OK")

@@ -15,73 +15,26 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
-#include "parser.h"
-#include <string.h>
+#include "fs.h"
 #define _GNU_SOURCE
 #include "app_ctx.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include "parser.h"
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <tree_sitter/api.h>
 #include <unistd.h>
 
-const TSLanguage *tree_sitter_php_only(void);
-
-static int load_tree(const char *path, struct TSTree **out_tree,
-		     struct app_ctx *app_ctx)
-{
-	struct stat sb;
-	if (stat(path, &sb) == -1) {
-		return -1;
-	}
-
-	char *buf = malloc(sb.st_size + 1);
-	if (!buf) {
-		return -1;
-	}
-
-	int fd = open(path, O_RDONLY);
-	if (fd == -1) {
-		free(buf);
-		return -1;
-	}
-
-	ssize_t len = read(fd, buf, sb.st_size);
-	if (len < 0) {
-		free(buf);
-		close(fd);
-		return -1;
-	}
-
-	buf[len] = '\0';
-	app_ctx->parsing_file_content = buf;
-	close(fd);
-
-	TSParser *parser = ts_parser_new();
-	if (!parser) {
-		return -1;
-	}
-	ts_parser_set_language(parser, tree_sitter_php_only());
-
-	TSTree *tree = ts_parser_parse_string(
-		parser, NULL, app_ctx->parsing_file_content, len);
-	if (!tree) {
-		return -1;
-	}
-
-	*out_tree = tree;
-
-	ts_parser_delete(parser);
-	return 0;
-}
-
 static int scan(struct app_ctx *app_ctx)
 {
+	int err;
 	TSTree *tree;
-	if (load_tree(app_ctx->parsing_file_path, &tree, app_ctx)) {
+	err = fs_load_tree(app_ctx->parsing_file_path, &tree, app_ctx);
+	if (err) {
 		return -1;
 	}
 
@@ -107,17 +60,32 @@ int main(int argc, char *argv[])
 {
 	int err;
 	static struct option long_opts[] = {
-		{ "scan-file", required_argument, 0, 's' },
-		{ "print", required_argument, 0, 'p' },
-		{ 0, 0, 0, 0 }
+		{ "path", required_argument, 0, 'p' }, { 0, 0, 0, 0 }
 	};
-	struct app_ctx app_ctx = { 0 };
+	struct app_ctx ctx = { 0 };
 
 	int c;
+	struct stat sb;
+	char *arg_value;
 	while ((c = getopt_long(argc, argv, "", long_opts, NULL)) != -1) {
 		switch (c) {
-		case 's':
-			app_ctx.parsing_file_path = strdup(optarg);
+		case 'p':
+			arg_value = strdup(optarg);
+			err = stat(arg_value, &sb);
+			if (err) {
+				fprintf(stderr, "wrong args\n");
+				return 1;
+			}
+			if (S_ISDIR(sb.st_mode)) {
+				ctx.fs_mode = FS_MODE_ROOT_DIR;
+				ctx.root_path = arg_value;
+			} else if (S_ISREG(sb.st_mode)) {
+				ctx.fs_mode = FS_MODE_SINGLE_FILE;
+				ctx.root_path = arg_value;
+			} else {
+				fprintf(stderr, "not a file or dir\n");
+				return 1;
+			}
 			break;
 		default:
 			fprintf(stderr, "wrong args\n");
@@ -125,14 +93,21 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (!app_ctx.parsing_file_path) {
-		fprintf(stderr, "wrong args\n");
+	switch (ctx.fs_mode) {
+	case FS_MODE_ROOT_DIR:
+		fprintf(stderr, "not implemented\n");
 		return 1;
-	}
-
-	err = scan(&app_ctx);
-	if (err) {
-		fprintf(stderr, "scan error\n");
+		break;
+	case FS_MODE_SINGLE_FILE:
+		ctx.parsing_file_path = strdup(ctx.root_path);
+		err = scan(&ctx);
+		if (err) {
+			fprintf(stderr, "scan error\n");
+			return 1;
+		}
+		break;
+	default:
+		fprintf(stderr, "wrong args\n");
 		return 1;
 	}
 
