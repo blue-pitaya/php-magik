@@ -15,9 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
+#define _GNU_SOURCE
 #include "fs.h"
 #include "lsp.h"
-#define _GNU_SOURCE
 #include "app_ctx.h"
 #include <dirent.h>
 #include <fcntl.h>
@@ -30,60 +30,34 @@
 #include <tree_sitter/api.h>
 #include <unistd.h>
 
-static int scan(struct app_ctx *app_ctx)
-{
-	int err;
-	TSTree *tree;
-	err = fs_load_tree(app_ctx->parsing_file_path, &tree, app_ctx);
-	if (err) {
-		return -1;
-	}
-
-	TSNode root = ts_tree_root_node(tree);
-
-	struct parser_ctx ctx = { 0 };
-	ctx.file_content = app_ctx->parsing_file_content;
-	vec_init(&ctx.vars, sizeof(struct php_var));
-	vec_init(&ctx.funcs, sizeof(struct php_function));
-
-	parse_program(root, &ctx);
-	parser_print_php_funcs(&ctx);
-	parser_print_php_vars(&ctx);
-
-	php_vars_free(&ctx.vars);
-	php_funcs_free(&ctx.funcs);
-	free(ctx.ns);
-	ts_tree_delete(tree);
-	return 0;
-}
-
 static int parse(const char *path, const char *content, size_t size,
-		 struct app_ctx *app_ctx)
+		 struct app_ctx *ctx)
 {
-	app_ctx->parsing_file_path = strdup(path);
+	ctx->parsing_file_path = strdup(path);
 	printf("Parsing: %s\n", path);
 
 	int err;
 	TSTree *tree;
-	err = fs_load_tree(app_ctx->parsing_file_path, &tree, app_ctx);
+	err = fs_load_tree(ctx->parsing_file_path, &tree, ctx);
 	if (err) {
 		return -1;
 	}
 
 	TSNode root = ts_tree_root_node(tree);
 
-	struct parser_ctx ctx = { 0 };
-	ctx.file_content = app_ctx->parsing_file_content;
-	vec_init(&ctx.vars, sizeof(struct php_var));
-	vec_init(&ctx.funcs, sizeof(struct php_function));
+	struct parser_ctx p_ctx = { 0 };
+	p_ctx.file_content = ctx->parsing_file_content;
+	vec_init(&p_ctx.vars, sizeof(struct php_var));
+	vec_init(&p_ctx.funcs, sizeof(struct php_function));
 
-	parse_program(root, &ctx);
-	parser_print_php_funcs(&ctx);
-	parser_print_php_vars(&ctx);
+	parse_program(root, &p_ctx);
 
-	php_vars_free(&ctx.vars);
-	php_funcs_free(&ctx.funcs);
-	free(ctx.ns);
+	parser_print_php_funcs(&p_ctx);
+	parser_print_php_vars(&p_ctx);
+
+	php_vars_free(&p_ctx.vars);
+	php_funcs_free(&p_ctx.funcs);
+	free(p_ctx.ns);
 	ts_tree_delete(tree);
 	return 0;
 }
@@ -134,8 +108,7 @@ int main(int argc, char *argv[])
 		}
 		break;
 	case FS_MODE_SINGLE_FILE:
-		ctx.parsing_file_path = strdup(ctx.root_path);
-		err = scan(&ctx);
+		err = fs_walk(ctx.root_path, ".php", parse, &ctx);
 		if (err) {
 			fprintf(stderr, "scan error\n");
 			return 1;
@@ -145,6 +118,8 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "wrong args\n");
 		return 1;
 	}
+
+	exit(0);
 
 	struct lsp_context lsp_ctx = { 0 };
 	lsp_run(&lsp_ctx);

@@ -25,9 +25,15 @@ enum fs_mode {
 	FS_MODE_ROOT_DIR,
 };
 
+struct php_file {
+	char *uri;
+	char *path;
+};
+
 struct app_ctx {
 	enum fs_mode fs_mode;
 	char *root_path;
+	struct vec files; /**< struct php_file */
 	// dynamic
 	char *parsing_file_path;
 	char *parsing_file_content;

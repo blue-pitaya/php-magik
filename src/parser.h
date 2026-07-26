@@ -31,6 +31,7 @@ struct php_var {
 	char *type;
 	enum php_var_kind kind;
 	uint32_t line, col; /* 0-based */
+	int file_id;
 };
 
 enum php_func_kind { FUNC_DEF, FUNC_CALL, FUNC_METHOD };
@@ -43,6 +44,7 @@ struct php_function {
 	enum php_func_kind kind;
 	char *return_type; /* defs only, NULL if unknown */
 	uint32_t line, col;
+	int file_id;
 };
 
 struct parser_ctx {

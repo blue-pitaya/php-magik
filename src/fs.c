@@ -104,21 +104,27 @@ static int walk_dir(const char *dir, const char *ext, fs_parser_fn parser,
 int fs_walk(const char *root, const char *ext, fs_parser_fn parser,
 	    struct app_ctx *ctx)
 {
+	int err;
 	struct stat st;
-	if (stat(root, &st) < 0) {
+
+	err = stat(root, &st);
+	if (err) {
 		fprintf(stderr, "fs: stat %s: %s\n", root, strerror(errno));
-		return -1;
+		return err;
 	}
+
 	if (S_ISREG(st.st_mode)) {
-		size_t sz;
-		char *content = read_file(root, &sz);
+		size_t len;
+		char *content = read_file(root, &len);
 		if (!content) {
 			return -1;
 		}
-		int err = parser(root, content, sz, ctx);
+
+		err = parser(root, content, len, ctx);
 		free(content);
 		return err;
 	}
+
 	return walk_dir(root, ext, parser, ctx);
 }
 
