@@ -28,7 +28,7 @@
 const TSLanguage *tree_sitter_php_only(void);
 
 typedef int (*fs_parser_fn)(const char *path, const char *content, size_t size,
-			    void *ctx);
+			    struct app_ctx *ctx);
 
 static char *read_file(const char *path, size_t *out_size)
 {
@@ -101,7 +101,8 @@ static int walk_dir(const char *dir, const char *ext, fs_parser_fn parser,
 	return ret;
 }
 
-int fs_walk(const char *root, const char *ext, fs_parser_fn parser, void *ctx)
+int fs_walk(const char *root, const char *ext, fs_parser_fn parser,
+	    struct app_ctx *ctx)
 {
 	struct stat st;
 	if (stat(root, &st) < 0) {

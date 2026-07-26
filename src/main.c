@@ -16,6 +16,7 @@
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
 #include "fs.h"
+#include "lsp.h"
 #define _GNU_SOURCE
 #include "app_ctx.h"
 #include <dirent.h>
@@ -31,6 +32,37 @@
 
 static int scan(struct app_ctx *app_ctx)
 {
+	int err;
+	TSTree *tree;
+	err = fs_load_tree(app_ctx->parsing_file_path, &tree, app_ctx);
+	if (err) {
+		return -1;
+	}
+
+	TSNode root = ts_tree_root_node(tree);
+
+	struct parser_ctx ctx = { 0 };
+	ctx.file_content = app_ctx->parsing_file_content;
+	vec_init(&ctx.vars, sizeof(struct php_var));
+	vec_init(&ctx.funcs, sizeof(struct php_function));
+
+	parse_program(root, &ctx);
+	parser_print_php_funcs(&ctx);
+	parser_print_php_vars(&ctx);
+
+	php_vars_free(&ctx.vars);
+	php_funcs_free(&ctx.funcs);
+	free(ctx.ns);
+	ts_tree_delete(tree);
+	return 0;
+}
+
+static int parse(const char *path, const char *content, size_t size,
+		 struct app_ctx *app_ctx)
+{
+	app_ctx->parsing_file_path = strdup(path);
+	printf("Parsing: %s\n", path);
+
 	int err;
 	TSTree *tree;
 	err = fs_load_tree(app_ctx->parsing_file_path, &tree, app_ctx);
@@ -95,8 +127,11 @@ int main(int argc, char *argv[])
 
 	switch (ctx.fs_mode) {
 	case FS_MODE_ROOT_DIR:
-		fprintf(stderr, "not implemented\n");
-		return 1;
+		err = fs_walk(ctx.root_path, ".php", parse, &ctx);
+		if (err) {
+			fprintf(stderr, "error\n");
+			return 1;
+		}
 		break;
 	case FS_MODE_SINGLE_FILE:
 		ctx.parsing_file_path = strdup(ctx.root_path);
@@ -110,6 +145,9 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "wrong args\n");
 		return 1;
 	}
+
+	struct lsp_context lsp_ctx = { 0 };
+	lsp_run(&lsp_ctx);
 
 	return 0;
 }

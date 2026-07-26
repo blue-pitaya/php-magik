@@ -15,19 +15,15 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef FS_H
-#define FS_H
+#ifndef LSP_H
+#define LSP_H
 
-#include <stddef.h>
-#include <sys/types.h>
-#include <tree_sitter/api.h>
-#include "app_ctx.h"
+#include <stdio.h>
 
-typedef int (*fs_parser_fn)(const char *path, const char *content, size_t size,
-			    struct app_ctx *ctx);
+struct lsp_context {
+	FILE *log_file;
+};
 
-int fs_walk(const char *root, const char *ext, fs_parser_fn parser,
-	    struct app_ctx *ctx);
-int fs_load_tree(const char *path, TSTree **out_tree, struct app_ctx *app_ctx);
+int lsp_run(struct lsp_context *ctx);
 
 #endif
