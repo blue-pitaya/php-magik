@@ -20,25 +20,21 @@
 
 #include "vector.h"
 
-enum fs_mode {
-	FS_MODE_SINGLE_FILE,
-	FS_MODE_ROOT_DIR,
-};
-
 struct php_file {
 	char *uri;
 	char *path;
 };
 
 struct app_ctx {
-	enum fs_mode fs_mode;
 	char *root_path;
 	struct vec files; /**< struct php_file */
+	struct vec vars; /**< struct php_var */
+	struct vec funcs; /**< struct php_function */
 	// dynamic
 	char *parsing_file_path;
 	char *parsing_file_content;
 };
 
-void app_ctx_free(struct app_ctx *ctx);
+int app_ctx_init(struct app_ctx *ctx);
 
 #endif

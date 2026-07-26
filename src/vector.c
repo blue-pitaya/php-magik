@@ -58,7 +58,15 @@ int vec_push(struct vec *v, const void *item)
 	return 0;
 }
 
-void *vec_get(struct vec *v, int i)
+void *vec_get(const struct vec *v, int i)
 {
 	return (char *)v->data + i * v->elem_size;
+}
+
+void vec_concat(struct vec *v, const struct vec *other)
+{
+	for (int i = 0; i < other->len; i++) {
+		void *el = vec_get(other, i);
+		vec_push(v, el);
+	}
 }

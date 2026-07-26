@@ -31,6 +31,7 @@ int vec_init(struct vec *v, int elem_size);
 void vec_free(struct vec *v);
 
 int vec_push(struct vec *v, const void *item);
-void *vec_get(struct vec *v, int i);
+void *vec_get(const struct vec *v, int i);
+void vec_concat(struct vec *v, const struct vec *other);
 
 #endif

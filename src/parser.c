@@ -267,6 +267,7 @@ static void push_var(char *name, char *type, enum php_var_kind kind,
 		.line = p.row,
 		.col = p.column,
 		.type = type,
+		.file_id = ctx->file_id,
 	};
 	vec_push(&ctx->vars, &var);
 }
@@ -328,6 +329,7 @@ static void push_function(char *name, char *ret, enum php_func_kind kind,
 		.return_type = ret,
 		.line = p.row,
 		.col = p.column,
+		.file_id = ctx->file_id,
 	};
 	vec_push(&ctx->funcs, &fn);
 }
@@ -490,15 +492,15 @@ static size_t longest_str(const char *arr[], size_t n)
 	return max;
 }
 
-void parser_print_php_vars(struct parser_ctx *ctx)
+void parser_print_php_vars(struct vec *vars)
 {
 	static const char *kind_str[] = { "property", "param", "use", "this->",
 					  "obj->" };
 	int width = (int)longest_str(kind_str,
 				     sizeof(kind_str) / sizeof(kind_str[0]));
 
-	for (int i = 0; i < ctx->vars.len; i++) {
-		struct php_var *var = vec_get(&ctx->vars, i);
+	for (int i = 0; i < vars->len; i++) {
+		struct php_var *var = vec_get(vars, i);
 		printf("var %-*s %s%s%s @%u:%u in %s%s%s%s%s\n", width,
 		       kind_str[var->kind], var->name, var->type ? ": " : "",
 		       var->type ? var->type : "", var->line + 1, var->col + 1,
@@ -509,14 +511,14 @@ void parser_print_php_vars(struct parser_ctx *ctx)
 	}
 }
 
-void parser_print_php_funcs(struct parser_ctx *ctx)
+void parser_print_php_funcs(struct vec *funcs)
 {
 	static const char *kind_str[] = { "def", "call", "obj->" };
 	int width = (int)longest_str(kind_str,
 				     sizeof(kind_str) / sizeof(kind_str[0]));
 
-	for (int i = 0; i < ctx->funcs.len; i++) {
-		struct php_function *fn = vec_get(&ctx->funcs, i);
+	for (int i = 0; i < funcs->len; i++) {
+		struct php_function *fn = vec_get(funcs, i);
 		printf("func %-*s %s()%s%s @%u:%u in %s%s%s\n", width,
 		       kind_str[fn->kind], fn->name,
 		       fn->return_type ? ": " : "",

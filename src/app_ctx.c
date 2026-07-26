@@ -16,10 +16,25 @@
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
 #include "app_ctx.h"
-#include <stdlib.h>
+#include "parser.h"
+#include "vector.h"
 
-void app_ctx_free(struct app_ctx *ctx)
+int app_ctx_init(struct app_ctx *ctx)
 {
-	free(ctx->parsing_file_path);
-	free(ctx->parsing_file_content);
+	int err;
+
+	err = vec_init(&ctx->files, sizeof(struct php_file));
+	if (err) {
+		return err;
+	}
+	err = vec_init(&ctx->vars, sizeof(struct php_var));
+	if (err) {
+		return err;
+	}
+	err = vec_init(&ctx->funcs, sizeof(struct php_function));
+	if (err) {
+		return err;
+	}
+
+	return 0;
 }

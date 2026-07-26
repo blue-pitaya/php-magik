@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with php-magik. If not, see <https://www.gnu.org/licenses/>.
 
+#include "vector.h"
 #define _GNU_SOURCE
 #include "fs.h"
 #include "lsp.h"
@@ -46,18 +47,19 @@ static int parse(const char *path, const char *content, size_t size,
 	TSNode root = ts_tree_root_node(tree);
 
 	struct parser_ctx p_ctx = { 0 };
+	p_ctx.file_id = ctx->files.len;
 	p_ctx.file_content = ctx->parsing_file_content;
 	vec_init(&p_ctx.vars, sizeof(struct php_var));
 	vec_init(&p_ctx.funcs, sizeof(struct php_function));
 
 	parse_program(root, &p_ctx);
 
-	parser_print_php_funcs(&p_ctx);
-	parser_print_php_vars(&p_ctx);
+	vec_concat(&ctx->vars, &p_ctx.vars);
+	vec_concat(&ctx->funcs, &p_ctx.funcs);
 
-	php_vars_free(&p_ctx.vars);
-	php_funcs_free(&p_ctx.funcs);
 	free(p_ctx.ns);
+	free(p_ctx.class_name);
+	free(p_ctx.function_name);
 	ts_tree_delete(tree);
 	return 0;
 }
@@ -68,7 +70,9 @@ int main(int argc, char *argv[])
 	static struct option long_opts[] = {
 		{ "path", required_argument, 0, 'p' }, { 0, 0, 0, 0 }
 	};
+
 	struct app_ctx ctx = { 0 };
+	app_ctx_init(&ctx);
 
 	int c;
 	struct stat sb;
@@ -77,21 +81,7 @@ int main(int argc, char *argv[])
 		switch (c) {
 		case 'p':
 			arg_value = strdup(optarg);
-			err = stat(arg_value, &sb);
-			if (err) {
-				fprintf(stderr, "wrong args\n");
-				return 1;
-			}
-			if (S_ISDIR(sb.st_mode)) {
-				ctx.fs_mode = FS_MODE_ROOT_DIR;
-				ctx.root_path = arg_value;
-			} else if (S_ISREG(sb.st_mode)) {
-				ctx.fs_mode = FS_MODE_SINGLE_FILE;
-				ctx.root_path = arg_value;
-			} else {
-				fprintf(stderr, "not a file or dir\n");
-				return 1;
-			}
+			ctx.root_path = arg_value;
 			break;
 		default:
 			fprintf(stderr, "wrong args\n");
@@ -99,25 +89,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	switch (ctx.fs_mode) {
-	case FS_MODE_ROOT_DIR:
-		err = fs_walk(ctx.root_path, ".php", parse, &ctx);
-		if (err) {
-			fprintf(stderr, "error\n");
-			return 1;
-		}
-		break;
-	case FS_MODE_SINGLE_FILE:
-		err = fs_walk(ctx.root_path, ".php", parse, &ctx);
-		if (err) {
-			fprintf(stderr, "scan error\n");
-			return 1;
-		}
-		break;
-	default:
-		fprintf(stderr, "wrong args\n");
+	err = fs_walk(ctx.root_path, ".php", parse, &ctx);
+	if (err) {
+		fprintf(stderr, "scan error\n");
 		return 1;
 	}
+
+	parser_print_php_funcs(&ctx.funcs);
+	parser_print_php_vars(&ctx.vars);
 
 	exit(0);
 

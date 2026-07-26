@@ -101,31 +101,32 @@ static int walk_dir(const char *dir, const char *ext, fs_parser_fn parser,
 	return ret;
 }
 
-int fs_walk(const char *root, const char *ext, fs_parser_fn parser,
+int fs_walk(const char *path, const char *ext, fs_parser_fn parser,
 	    struct app_ctx *ctx)
 {
 	int err;
 	struct stat st;
 
-	err = stat(root, &st);
+	err = stat(path, &st);
 	if (err) {
-		fprintf(stderr, "fs: stat %s: %s\n", root, strerror(errno));
+		fprintf(stderr, "fs: stat %s: %s\n", path, strerror(errno));
 		return err;
 	}
 
 	if (S_ISREG(st.st_mode)) {
+
 		size_t len;
-		char *content = read_file(root, &len);
+		char *content = read_file(path, &len);
 		if (!content) {
 			return -1;
 		}
 
-		err = parser(root, content, len, ctx);
+		err = parser(path, content, len, ctx);
 		free(content);
 		return err;
 	}
 
-	return walk_dir(root, ext, parser, ctx);
+	return walk_dir(path, ext, parser, ctx);
 }
 
 int fs_load_tree(const char *path, TSTree **out_tree, struct app_ctx *app_ctx)
