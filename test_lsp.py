@@ -107,15 +107,15 @@ def run_test(n):
         if file not in opened:
             s.notify(*lsp_method_did_open(uri, (root / file).read_text()))
             opened.add(file)
-        results.append(
-            s.send(
-                method,
-                {
-                    "textDocument": {"uri": uri},
-                    "position": pos,
-                },
-            )
+        msg = s.send(
+            method,
+            {
+                "textDocument": {"uri": uri},
+                "position": pos,
+            },
         )
+        print("debug: " + msg)
+        results.append(msg)
         expected.append(exp)
     s.close()
     check(f"test_{n}", results, expected)

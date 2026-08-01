@@ -21,6 +21,7 @@
 #include <string.h>
 #include "yyjson.h"
 #include "lsp.h"
+#include "debug.h"
 
 static void lsp_log(struct lsp_context *ctx, const char *fmt, ...)
 {
@@ -88,6 +89,7 @@ static void send_response(yyjson_val *id, yyjson_mut_doc *doc,
 	yyjson_mut_obj_add_str(doc, root, "jsonrpc", "2.0");
 	yyjson_mut_obj_add_val(doc, root, "id", yyjson_val_mut_copy(doc, id));
 	yyjson_mut_obj_add_val(doc, root, "result", result);
+	DEBUG_MJSON("Respond", root);
 	lsp_write(doc);
 }
 
@@ -171,6 +173,7 @@ static yyjson_mut_val *handle_definition(struct lsp_context *ctx,
 
 int lsp_run(struct lsp_context *ctx)
 {
+	DEBUG("Started");
 	ctx->log_file = fopen("/tmp/php-magik.log", "w");
 	if (!ctx->log_file) {
 		return -1;
@@ -180,7 +183,9 @@ int lsp_run(struct lsp_context *ctx)
 	size_t msg_len;
 	char *msg;
 
+	int i = 0;
 	while (running) {
+		DEBUG("Loop: %d", i);
 		if (lsp_read(&msg, &msg_len)) {
 			break;
 		}
@@ -190,6 +195,7 @@ int lsp_run(struct lsp_context *ctx)
 		if (!req) {
 			continue;
 		}
+		DEBUG_JSON("Requet parsed", yyjson_doc_get_root(req));
 
 		yyjson_val *root = yyjson_doc_get_root(req);
 		yyjson_val *id = yyjson_obj_get(root, "id");
@@ -201,7 +207,9 @@ int lsp_run(struct lsp_context *ctx)
 		if (!m) {
 			lsp_log(ctx, "message without method\n");
 		} else if (!strcmp(m, "initialize")) {
-			send_response(id, resp, handle_initialize(resp));
+			DEBUG("Handle: %s", m);
+			yyjson_mut_val *zz = handle_initialize(resp);
+			send_response(id, resp, zz);
 		} else if (!strcmp(m, "initialized")) {
 			lsp_log(ctx, "initialized\n");
 		} else if (!strcmp(m, "shutdown")) {
@@ -237,6 +245,7 @@ int lsp_run(struct lsp_context *ctx)
 
 		yyjson_mut_doc_free(resp);
 		yyjson_doc_free(req);
+		++i;
 	}
 
 	fclose(ctx->log_file);

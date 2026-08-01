@@ -98,8 +98,6 @@ int main(int argc, char *argv[])
 	parser_print_php_funcs(&ctx.funcs);
 	parser_print_php_vars(&ctx.vars);
 
-	exit(0);
-
 	struct lsp_context lsp_ctx = { 0 };
 	lsp_run(&lsp_ctx);
 
