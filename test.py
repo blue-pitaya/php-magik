@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 """Unified test suite.
 
-Builds the server once, then runs the LSP tests. Each test gets its own
-LspClient (spawns the server, does the initialize handshake) to open
-file(s) and issue the requests it's actually testing.
+Organized by fixture, not by LSP command: each lsp-tests/test_N/ gets one
+test_N() function that spawns its own LspClient (spawns the server, does
+the initialize handshake) and runs whatever requests are relevant to that
+fixture - hover, definition, or both.
 
-Fixtures live under lsp-tests/test_N/. Single-file cases are just
-test_N/main.php; test_8 is the one exception with multiple files
-(Foo.php + NSA/A.php + NSB/B.php), since it's specifically testing
-cross-file indexing and go-to-definition.
+test_N/main.php is the standard single-file layout; test_8 is the one
+exception with multiple files (Foo.php + NSA/A.php + NSB/B.php), since
+it's specifically testing cross-file indexing and go-to-definition.
 
-The `test_hover_*` tests replace the old tests/test_N.php + test_N_ex.txt
-CLI-dump fixtures: instead of diffing a printed index dump, they hover at
-the start of each identifier the dump used to describe and check that the
-resolved signature/type still matches.
+The hover_cases() driven tests replace the old tests/test_N.php +
+test_N_ex.txt CLI-dump fixtures: instead of diffing a printed index dump,
+they hover at the start of each identifier the dump used to describe and
+check that the resolved signature/type still matches.
 """
 
 import json
@@ -31,15 +31,26 @@ SHOW_LOGS = False  # flip to True to see the server's stderr debug logs
 failures = 0
 
 
+# ---------------------------------------------------------------------------
+# Output helpers
+# ---------------------------------------------------------------------------
+
+USE_COLOR = sys.stdout.isatty()
+
+
+def _c(text: str, code: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if USE_COLOR else text
+
+
 def check(name, actual, expected):
     global failures
     if actual == expected:
-        print(f"{name}: OK")
+        print(f"  {_c('OK', '32')}    {name}")
     else:
         failures += 1
-        print(f"{name}: ERROR")
-        print(f"  expected: {expected!r}")
-        print(f"  actual:   {actual!r}")
+        print(f"  {_c('ERROR', '31;1')} {name}")
+        print(f"    expected: {expected!r}")
+        print(f"    actual:   {actual!r}")
 
 
 def php(text: str) -> str:
@@ -130,6 +141,16 @@ class LspClient:
         contents = (result.get("result") or {}).get("contents") or {}
         return contents.get("value")
 
+    def definition(self, uri: str, line: int, character: int):
+        result = self.request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": uri},
+                "position": {"line": line, "character": character},
+            },
+        )
+        return result.get("result")
+
     def close(self):
         self.request("shutdown")
         self.notify("exit")
@@ -140,67 +161,26 @@ class LspClient:
             self.proc.wait()
 
 
-# ---------------------------------------------------------------------------
-# lsp-tests/test_8: hover + definition across files (namespaces, classes)
-# ---------------------------------------------------------------------------
-
-
-def test_hover_method_call():
-    root = LSP_TEST_DIR / "test_8"
-    client = LspClient(root)
-    uri = client.did_open(root / "Foo.php")
-
-    value = client.hover(uri, 14, 18)
-    check(
-        "lsp:hover $a->get()",
-        value,
-        php("function get(): string"),
-    )
-    client.close()
-
-
-def test_definition_method_call():
-    root = LSP_TEST_DIR / "test_8"
-    client = LspClient(root)
-    uri = client.did_open(root / "Foo.php")
-
-    result = client.request(
-        "textDocument/definition",
-        {"textDocument": {"uri": uri}, "position": {"line": 14, "character": 18}},
-    )
-    check(
-        "lsp:definition $a->get()",
-        result.get("result"),
-        {
-            "uri": f"file://{root / 'NSA' / 'A.php'}",
-            "range": {
-                "start": {"line": 6, "character": 20},
-                "end": {"line": 6, "character": 23},
-            },
-        },
-    )
-    client.close()
-
-
-# ---------------------------------------------------------------------------
-# lsp-tests/test_N/main.php: hover at the start of every identifier the old
-# tests/test_N_ex.txt dump described, checking the same signature/type.
-# ---------------------------------------------------------------------------
-
-
-def run_hover_cases(n: int, cases):
+def hover_cases(n: int, cases):
+    """Run a list of (line, character, expected) hover checks against
+    lsp-tests/test_n/main.php."""
     path = LSP_TEST_DIR / f"test_{n}" / "main.php"
     client = LspClient(path)
     uri = client.did_open(path)
     for line, character, expected in cases:
         value = client.hover(uri, line, character)
-        check(f"hover:test_{n}@{line}:{character}", value, expected)
+        check(f"hover@{line}:{character}", value, expected)
     client.close()
 
 
-def test_hover_literal_return_types():
-    # test_1/main.php: return type inferred from a literal return value
-    run_hover_cases(
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+def test_1():
+    # return type inferred from a literal return value
+    hover_cases(
         1,
         [
             (2, 9, php("function zero(): int")),
@@ -210,9 +190,9 @@ def test_hover_literal_return_types():
     )
 
 
-def test_hover_arithmetic_return_types():
-    # test_2/main.php: return type inferred through +, *, / on literals
-    run_hover_cases(
+def test_2():
+    # return type inferred through +, *, / on literals
+    hover_cases(
         2,
         [
             (2, 9, php("function add(): int")),
@@ -222,9 +202,9 @@ def test_hover_arithmetic_return_types():
     )
 
 
-def test_hover_params():
-    # test_3/main.php: declared param types, and reads resolving to them
-    run_hover_cases(
+def test_3():
+    # declared param types, and reads resolving to them
+    hover_cases(
         3,
         [
             (2, 9, php("function add(): int")),
@@ -236,9 +216,9 @@ def test_hover_params():
     )
 
 
-def test_hover_local_vars():
-    # test_4/main.php: types propagated through local var assignments
-    run_hover_cases(
+def test_4():
+    # types propagated through local var assignments
+    hover_cases(
         4,
         [
             (2, 9, php("function add(): int")),
@@ -258,9 +238,9 @@ def test_hover_local_vars():
     )
 
 
-def test_hover_methods():
-    # test_5/main.php: methods across two classes in one namespace
-    run_hover_cases(
+def test_5():
+    # methods across two classes in one namespace
+    hover_cases(
         5,
         [
             (6, 20, php("function print(): int")),
@@ -274,9 +254,9 @@ def test_hover_methods():
     )
 
 
-def test_hover_properties():
-    # test_6/main.php: typed properties, $this->prop, and bare $this
-    run_hover_cases(
+def test_6():
+    # typed properties, $this->prop, and bare $this
+    hover_cases(
         6,
         [
             (12, 20, php("function print(): int")),
@@ -302,10 +282,10 @@ def test_hover_properties():
     )
 
 
-def test_hover_chained_properties():
-    # test_7/main.php: object-typed properties and $this->engine->prop
-    # chains (the second hop, ->power/->fuel, isn't indexed - known gap)
-    run_hover_cases(
+def test_7():
+    # object-typed properties and $this->engine->prop chains (the second
+    # hop, ->power/->fuel, isn't indexed - known gap)
+    hover_cases(
         7,
         [
             (13, 20, php("function __construct()")),
@@ -327,21 +307,62 @@ def test_hover_chained_properties():
     )
 
 
-LSP_TESTS = [
-    test_hover_method_call,
-    test_definition_method_call,
-    test_hover_literal_return_types,
-    test_hover_arithmetic_return_types,
-    test_hover_params,
-    test_hover_local_vars,
-    test_hover_methods,
-    test_hover_properties,
-    test_hover_chained_properties,
-]
+def test_8():
+    # hover + definition across files: Foo.php calls into NSA/A.php
+    root = LSP_TEST_DIR / "test_8"
+    client = LspClient(root)
+    uri = client.did_open(root / "Foo.php")
+
+    check(
+        "hover $a->get()",
+        client.hover(uri, 14, 18),
+        php("function get(): string"),
+    )
+    check(
+        "definition $a->get()",
+        client.definition(uri, 14, 18),
+        {
+            "uri": f"file://{root / 'NSA' / 'A.php'}",
+            "range": {
+                "start": {"line": 6, "character": 20},
+                "end": {"line": 6, "character": 23},
+            },
+        },
+    )
+    client.close()
+
+
+def test_9():
+    # definition on a plain local variable (no class, no function) - PHP
+    # has no distinct "declaration" node for a local, so this jumps to
+    # its earliest occurrence in the same file/scope.
+    root = LSP_TEST_DIR / "test_9"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    # `echo $a;` on line 4 (0-based line 3) -> should jump to `$a = 10;`
+    # on line 3 (0-based line 2), the earlier of the two occurrences.
+    check(
+        "definition $a (local var)",
+        client.definition(uri, 3, 5),
+        {
+            "uri": uri,
+            "range": {
+                "start": {"line": 2, "character": 0},
+                "end": {"line": 2, "character": 2},
+            },
+        },
+    )
+    client.close()
+
+
+TESTS = [test_1, test_2, test_3, test_4, test_5, test_6, test_7, test_8, test_9]
 
 
 def run_lsp_tests():
-    for t in LSP_TESTS:
+    for t in TESTS:
+        print(_c(f"Running {t.__name__}...", "36;1"))
         t()
 
 
@@ -350,10 +371,11 @@ def main():
 
     run_lsp_tests()
 
+    print()
     if failures:
-        print(f"\n{failures} check(s) failed")
+        print(_c(f"{failures} check(s) failed", "31;1"))
         sys.exit(1)
-    print("\nall checks passed")
+    print(_c("all checks passed", "32;1"))
 
 
 if __name__ == "__main__":
