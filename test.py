@@ -357,7 +357,50 @@ def test_9():
     client.close()
 
 
-TESTS = [test_1, test_2, test_3, test_4, test_5, test_6, test_7, test_8, test_9]
+def test_10():
+    # go-to-definition "in class context": $this->prop and $this->method()
+    # both resolving within the same class (Greeter, in Greeter.php)
+    root = LSP_TEST_DIR / "test_10"
+    client = LspClient(root)
+    uri = client.did_open(root / "Greeter.php")
+
+    check(
+        "definition $this->name (property)",
+        client.definition(uri, 13, 34),
+        {
+            "uri": uri,
+            "range": {
+                "start": {"line": 4, "character": 18},
+                "end": {"line": 4, "character": 23},
+            },
+        },
+    )
+    check(
+        "definition $this->greet() (method)",
+        client.definition(uri, 18, 33),
+        {
+            "uri": uri,
+            "range": {
+                "start": {"line": 11, "character": 20},
+                "end": {"line": 11, "character": 25},
+            },
+        },
+    )
+    client.close()
+
+
+TESTS = [
+    test_1,
+    test_2,
+    test_3,
+    test_4,
+    test_5,
+    test_6,
+    test_7,
+    test_8,
+    test_9,
+    test_10,
+]
 
 
 def run_lsp_tests():
