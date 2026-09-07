@@ -19,6 +19,7 @@
 #define APP_CTX_H
 
 #include "vector.h"
+#include <stddef.h>
 #include <tree_sitter/api.h>
 
 struct php_file {
@@ -38,5 +39,12 @@ struct app_ctx {
 
 int app_ctx_init(struct app_ctx *ctx);
 struct php_file *app_ctx_find_file(struct app_ctx *ctx, const char *uri);
+
+/** reparses an already-indexed file's content in place (tree, source
+ * buffer, and its vars/funcs entries), for textDocument/didOpen and
+ * textDocument/didChange. Returns -1 if `uri` isn't in the index (e.g. a
+ * file opened from outside the indexed root). */
+int app_ctx_reparse_file(struct app_ctx *ctx, const char *uri,
+			 const char *content, size_t len);
 
 #endif

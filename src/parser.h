@@ -59,6 +59,8 @@ struct parser_ctx {
 
 void php_vars_free(struct vec *v);
 void php_funcs_free(struct vec *v);
+void php_vars_remove_file(struct vec *v, int file_id);
+void php_funcs_remove_file(struct vec *v, int file_id);
 
 /** root is (program) node */
 int parse_program(TSNode root, struct parser_ctx *ctx);

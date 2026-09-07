@@ -315,6 +315,29 @@ void php_vars_free(struct vec *v)
 	vec_free(v);
 }
 
+/* drops every entry belonging to `file_id` in place, freeing its owned
+ * strings, so a file can be reparsed without leaking or duplicating */
+void php_vars_remove_file(struct vec *v, int file_id)
+{
+	int w = 0;
+	for (int i = 0; i < v->len; i++) {
+		struct php_var *var = vec_get(v, i);
+		if (var->file_id == file_id) {
+			free(var->name);
+			free(var->ns);
+			free(var->class_name);
+			free(var->function_name);
+			free(var->type);
+			continue;
+		}
+		if (w != i) {
+			memcpy(vec_get(v, w), var, sizeof(*var));
+		}
+		w++;
+	}
+	v->len = w;
+}
+
 /* takes ownership of name and ret */
 static void push_function(char *name, char *ret, enum php_func_kind kind,
 			  TSNode node, struct parser_ctx *ctx)
@@ -356,6 +379,29 @@ void php_funcs_free(struct vec *v)
 		free(fn->return_type);
 	}
 	vec_free(v);
+}
+
+/* drops every entry belonging to `file_id` in place, freeing its owned
+ * strings, so a file can be reparsed without leaking or duplicating */
+void php_funcs_remove_file(struct vec *v, int file_id)
+{
+	int w = 0;
+	for (int i = 0; i < v->len; i++) {
+		struct php_function *fn = vec_get(v, i);
+		if (fn->file_id == file_id) {
+			free(fn->name);
+			free(fn->ns);
+			free(fn->class_name);
+			free(fn->function_name);
+			free(fn->return_type);
+			continue;
+		}
+		if (w != i) {
+			memcpy(vec_get(v, w), fn, sizeof(*fn));
+		}
+		w++;
+	}
+	v->len = w;
 }
 
 /* records every (variable_name) in the subtree: declarations and usages */
