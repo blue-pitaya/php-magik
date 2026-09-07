@@ -18,10 +18,12 @@
 #ifndef LSP_H
 #define LSP_H
 
+#include "app_ctx.h"
 #include <stdio.h>
 
 struct lsp_context {
 	FILE *log_file;
+	struct app_ctx *app;
 };
 
 int lsp_run(struct lsp_context *ctx);

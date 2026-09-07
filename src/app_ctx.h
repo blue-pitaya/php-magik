@@ -19,10 +19,14 @@
 #define APP_CTX_H
 
 #include "vector.h"
+#include <tree_sitter/api.h>
 
 struct php_file {
+	int file_id;
 	char *uri;
 	char *path;
+	char *content; /* owned; source backing `tree`, kept alive for lookups */
+	TSTree *tree;
 };
 
 struct app_ctx {
@@ -30,11 +34,9 @@ struct app_ctx {
 	struct vec files; /**< struct php_file */
 	struct vec vars; /**< struct php_var */
 	struct vec funcs; /**< struct php_function */
-	// dynamic
-	char *parsing_file_path;
-	char *parsing_file_content;
 };
 
 int app_ctx_init(struct app_ctx *ctx);
+struct php_file *app_ctx_find_file(struct app_ctx *ctx, const char *uri);
 
 #endif

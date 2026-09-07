@@ -18,6 +18,7 @@
 #include "app_ctx.h"
 #include "parser.h"
 #include "vector.h"
+#include <string.h>
 
 int app_ctx_init(struct app_ctx *ctx)
 {
@@ -37,4 +38,15 @@ int app_ctx_init(struct app_ctx *ctx)
 	}
 
 	return 0;
+}
+
+struct php_file *app_ctx_find_file(struct app_ctx *ctx, const char *uri)
+{
+	for (int i = 0; i < ctx->files.len; i++) {
+		struct php_file *f = vec_get(&ctx->files, i);
+		if (f->uri && !strcmp(f->uri, uri)) {
+			return f;
+		}
+	}
+	return NULL;
 }

@@ -129,27 +129,16 @@ int fs_walk(const char *path, const char *ext, fs_parser_fn parser,
 	return walk_dir(path, ext, parser, ctx);
 }
 
-int fs_load_tree(const char *path, TSTree **out_tree, struct app_ctx *app_ctx)
+int fs_parse_tree(const char *content, size_t len, TSTree **out_tree)
 {
-	size_t len;
-	char *buf = read_file(path, &len);
-	if (!buf) {
-		return -1;
-	}
-
-	app_ctx->parsing_file_content = buf;
 	TSParser *parser = ts_parser_new();
 	if (!parser) {
-		free(buf);
-		app_ctx->parsing_file_content = NULL;
 		return -1;
 	}
 	ts_parser_set_language(parser, tree_sitter_php_only());
-	TSTree *tree = ts_parser_parse_string(parser, NULL, buf, len);
+	TSTree *tree = ts_parser_parse_string(parser, NULL, content, len);
 	ts_parser_delete(parser);
 	if (!tree) {
-		free(buf);
-		app_ctx->parsing_file_content = NULL;
 		return -1;
 	}
 	*out_tree = tree;

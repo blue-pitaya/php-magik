@@ -23,32 +23,52 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <limits.h>
 #include "parser.h"
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <tree_sitter/api.h>
 #include <unistd.h>
 
+/* "file://" + absolute path, so it matches the uris editors send */
+static char *path_to_uri(const char *path)
+{
+	char resolved[PATH_MAX];
+	const char *abs = realpath(path, resolved) ? resolved : path;
+	char *uri = malloc(strlen("file://") + strlen(abs) + 1);
+	if (!uri) {
+		return NULL;
+	}
+	sprintf(uri, "file://%s", abs);
+	return uri;
+}
+
 static int parse(const char *path, const char *content, size_t size,
 		 struct app_ctx *ctx)
 {
-	ctx->parsing_file_path = strdup(path);
-	fprintf(stderr, "Parsing: %s\n", path);
-
 	int err;
 	TSTree *tree;
-	err = fs_load_tree(ctx->parsing_file_path, &tree, ctx);
+	err = fs_parse_tree(content, size, &tree);
 	if (err) {
 		return -1;
 	}
 
 	TSNode root = ts_tree_root_node(tree);
 
+	struct php_file file = {
+		.file_id = ctx->files.len,
+		.uri = path_to_uri(path),
+		.path = strdup(path),
+		.content = strndup(content, size),
+		.tree = tree,
+	};
+
 	struct parser_ctx p_ctx = { 0 };
-	p_ctx.file_id = ctx->files.len;
-	p_ctx.file_content = ctx->parsing_file_content;
+	p_ctx.file_id = file.file_id;
+	p_ctx.file_content = file.content;
 	vec_init(&p_ctx.vars, sizeof(struct php_var));
 	vec_init(&p_ctx.funcs, sizeof(struct php_function));
 
@@ -56,11 +76,15 @@ static int parse(const char *path, const char *content, size_t size,
 
 	vec_concat(&ctx->vars, &p_ctx.vars);
 	vec_concat(&ctx->funcs, &p_ctx.funcs);
+	vec_free(&p_ctx.vars);
+	vec_free(&p_ctx.funcs);
 
 	free(p_ctx.ns);
 	free(p_ctx.class_name);
 	free(p_ctx.function_name);
-	ts_tree_delete(tree);
+
+	/* tree/content are kept alive in ctx->files for the LSP's lifetime */
+	vec_push(&ctx->files, &file);
 	return 0;
 }
 
@@ -95,10 +119,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	parser_print_php_funcs(&ctx.funcs);
-	parser_print_php_vars(&ctx.vars);
-
 	struct lsp_context lsp_ctx = { 0 };
+	lsp_ctx.app = &ctx;
 	lsp_run(&lsp_ctx);
 
 	return 0;

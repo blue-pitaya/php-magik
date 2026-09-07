@@ -19,9 +19,220 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <tree_sitter/api.h>
 #include "yyjson.h"
 #include "lsp.h"
+#include "app_ctx.h"
+#include "parser.h"
+#include "vector.h"
 #include "debug.h"
+
+static char *xsprintf(const char *fmt, ...)
+{
+	va_list ap, ap2;
+	va_start(ap, fmt);
+	va_copy(ap2, ap);
+	int n = vsnprintf(NULL, 0, fmt, ap);
+	va_end(ap);
+	char *buf = n < 0 ? NULL : malloc(n + 1);
+	if (buf) {
+		vsnprintf(buf, n + 1, fmt, ap2);
+	}
+	va_end(ap2);
+	return buf;
+}
+
+static char *node_text(TSNode node, const char *content)
+{
+	uint32_t start = ts_node_start_byte(node);
+	uint32_t end = ts_node_end_byte(node);
+	return strndup(content + start, end - start);
+}
+
+/* "foo" -> "$foo", to match how property names are stored */
+static char *prop_name(const char *text)
+{
+	char *name = malloc(strlen(text) + 2);
+	if (name) {
+		name[0] = '$';
+		strcpy(name + 1, text);
+	}
+	return name;
+}
+
+static struct php_var *find_var_at(struct app_ctx *app, int file_id, TSPoint p,
+				   const char *name)
+{
+	for (int i = 0; i < app->vars.len; i++) {
+		struct php_var *v = vec_get(&app->vars, i);
+		if (v->file_id == file_id && v->line == p.row &&
+		    v->col == p.column && !strcmp(v->name, name)) {
+			return v;
+		}
+	}
+	return NULL;
+}
+
+static struct php_function *find_func_at(struct app_ctx *app, int file_id,
+					 TSPoint p, const char *name)
+{
+	for (int i = 0; i < app->funcs.len; i++) {
+		struct php_function *f = vec_get(&app->funcs, i);
+		if (f->file_id == file_id && f->line == p.row &&
+		    f->col == p.column && !strcmp(f->name, name)) {
+			return f;
+		}
+	}
+	return NULL;
+}
+
+struct resolved {
+	struct php_var *var;
+	struct php_function *func;
+};
+
+/* whichever indexed var/function usage or declaration sits exactly at
+ * line:character, matched by the AST node's own text and position */
+static struct resolved resolve_at(struct app_ctx *app, struct php_file *file,
+				  int line, int character)
+{
+	struct resolved r = { 0 };
+	TSPoint pt = { (uint32_t)line, (uint32_t)character };
+	TSNode root = ts_tree_root_node(file->tree);
+	/* named variant: variable_name is ["$" (anonymous), name (named)], so
+	 * the plain descendant lookup would land on the bare "$" leaf when
+	 * hovering exactly on it instead of variable_name itself */
+	TSNode node = ts_node_named_descendant_for_point_range(root, pt, pt);
+	if (ts_node_is_null(node)) {
+		return r;
+	}
+
+	const char *t = ts_node_type(node);
+	TSPoint p = ts_node_start_point(node);
+	char *text = node_text(node, file->content);
+
+	if (!strcmp(t, "variable_name")) {
+		r.var = find_var_at(app, file->file_id, p, text);
+	} else if (!strcmp(t, "name") || !strcmp(t, "qualified_name")) {
+		r.func = find_func_at(app, file->file_id, p, text);
+		if (!r.func) {
+			char *pn = prop_name(text);
+			r.var = find_var_at(app, file->file_id, p, pn);
+			free(pn);
+		}
+	}
+
+	free(text);
+	return r;
+}
+
+/* definition target for a function/method usage: the matching FUNC_DEF,
+ * same class for methods, no class for plain function calls */
+static struct php_function *find_func_def(struct app_ctx *app,
+					  struct php_function *call)
+{
+	for (int i = 0; i < app->funcs.len; i++) {
+		struct php_function *f = vec_get(&app->funcs, i);
+		if (f->kind != FUNC_DEF || strcmp(f->name, call->name)) {
+			continue;
+		}
+		if (call->kind == FUNC_METHOD) {
+			if (!f->class_name || !call->class_name ||
+			    strcmp(f->class_name, call->class_name)) {
+				continue;
+			}
+		} else if (f->class_name) {
+			continue;
+		}
+		return f;
+	}
+	return NULL;
+}
+
+/* definition target for a variable usage: the class property for
+ * $this/$obj access, else the earliest occurrence in the same scope */
+static struct php_var *find_var_def(struct app_ctx *app, struct php_var *use)
+{
+	if (use->kind == VAR_PROPERTY) {
+		return use;
+	}
+	if (use->kind == VAR_OBJ || use->kind == VAR_THIS) {
+		for (int i = 0; i < app->vars.len; i++) {
+			struct php_var *v = vec_get(&app->vars, i);
+			if (v->kind == VAR_PROPERTY && v->class_name &&
+			    use->class_name &&
+			    !strcmp(v->class_name, use->class_name) &&
+			    !strcmp(v->name, use->name)) {
+				return v;
+			}
+		}
+		return NULL;
+	}
+
+	struct php_var *best = NULL;
+	for (int i = 0; i < app->vars.len; i++) {
+		struct php_var *v = vec_get(&app->vars, i);
+		if (v->file_id != use->file_id || strcmp(v->name, use->name)) {
+			continue;
+		}
+		int same_fn = (!v->function_name && !use->function_name) ||
+			      (v->function_name && use->function_name &&
+			       !strcmp(v->function_name, use->function_name));
+		if (!same_fn) {
+			continue;
+		}
+		if (!best || v->line < best->line ||
+		    (v->line == best->line && v->col < best->col)) {
+			best = v;
+		}
+	}
+	return best;
+}
+
+/* most recent known type of the same variable, at or before `at`, in the
+ * same file+function scope; mirrors parser.c's scope_var_type() but at
+ * query time over the whole index instead of during a single parse pass */
+static const char *latest_var_type(struct app_ctx *app, struct php_var *at)
+{
+	struct php_var *best = NULL;
+	for (int i = 0; i < app->vars.len; i++) {
+		struct php_var *v = vec_get(&app->vars, i);
+		if (v->file_id != at->file_id || !v->type ||
+		    strcmp(v->name, at->name)) {
+			continue;
+		}
+		int same_fn = (!v->function_name && !at->function_name) ||
+			      (v->function_name && at->function_name &&
+			       !strcmp(v->function_name, at->function_name));
+		if (!same_fn) {
+			continue;
+		}
+		if (v->line > at->line ||
+		    (v->line == at->line && v->col > at->col)) {
+			continue;
+		}
+		if (!best || v->line > best->line ||
+		    (v->line == best->line && v->col > best->col)) {
+			best = v;
+		}
+	}
+	return best ? best->type : NULL;
+}
+
+static yyjson_mut_val *location_json(yyjson_mut_doc *doc, const char *uri,
+				     uint32_t line, uint32_t col, size_t len)
+{
+	yyjson_mut_val *loc = yyjson_mut_obj(doc);
+	yyjson_mut_obj_add_str(doc, loc, "uri", uri);
+	yyjson_mut_val *range = yyjson_mut_obj_add_obj(doc, loc, "range");
+	yyjson_mut_val *start = yyjson_mut_obj_add_obj(doc, range, "start");
+	yyjson_mut_obj_add_uint(doc, start, "line", line);
+	yyjson_mut_obj_add_uint(doc, start, "character", col);
+	yyjson_mut_val *end = yyjson_mut_obj_add_obj(doc, range, "end");
+	yyjson_mut_obj_add_uint(doc, end, "line", line);
+	yyjson_mut_obj_add_uint(doc, end, "character", col + len);
+	return loc;
+}
 
 static void lsp_log(struct lsp_context *ctx, const char *fmt, ...)
 {
@@ -148,12 +359,42 @@ static yyjson_mut_val *handle_hover(struct lsp_context *ctx, yyjson_val *params,
 	int col = yyjson_get_int(yyjson_obj_get(pos, "character"));
 	lsp_log(ctx, "hover: %s %d:%d\n", uri, line, col);
 
+	struct php_file *file = app_ctx_find_file(ctx->app, uri);
+	if (!file) {
+		return yyjson_mut_null(doc);
+	}
+
+	struct resolved r = resolve_at(ctx->app, file, line, col);
+	char *text = NULL;
+	if (r.var) {
+		const char *type =
+			r.var->type ? r.var->type :
+				      latest_var_type(ctx->app, r.var);
+		text = type ? xsprintf("```php\n%s: %s\n```", r.var->name, type) :
+			     xsprintf("```php\n%s\n```", r.var->name);
+	} else if (r.func) {
+		const char *ret = r.func->return_type;
+		if (!ret && r.func->kind != FUNC_DEF) {
+			struct php_function *def =
+				find_func_def(ctx->app, r.func);
+			if (def) {
+				ret = def->return_type;
+			}
+		}
+		text = ret ? xsprintf("```php\nfunction %s(): %s\n```",
+				      r.func->name, ret) :
+			    xsprintf("```php\nfunction %s()\n```", r.func->name);
+	}
+	if (!text) {
+		return yyjson_mut_null(doc);
+	}
+
 	yyjson_mut_val *result = yyjson_mut_obj(doc);
 	yyjson_mut_val *contents =
 		yyjson_mut_obj_add_obj(doc, result, "contents");
 	yyjson_mut_obj_add_str(doc, contents, "kind", "markdown");
-	yyjson_mut_obj_add_str(doc, contents, "value",
-			       "```php\n// hover info\n```");
+	yyjson_mut_obj_add_strcpy(doc, contents, "value", text);
+	free(text);
 	return result;
 }
 
@@ -167,6 +408,31 @@ static yyjson_mut_val *handle_definition(struct lsp_context *ctx,
 	int line = yyjson_get_int(yyjson_obj_get(pos, "line"));
 	int col = yyjson_get_int(yyjson_obj_get(pos, "character"));
 	lsp_log(ctx, "definition: %s %d:%d\n", uri, line, col);
+
+	struct php_file *file = app_ctx_find_file(ctx->app, uri);
+	if (!file) {
+		return yyjson_mut_null(doc);
+	}
+
+	struct resolved r = resolve_at(ctx->app, file, line, col);
+
+	if (r.func) {
+		struct php_function *def = find_func_def(ctx->app, r.func);
+		if (def) {
+			struct php_file *df =
+				vec_get(&ctx->app->files, def->file_id);
+			return location_json(doc, df->uri, def->line, def->col,
+					     strlen(def->name));
+		}
+	} else if (r.var) {
+		struct php_var *def = find_var_def(ctx->app, r.var);
+		if (def) {
+			struct php_file *df =
+				vec_get(&ctx->app->files, def->file_id);
+			return location_json(doc, df->uri, def->line, def->col,
+					     strlen(def->name));
+		}
+	}
 
 	return yyjson_mut_null(doc);
 }

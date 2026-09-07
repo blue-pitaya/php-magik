@@ -28,6 +28,6 @@ typedef int (*fs_parser_fn)(const char *path, const char *content, size_t size,
 
 int fs_walk(const char *path, const char *ext, fs_parser_fn parser,
 	    struct app_ctx *ctx);
-int fs_load_tree(const char *path, TSTree **out_tree, struct app_ctx *app_ctx);
+int fs_parse_tree(const char *content, size_t len, TSTree **out_tree);
 
 #endif

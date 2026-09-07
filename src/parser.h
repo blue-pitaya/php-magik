@@ -60,9 +60,6 @@ struct parser_ctx {
 void php_vars_free(struct vec *v);
 void php_funcs_free(struct vec *v);
 
-void parser_print_php_vars(struct vec *vars);
-void parser_print_php_funcs(struct vec *funcs);
-
 /** root is (program) node */
 int parse_program(TSNode root, struct parser_ctx *ctx);
 

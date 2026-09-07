@@ -1,5 +1,0 @@
-func def   add(): int @3:1 in (top-level)
-var param    $a: int @3:18 in add
-var param    $b: int @3:26 in add
-var use      $a @5:12 in add
-var use      $b @5:17 in add

@@ -421,8 +421,10 @@ static int parse_function_like(TSNode root, struct parser_ctx *ctx)
 	}
 	ctx->function_name = get_node_text(name, ctx);
 	collect_variables(root, ctx); /* before return inference: fills scope */
+	/* position the def at its own name, not the declaration's start, so
+	 * hovering/go-to-def on the name lines up like every other symbol */
 	push_function(strdup(ctx->function_name), infer_return_type(root, ctx),
-		      FUNC_DEF, root, ctx);
+		      FUNC_DEF, name, ctx);
 	free(ctx->function_name);
 	ctx->function_name = NULL;
 	return 0;
@@ -478,54 +480,6 @@ static int parse_namespace_definition(TSNode root, struct parser_ctx *ctx)
 		}
 	}
 	return 0;
-}
-
-static size_t longest_str(const char *arr[], size_t n)
-{
-	size_t max = 0;
-	for (size_t i = 0; i < n; i++) {
-		size_t len = strlen(arr[i]);
-		if (len > max) {
-			max = len;
-		}
-	}
-	return max;
-}
-
-void parser_print_php_vars(struct vec *vars)
-{
-	static const char *kind_str[] = { "property", "param", "use", "this->",
-					  "obj->" };
-	int width = (int)longest_str(kind_str,
-				     sizeof(kind_str) / sizeof(kind_str[0]));
-
-	for (int i = 0; i < vars->len; i++) {
-		struct php_var *var = vec_get(vars, i);
-		fprintf(stderr, "var %-*s %s%s%s @%u:%u in %s%s%s%s%s\n", width,
-		       kind_str[var->kind], var->name, var->type ? ": " : "",
-		       var->type ? var->type : "", var->line + 1, var->col + 1,
-		       var->ns ? var->ns : "", var->ns ? "\\" : "",
-		       var->class_name ? var->class_name : "",
-		       var->class_name ? "::" : "",
-		       var->function_name ? var->function_name : "(top-level)");
-	}
-}
-
-void parser_print_php_funcs(struct vec *funcs)
-{
-	static const char *kind_str[] = { "def", "call", "obj->" };
-	int width = (int)longest_str(kind_str,
-				     sizeof(kind_str) / sizeof(kind_str[0]));
-
-	for (int i = 0; i < funcs->len; i++) {
-		struct php_function *fn = vec_get(funcs, i);
-		fprintf(stderr, "func %-*s %s()%s%s @%u:%u in %s%s%s\n", width,
-		       kind_str[fn->kind], fn->name,
-		       fn->return_type ? ": " : "",
-		       fn->return_type ? fn->return_type : "", fn->line + 1,
-		       fn->col + 1, fn->ns ? fn->ns : "", fn->ns ? "\\" : "",
-		       fn->class_name ? fn->class_name : "(top-level)");
-	}
 }
 
 int parse_program(TSNode root, struct parser_ctx *ctx)
