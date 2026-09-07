@@ -35,7 +35,7 @@ static int parse(const char *path, const char *content, size_t size,
 		 struct app_ctx *ctx)
 {
 	ctx->parsing_file_path = strdup(path);
-	printf("Parsing: %s\n", path);
+	fprintf(stderr, "Parsing: %s\n", path);
 
 	int err;
 	TSTree *tree;

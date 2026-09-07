@@ -501,7 +501,7 @@ void parser_print_php_vars(struct vec *vars)
 
 	for (int i = 0; i < vars->len; i++) {
 		struct php_var *var = vec_get(vars, i);
-		printf("var %-*s %s%s%s @%u:%u in %s%s%s%s%s\n", width,
+		fprintf(stderr, "var %-*s %s%s%s @%u:%u in %s%s%s%s%s\n", width,
 		       kind_str[var->kind], var->name, var->type ? ": " : "",
 		       var->type ? var->type : "", var->line + 1, var->col + 1,
 		       var->ns ? var->ns : "", var->ns ? "\\" : "",
@@ -519,7 +519,7 @@ void parser_print_php_funcs(struct vec *funcs)
 
 	for (int i = 0; i < funcs->len; i++) {
 		struct php_function *fn = vec_get(funcs, i);
-		printf("func %-*s %s()%s%s @%u:%u in %s%s%s\n", width,
+		fprintf(stderr, "func %-*s %s()%s%s @%u:%u in %s%s%s\n", width,
 		       kind_str[fn->kind], fn->name,
 		       fn->return_type ? ": " : "",
 		       fn->return_type ? fn->return_type : "", fn->line + 1,
