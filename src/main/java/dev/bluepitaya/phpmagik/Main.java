@@ -9,23 +9,10 @@ import java.nio.file.Path;
 public final class Main {
 
     public static void main(String[] args) throws IOException {
-        String rootPath = null;
-        for (int i = 0; i < args.length; i++) {
-            if (args[i].equals("--path") && i + 1 < args.length) {
-                rootPath = args[++i];
-            } else if (args[i].startsWith("--path=")) {
-                rootPath = args[i].substring("--path=".length());
-            } else {
-                System.err.println("wrong args");
-                System.exit(1);
-            }
-        }
-        if (rootPath == null) {
-            System.err.println("wrong args");
-            System.exit(1);
-        }
+        var programParams = new ProgramParams(args);
+        var rootPath = programParams.rootPath;
+        var workspace = new Workspace();
 
-        Workspace workspace = new Workspace();
         try {
             workspace.index(Path.of(rootPath));
         } catch (IOException cause) {
