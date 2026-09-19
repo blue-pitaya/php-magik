@@ -112,6 +112,21 @@ public class Node implements Iterable<Node> {
 
     private native Node getDescendant(int startByte, int endByte, boolean named);
 
+    /**
+     * The smallest node within this node spanning the given range of points.
+     *
+     * @throws NullPointerException if either point is {@code null}
+     */
+    public Node getDescendant(Point startPoint, Point endPoint) {
+        return getDescendant(startPoint, endPoint, false);
+    }
+
+    public Node getNamedDescendant(Point startPoint, Point endPoint) {
+        return getDescendant(startPoint, endPoint, true);
+    }
+
+    private native Node getDescendant(Point startPoint, Point endPoint, boolean named);
+
     /** Includes the node itself. */
     public native int getDescendantCount();
 

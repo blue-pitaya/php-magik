@@ -127,7 +127,7 @@ class Runner:
         self.build_java()
         self.build_native()
 
-    def run_demo(self):
+    def serve(self, path: str):
         self.build_all()
         self.run(
             "java",
@@ -135,6 +135,8 @@ class Runner:
             "-cp",
             self.paths.classes,
             "dev.bluepitaya.phpmagik.Main",
+            "--path",
+            path,
         )
 
 
@@ -145,12 +147,22 @@ def main():
         "build_java": runner.build_java,
         "build_native": runner.build_native,
         "build_all": runner.build_all,
-        "run_demo": runner.run_demo,
+        "serve": runner.serve,
     }
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=list(cmds))
+    parser.add_argument(
+        "path",
+        nargs="?",
+        help="project root to index; required by serve",
+    )
     args = parser.parse_args()
-    cmds[args.command]()
+    if args.command == "serve":
+        if args.path is None:
+            parser.error("serve needs a path to index")
+        runner.serve(args.path)
+    else:
+        cmds[args.command]()
 
 
 if __name__ == "__main__":

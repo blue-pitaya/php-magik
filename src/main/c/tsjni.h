@@ -34,6 +34,8 @@ extern jfieldID _nodeTreeField;
 
 extern jclass _pointClass;
 extern jmethodID _pointConstructor;
+extern jfieldID _pointRowField;
+extern jfieldID _pointColumnField;
 
 extern jclass _treeClass;
 extern jmethodID _treeConstructor;
@@ -58,5 +60,7 @@ jobject __marshalNode(JNIEnv *env, TSNode node, jobject treeObject);
 TSNode __unmarshalNode(JNIEnv *env, jobject nodeObject);
 
 jobject __marshalPoint(JNIEnv *env, TSPoint point);
+
+TSPoint __unmarshalPoint(JNIEnv *env, jobject pointObject);
 
 #endif

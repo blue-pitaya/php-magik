@@ -67,7 +67,7 @@ JNIEXPORT jobjectArray JNICALL Java_dev_bluepitaya_phpmagik_ts_Node_getChildren(
   return children;
 }
 
-JNIEXPORT jobject JNICALL Java_dev_bluepitaya_phpmagik_ts_Node_getDescendant(
+JNIEXPORT jobject JNICALL Java_dev_bluepitaya_phpmagik_ts_Node_getDescendant__IIZ(
     JNIEnv *env, jobject thisObject, jint startByte, jint endByte, jboolean named) {
   if (startByte < 0 || endByte < 0) {
     __throwIAE(env, "The start and end bytes must not be negative!");
@@ -82,6 +82,28 @@ JNIEXPORT jobject JNICALL Java_dev_bluepitaya_phpmagik_ts_Node_getDescendant(
             : ts_node_descendant_for_byte_range;
   TSNode node = __unmarshalNode(env, thisObject);
   TSNode descendant = descendant_getter(node, (uint32_t)startByte, (uint32_t)endByte);
+  return __marshalNode(env, descendant, __nodeTree(env, thisObject));
+}
+
+JNIEXPORT jobject JNICALL
+Java_dev_bluepitaya_phpmagik_ts_Node_getDescendant__Ldev_bluepitaya_phpmagik_ts_Point_2Ldev_bluepitaya_phpmagik_ts_Point_2Z(
+    JNIEnv *env, jobject thisObject, jobject startPointObject, jobject endPointObject,
+    jboolean named) {
+  if (startPointObject == NULL) {
+    __throwNPE(env, "Start point must not be null!");
+    return NULL;
+  }
+  if (endPointObject == NULL) {
+    __throwNPE(env, "End point must not be null!");
+    return NULL;
+  }
+  TSNode (*descendant_getter)(TSNode, TSPoint, TSPoint) =
+      named ? ts_node_named_descendant_for_point_range
+            : ts_node_descendant_for_point_range;
+  TSNode node = __unmarshalNode(env, thisObject);
+  TSPoint startPoint = __unmarshalPoint(env, startPointObject);
+  TSPoint endPoint = __unmarshalPoint(env, endPointObject);
+  TSNode descendant = descendant_getter(node, startPoint, endPoint);
   return __marshalNode(env, descendant, __nodeTree(env, thisObject));
 }
 

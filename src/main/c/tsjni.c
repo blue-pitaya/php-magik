@@ -39,6 +39,8 @@ jfieldID _nodeTreeField;
 
 jclass _pointClass;
 jmethodID _pointConstructor;
+jfieldID _pointRowField;
+jfieldID _pointColumnField;
 
 jclass _treeClass;
 jmethodID _treeConstructor;
@@ -85,6 +87,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
   _loadClass(_pointClass, PACKAGE "Point");
   _pointConstructor = (*env)->GetMethodID(env, _pointClass, "<init>", "(II)V");
+  _pointRowField = (*env)->GetFieldID(env, _pointClass, "row", "I");
+  _pointColumnField = (*env)->GetFieldID(env, _pointClass, "column", "I");
 
   _loadClass(_treeClass, PACKAGE "Tree");
   _treeConstructor = (*env)->GetMethodID(env, _treeClass, "<init>", "(J[B)V");
@@ -168,4 +172,11 @@ TSNode __unmarshalNode(JNIEnv *env, jobject nodeObject) {
 jobject __marshalPoint(JNIEnv *env, TSPoint point) {
   return (*env)->NewObject(env, _pointClass, _pointConstructor, (jint)point.row,
                            (jint)point.column);
+}
+
+TSPoint __unmarshalPoint(JNIEnv *env, jobject pointObject) {
+  TSPoint point;
+  point.row = (uint32_t)(*env)->GetIntField(env, pointObject, _pointRowField);
+  point.column = (uint32_t)(*env)->GetIntField(env, pointObject, _pointColumnField);
+  return point;
 }

@@ -1,19 +1,48 @@
 # php-magik (Java)
 
-Step one of porting `../c-project` to Java: a JNI binding that parses PHP with
-the same tree-sitter build the C project uses.
+A PHP language server, ported to Java from the C implementation kept under
+`.old-project/`. It parses PHP with the same tree-sitter build the C project
+used, reached through a hand-written JNI binding.
+
+## Status
+
+The whole LSP surface of the C version is ported: `initialize`, `didOpen`,
+`didChange`, `didClose`, `hover`, `definition`, `references`, `documentSymbol`,
+`workspace/symbol` and `completion`, over the same stdio JSON-RPC transport.
+
+```
+src/main/java/dev/bluepitaya/phpmagik/
+  Main.java              --path <dir|file>, indexes, then serves on stdio
+  json/Json.java         minimal JSON tree, standing in for the vendored yyjson
+  index/
+    Indexer.java         port of the C parser.c: walks a tree, records symbols
+    Workspace.java       port of app_ctx.c + fs.c: the file/var/func indexes
+    PhpFile, PhpVar, PhpFunction, VarKind, FuncKind
+  lsp/LspServer.java     port of lsp.c: transport, dispatch, every handler
+  ts/                    the tree-sitter binding (below)
+```
+
+## Test
+
+`python test.py` builds everything and runs the suite. It is the C project's
+`test.py` with only the launch command changed, and `lsp-tests/` holds copies of
+that project's fixtures, so the two implementations can be compared check for
+check.
+
+## The tree-sitter binding
 
 Both sides of the binding - the C glue and the Java wrappers - are ported from
-[seart-group/java-tree-sitter][upstream] (MIT). The upstream sources they were
-ported from are kept verbatim under `src/main/c/java-tree-sitter/`, with their
-`LICENSE`, as the reference; they are not compiled.
+[seart-group/java-tree-sitter][upstream] (MIT). A checkout of it is kept at
+`java-tree-sitter/` purely as the reference to port against: it is not a module
+of this project, nothing in it is compiled or on the classpath, and it is
+gitignored.
 
 [upstream]: https://github.com/seart-group/java-tree-sitter
 
 ## Build and run
 
 ```
-./build.py run_demo      # compile everything, then run the demo
+./build.py serve <dir>   # compile everything, then serve LSP on stdio
 ./build.py build_java    # mvn package only (also emits the JNI headers)
 ./build.py build_native  # compile/link libtsjni.so only
 ./build.py build_all
@@ -99,13 +128,18 @@ src/main/c/
   tsjni.h, tsjni.c             cached IDs, throw helpers, marshalling
   tsjni_node.c                 Node natives
   tsjni_tree.c, tsjni_parser.c owned pointers
-  java-tree-sitter/            upstream sources + LICENSE, reference only
 src/main/java/dev/bluepitaya/phpmagik/ts/
   LibraryLoader.java           loads libtsjni.so
   External.java                base for owned pointers
   Node.java                    the ported struct
   Point.java                   ditto, row/column
+  Nodes.java                   bounds-safe child accessors
   Parser.java, Tree.java       owned pointers
   ParsingException.java
-  Main.java                    demo: parse a snippet, walk the tree
+test.py                        the C project's suite, pointed at the JVM
+lsp-tests/                     its fixtures, copied verbatim
 ```
+
+The one binding added beyond the original proof of concept is
+`ts_node_descendant_for_point_range`, which the LSP layer needs to find the node
+under an editor position.
