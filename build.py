@@ -13,11 +13,17 @@ class Paths:
         self.target = root / "target"
         self.headers = self.target / "headers"
         self.classes = self.target / "classes"
+        self.dependency = self.target / "dependency"
         self.native = self.target / "native"
         self.objects = self.native / "obj"
         self.library = self.native / "libtsjni.so"
         self._tree_sitter = root / ".old-project" / "tree-sitter"
         self._tree_sitter_php = root / ".old-project" / "tree-sitter-php"
+
+    def classpath(self) -> str:
+        """Our classes plus the jars mvn package copied next to them. The
+        trailing /* is expanded by the JVM itself, not the shell."""
+        return os.pathsep.join([str(self.classes), f"{self.dependency}/*"])
 
     def _require(self, path: Path, hint: str | None = None):
         if path.exists():
@@ -133,7 +139,7 @@ class Runner:
             "java",
             f"-Djava.library.path={self.paths.native}",
             "-cp",
-            self.paths.classes,
+            self.paths.classpath(),
             "dev.bluepitaya.phpmagik.Main",
             "--path",
             path,

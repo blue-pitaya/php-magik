@@ -11,19 +11,16 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
-/**
- * Every indexed file, and the flat variable and function indexes spanning them.
- *
- * <p>Entries carry their {@code fileId}, so a single file's contribution can be
- * dropped and rebuilt on a reparse without disturbing the rest.
- */
 public final class Workspace implements AutoCloseable {
 
-    private final Parser parser = new Parser();
-
+    private final Parser parser;
     private final List<PhpFile> files = new ArrayList<>();
     private final List<PhpVar> vars = new ArrayList<>();
     private final List<PhpFunction> funcs = new ArrayList<>();
+
+    public Workspace(Parser parser) {
+        this.parser = parser;
+    }
 
     public List<PhpFile> files() {
         return files;

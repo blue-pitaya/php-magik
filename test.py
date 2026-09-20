@@ -21,6 +21,7 @@ directly.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,12 +29,15 @@ from typing import IO
 
 ROOT = Path(__file__).resolve().parent
 CLASSES = ROOT / "target" / "classes"
+DEPENDENCY = ROOT / "target" / "dependency"
 NATIVE = ROOT / "target" / "native"
+# the trailing /* is expanded by the JVM itself, not the shell
+CLASSPATH = os.pathsep.join([str(CLASSES), f"{DEPENDENCY}/*"])
 SERVER = [
     "java",
     f"-Djava.library.path={NATIVE}",
     "-cp",
-    str(CLASSES),
+    CLASSPATH,
     "dev.bluepitaya.phpmagik.Main",
 ]
 LSP_TEST_DIR = ROOT / "lsp-tests"
@@ -138,7 +142,16 @@ class LspClient:
     def _read(self):
         header = b""
         while not header.endswith(b"\r\n\r\n"):
-            header += self.stdout.read(1)
+            byte = self.stdout.read(1)
+            if not byte:
+                # read(1) keeps returning b"" at EOF, so without this a dead
+                # server spins here forever instead of failing
+                raise RuntimeError(
+                    f"server closed stdout after {header!r} "
+                    f"(exit code {self.proc.poll()}); "
+                    "set SHOW_LOGS = True to see its stderr"
+                )
+            header += byte
         length = int(header.split(b":")[1])
         return json.loads(self.stdout.read(length))
 

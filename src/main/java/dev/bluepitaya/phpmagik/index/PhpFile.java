@@ -2,11 +2,6 @@ package dev.bluepitaya.phpmagik.index;
 
 import dev.bluepitaya.phpmagik.ts.Tree;
 
-/**
- * An indexed source file. The tree and the UTF-8 bytes it was parsed from are
- * kept alive for the server's lifetime, since node lookups read both; a
- * reparse swaps them together.
- */
 public final class PhpFile {
 
     private final int fileId;
