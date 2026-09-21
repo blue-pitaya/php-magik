@@ -20,17 +20,19 @@ public final class ReferencesHandler {
     private final FunctionResolver functions;
     private final MethodResolver methods;
     private final PropertyResolver properties;
+    private final ClassResolver classes;
     private final Logger log;
 
     public ReferencesHandler(Workspace app, SymbolFinder symbols, VariableResolver variables,
                              FunctionResolver functions, MethodResolver methods,
-                             PropertyResolver properties, Logger log) {
+                             PropertyResolver properties, ClassResolver classes, Logger log) {
         this.app = app;
         this.symbols = symbols;
         this.variables = variables;
         this.functions = functions;
         this.methods = methods;
         this.properties = properties;
+        this.classes = classes;
         this.log = log;
     }
 
@@ -66,6 +68,11 @@ public final class ReferencesHandler {
         } else if (sym instanceof PhpPropertyUsage usage) {
             PhpPropertyDefinition declared = properties.definitionOf(usage);
             if (declared != null) collect(properties.usagesOf(declared, includeDecl), locs);
+        } else if (sym instanceof PhpClassDefinition cls) {
+            collect(classes.usagesOf(cls, includeDecl), locs);
+        } else if (sym instanceof PhpClassUsage usage) {
+            PhpClassDefinition declared = classes.definitionOf(usage);
+            if (declared != null) collect(classes.usagesOf(declared, includeDecl), locs);
         } else if (sym instanceof PhpVarDefinition def) {
             collect(variables.occurrencesOf(def, includeDecl), locs);
         } else if (sym instanceof PhpVarUsage usage) {

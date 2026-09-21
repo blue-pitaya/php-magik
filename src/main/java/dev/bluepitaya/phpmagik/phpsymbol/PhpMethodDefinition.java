@@ -11,8 +11,12 @@ import dev.bluepitaya.phpmagik.ts.Range;
  *
  * @param owner the declaring class, which is also where the namespace and the
  * qualified name come from - a method has none of its own
- * @param returnType declared, or inferred from the first {@code return};
- * {@code null} when neither is known
+ * @param returnType declared, or read off the first {@code return} that names
+ * one; {@code null} when no return does, and the expression needs
+ * {@code returnSource} followed instead
+ * @param returnSource where the first {@code return} pointing at something the
+ * index recorded takes its value from - a variable, a property read, a call -
+ * as the range of that usage, or {@code null} when none does
  * @param signature the declaration as written, from its modifiers up to but not
  * including the body, with an inferred return type appended when the source
  * declares none
@@ -25,8 +29,9 @@ import dev.bluepitaya.phpmagik.ts.Range;
  */
 public record PhpMethodDefinition(
         String name,
-        PhpClass owner,
+        PhpClassDefinition owner,
         String returnType,
+        Range returnSource,
         String signature,
         String doc,
         Range range,

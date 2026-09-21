@@ -6,14 +6,14 @@ used, reached through a hand-written JNI binding.
 
 ## Status
 
-The whole LSP surface of the C version is ported: `initialize`, `didOpen`,
-`didChange`, `didClose`, `hover`, `definition`, `references`, `documentSymbol`,
-`workspace/symbol` and `completion`, over the same stdio JSON-RPC transport.
+The LSP surface is `initialize`, `didOpen`, `didChange`, `didClose`, `hover`,
+`definition`, `references`, `documentSymbol` and `workspace/symbol`, over the
+same stdio JSON-RPC transport. The C version's `completion` is not ported.
 
 ```
 src/main/java/dev/bluepitaya/phpmagik/
   Main.java              --path <dir|file>, indexes, then serves on stdio
-  Indexer.java           port of the C parser.c: walks a tree, records symbols
+  Indexer.java           one walk of the tree, through the grammar's own fields
   Workspace.java         port of app_ctx.c + fs.c: the per-kind symbol indexes
   PhpFile.java           one indexed file: source, tree, imports
   SymbolFinder.java      what is written at a position, and what a type means
@@ -146,14 +146,15 @@ src/main/java/dev/bluepitaya/phpmagik/ts/
   ParsingException.java
 src/main/java/dev/bluepitaya/phpmagik/phpsymbol/
   PhpSymbol.java               sealed over every kind, each with a range
-  Php{Var,Function,Method,Property}{Definition,Usage}.java
-  PhpClass.java, PhpUseStatement.java, ClassKind.java, UseKind.java
+  Php{Var,Function,Method,Property,Class}{Definition,Usage}.java
+  PhpUseStatement.java, ClassKind.java, UseKind.java
 src/main/java/dev/bluepitaya/phpmagik/resolver/
-  {Variable,Function,Method,Property}Resolver.java
+  {Variable,Function,Method,Property,Class}Resolver.java
+  TypeInference.java            what a thing holds, by following the index
 src/main/java/dev/bluepitaya/phpmagik/lsp/
   LspServer.java               framing, dispatch, responses
   Json.java                    the shared mapper and JSON shapes
-  Logger.java                  /tmp/php-magik.log
+  Logger.java                  appends to the log Main opens
   dto/                         records the params bind to
   handler/                     one class per LSP request
 test.py                        the C project's suite, pointed at the JVM

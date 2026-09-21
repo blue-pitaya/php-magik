@@ -15,18 +15,18 @@ public final class HoverHandler {
 
     private final Workspace app;
     private final SymbolFinder symbols;
-    private final VariableResolver variables;
+    private final TypeInference types;
     private final FunctionResolver functions;
     private final MethodResolver methods;
     private final PropertyResolver properties;
     private final Logger log;
 
-    public HoverHandler(Workspace app, SymbolFinder symbols, VariableResolver variables,
+    public HoverHandler(Workspace app, SymbolFinder symbols, TypeInference types,
                         FunctionResolver functions, MethodResolver methods,
                         PropertyResolver properties, Logger log) {
         this.app = app;
         this.symbols = symbols;
-        this.variables = variables;
+        this.types = types;
         this.functions = functions;
         this.methods = methods;
         this.properties = properties;
@@ -47,15 +47,11 @@ public final class HoverHandler {
         PhpSymbol sym = symbols.resolveAt(file, line, col);
         String text = null;
         if (sym instanceof PhpVarDefinition def) {
-            /* an assignment the indexer could not type still shows whatever an
-             * earlier one said the variable holds */
-            String type = def.type() != null
-                    ? def.type()
-                    : variables.typeAt(def.fileId(), def.functionName(), def.name(),
-                            def.range().start());
-            text = typedHover(def.name(), symbols.resolveType(def.fileId(), def.ns(), type));
+            text = typedHover(def.name(),
+                    symbols.resolveType(def.fileId(), def.ns(), types.typeOf(def)));
         } else if (sym instanceof PhpVarUsage usage) {
-            text = variableHover(usage);
+            text = typedHover(usage.name(),
+                    symbols.resolveType(usage.fileId(), usage.ns(), types.typeOf(usage)));
         } else if (sym instanceof PhpPropertyDefinition property) {
             text = propertyHover(property);
         } else if (sym instanceof PhpPropertyUsage usage) {
@@ -72,7 +68,7 @@ public final class HoverHandler {
             PhpMethodDefinition declared = methods.definitionOf(usage);
             text = declared != null
                     ? methodHover(declared)
-                    : callableHover(usage.className() + "::" + usage.name(),
+                    : callableHover(callName(types.classOf(usage), usage.name()),
                             nameOnly(usage.name(), null), null);
         } else if (sym instanceof PhpFunctionDefinition def) {
             text = functionHover(def);
@@ -88,21 +84,10 @@ public final class HoverHandler {
         return new Hover(new MarkupContent("markdown", text));
     }
 
-    /**
-     * The type a variable holds where it is read: whatever the latest assignment
-     * or parameter before it says. A read of something never written - always
-     * {@code $this}, sometimes a global - has only a name to show.
-     */
-    private String variableHover(PhpVarUsage usage) {
-        String type = variables.typeAt(usage.fileId(), usage.functionName(), usage.name(),
-                usage.range().start());
-        return typedHover(usage.name(), symbols.resolveType(usage.fileId(), usage.ns(), type));
-    }
-
     /** A type is resolved where it was written, which for a property is its class's file. */
     private String propertyHover(PhpPropertyDefinition property) {
-        return typedHover(property.name(),
-                symbols.resolveType(property.fileId(), property.owner().ns(), property.type()));
+        return typedHover(property.name(), symbols.resolveType(property.fileId(),
+                property.owner().ns(), types.typeOf(property)));
     }
 
     /**
@@ -116,16 +101,31 @@ public final class HoverHandler {
     }
 
     private String methodHover(PhpMethodDefinition method) {
-        String signature = method.signature();
         return callableHover(method.qualifiedName(),
-                signature != null ? signature : nameOnly(method.name(), method.returnType()),
+                declaration(method.signature(), method.name(), method.returnType(),
+                        types.returnTypeOf(method)),
                 method.doc());
     }
 
+    /**
+     * The declaration as the indexer sliced it out, with a return type appended
+     * when the source declared none and the indexer could not name one either -
+     * which is the whole point of inferring it from what the body returns. It
+     * appends at most once: a stored return type is already in the slice.
+     */
+    private static String declaration(@Nullable String signature, String name,
+                                      @Nullable String storedReturn,
+                                      @Nullable String inferredReturn) {
+        if (signature == null) return nameOnly(name, inferredReturn);
+        return storedReturn == null && inferredReturn != null
+                ? signature + ": " + inferredReturn
+                : signature;
+    }
+
     private String functionHover(PhpFunctionDefinition func) {
-        String signature = func.signature();
         return callableHover(func.qualifiedName(),
-                signature != null ? signature : nameOnly(func.name(), func.returnType()),
+                declaration(func.signature(), func.name(), func.returnType(),
+                        types.returnTypeOf(func)),
                 func.doc());
     }
 
@@ -156,6 +156,11 @@ public final class HoverHandler {
 
     private static String qualifiedName(@Nullable String ns, String name) {
         return ns == null ? name : ns + "\\" + name;
+    }
+
+    /** {@code Cls::foo} when the call's object resolves to a class, else the bare name. */
+    private static String callName(@Nullable String cls, String name) {
+        return cls == null ? name : cls + "::" + name;
     }
 
     /** All that is left for a call whose declaration is not in the index. */

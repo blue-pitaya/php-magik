@@ -9,8 +9,9 @@ import dev.bluepitaya.phpmagik.ts.Range;
  * are {@link PhpPropertyUsage}s, since an access knows nothing but the name and
  * the class it was read from.
  *
- * <p>A constructor-promoted property is not one of these either - the source
- * writes it as a parameter, and that is how it is indexed.
+ * <p>A constructor-promoted property is one of these and a
+ * {@link PhpVarDefinition} both, recorded at the same range: the source writes
+ * it once, as a parameter that also declares a property.
  *
  * @param name the leading {@code $} is kept, so {@code "$x"}, which is also how
  * an access spells it once it has been matched to this declaration
@@ -21,7 +22,7 @@ import dev.bluepitaya.phpmagik.ts.Range;
  */
 public record PhpPropertyDefinition(
         String name,
-        PhpClass owner,
+        PhpClassDefinition owner,
         String type,
         Range range,
         int fileId) implements PhpSymbol {

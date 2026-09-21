@@ -8,7 +8,6 @@ import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.lsp.dto.WorkspaceSymbolParams;
-import dev.bluepitaya.phpmagik.lsp.handler.CompletionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidChangeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidCloseHandler;
@@ -18,9 +17,11 @@ import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.InitializeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.WorkspaceSymbolHandler;
+import dev.bluepitaya.phpmagik.resolver.ClassResolver;
 import dev.bluepitaya.phpmagik.resolver.FunctionResolver;
 import dev.bluepitaya.phpmagik.resolver.MethodResolver;
 import dev.bluepitaya.phpmagik.resolver.PropertyResolver;
+import dev.bluepitaya.phpmagik.resolver.TypeInference;
 import dev.bluepitaya.phpmagik.resolver.VariableResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -34,7 +35,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 
 @NullMarked
 public final class LspServer {
@@ -54,57 +54,55 @@ public final class LspServer {
     private final ReferencesHandler references;
     private final DocumentSymbolHandler documentSymbol;
     private final WorkspaceSymbolHandler workspaceSymbol;
-    private final CompletionHandler completion;
 
-    public LspServer(Workspace app) throws IOException {
+    public LspServer(Workspace app, Logger log) {
         this.in = new BufferedInputStream(System.in);
         this.out = System.out;
-        this.log = new Logger(Path.of("/tmp/php-magik.log"));
+        this.log = log;
 
         var symbols = new SymbolFinder(app);
         var variables = new VariableResolver(app);
         var functions = new FunctionResolver(app);
-        var methods = new MethodResolver(app);
-        var properties = new PropertyResolver(app);
+        /* the member resolvers ask it which class an access is on, so it comes
+         * first and knows nothing of them */
+        var types = new TypeInference(app, functions);
+        var methods = new MethodResolver(app, types);
+        var properties = new PropertyResolver(app, types);
+        var classes = new ClassResolver(app, symbols);
         this.initialize = new InitializeHandler();
         this.didOpen = new DidOpenHandler(app, log);
         this.didChange = new DidChangeHandler(app, log);
         this.didClose = new DidCloseHandler(log);
-        this.hover = new HoverHandler(app, symbols, variables, functions, methods, properties, log);
-        this.definition =
-                new DefinitionHandler(app, symbols, variables, functions, methods, properties, log);
-        this.references =
-                new ReferencesHandler(app, symbols, variables, functions, methods, properties, log);
+        this.hover = new HoverHandler(app, symbols, types, functions, methods, properties, log);
+        this.definition = new DefinitionHandler(app, symbols, variables, functions, methods,
+                properties, classes, log);
+        this.references = new ReferencesHandler(app, symbols, variables, functions, methods,
+                properties, classes, log);
         this.documentSymbol = new DocumentSymbolHandler(app, log);
         this.workspaceSymbol = new WorkspaceSymbolHandler(app, log);
-        this.completion = new CompletionHandler(app, symbols, variables, methods, properties, log);
     }
 
     public void run() throws IOException {
         var running = true;
 
-        try {
-            while (running) {
-                var message = readMessage();
-                if (message == null) {
-                    break;
-                }
-
-                JsonNode request;
-                try {
-                    request = Json.RejectsNullFieldsMapper.readTree(message);
-                } catch (JacksonException malformed) {
-                    continue;
-                }
-
-                try {
-                    running = dispatch(request);
-                } catch (IllegalArgumentException badRequest) {
-                    log.log("bad request: " + badRequest.getMessage());
-                }
+        while (running) {
+            var message = readMessage();
+            if (message == null) {
+                break;
             }
-        } finally {
-            log.close();
+
+            JsonNode request;
+            try {
+                request = Json.RejectsNullFieldsMapper.readTree(message);
+            } catch (JacksonException malformed) {
+                continue;
+            }
+
+            try {
+                running = dispatch(request);
+            } catch (IllegalArgumentException badRequest) {
+                log.log("bad request: " + badRequest.getMessage());
+            }
         }
     }
 
@@ -136,8 +134,6 @@ public final class LspServer {
                         documentSymbol.handle(bind(params, TextDocumentParams.class)));
                 case "workspace/symbol" -> respond(getRequestIdOrThrow(request),
                         workspaceSymbol.handle(bind(params, WorkspaceSymbolParams.class)));
-                case "textDocument/completion" -> respond(getRequestIdOrThrow(request),
-                        completion.handle(bind(params, TextDocumentPosition.class)));
                 default -> {
                     JsonNode id = request.get("id");
                     /* an unknown notification is still a notification: no reply */

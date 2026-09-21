@@ -7,14 +7,16 @@ import dev.bluepitaya.phpmagik.ts.Range;
  *
  * <p>Every kind that can be both declared and used is recorded as two types,
  * paired by one of the resolvers: {@code VariableResolver},
- * {@code FunctionResolver}, {@code MethodResolver}, {@code PropertyResolver}.
+ * {@code FunctionResolver}, {@code MethodResolver}, {@code PropertyResolver},
+ * {@code ClassResolver}.
  */
 public sealed interface PhpSymbol permits
         PhpVarDefinition, PhpVarUsage,
         PhpFunctionDefinition, PhpFunctionUsage,
         PhpMethodDefinition, PhpMethodUsage,
         PhpPropertyDefinition, PhpPropertyUsage,
-        PhpClass, PhpUseStatement {
+        PhpClassDefinition, PhpClassUsage,
+        PhpUseStatement {
 
     Range range();
 

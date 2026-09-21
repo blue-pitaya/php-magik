@@ -19,17 +19,19 @@ public final class DefinitionHandler {
     private final FunctionResolver functions;
     private final MethodResolver methods;
     private final PropertyResolver properties;
+    private final ClassResolver classes;
     private final Logger log;
 
     public DefinitionHandler(Workspace app, SymbolFinder symbols, VariableResolver variables,
                              FunctionResolver functions, MethodResolver methods,
-                             PropertyResolver properties, Logger log) {
+                             PropertyResolver properties, ClassResolver classes, Logger log) {
         this.app = app;
         this.symbols = symbols;
         this.variables = variables;
         this.functions = functions;
         this.methods = methods;
         this.properties = properties;
+        this.classes = classes;
         this.log = log;
     }
 
@@ -63,13 +65,18 @@ public final class DefinitionHandler {
         } else if (sym instanceof PhpPropertyUsage usage) {
             PhpPropertyDefinition declared = properties.definitionOf(usage);
             if (declared != null) return locationOf(declared);
+        } else if (sym instanceof PhpClassDefinition cls) {
+            return locationOf(cls);
+        } else if (sym instanceof PhpClassUsage usage) {
+            PhpClassDefinition declared = classes.definitionOf(usage);
+            if (declared != null) return locationOf(declared);
         } else if (sym instanceof PhpVarDefinition def) {
             /* from a reassignment, back to where the variable starts */
             return locationOf(variables.anchorOf(def));
         } else if (sym instanceof PhpVarUsage usage) {
             PhpVarDefinition declared = variables.definitionOf(usage);
-            /* nothing writes $this, a foreach value or a catch variable, so the
-             * best a jump can do for those is where the variable first appears */
+            /* nothing writes $this, and a list destructuring is recorded as
+             * reads, so the best a jump can do there is the first appearance */
             return locationOf(declared != null ? declared : variables.anchorOf(usage));
         }
 

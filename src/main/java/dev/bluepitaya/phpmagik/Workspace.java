@@ -1,6 +1,8 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.phpsymbol.PhpClass;
+import dev.bluepitaya.phpmagik.lsp.Logger;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDefinition;
@@ -22,6 +24,7 @@ import java.util.stream.Stream;
 public final class Workspace implements AutoCloseable {
 
     private final Parser parser;
+    private final Logger log;
     private final List<PhpFile> files = new ArrayList<>();
     private final List<PhpVarDefinition> varDefinitions = new ArrayList<>();
     private final List<PhpVarUsage> varUsages = new ArrayList<>();
@@ -31,59 +34,56 @@ public final class Workspace implements AutoCloseable {
     private final List<PhpMethodUsage> methodUsages = new ArrayList<>();
     private final List<PhpPropertyDefinition> properties = new ArrayList<>();
     private final List<PhpPropertyUsage> propertyUsages = new ArrayList<>();
-    private final List<PhpClass> classes = new ArrayList<>();
+    private final List<PhpClassDefinition> classes = new ArrayList<>();
+    private final List<PhpClassUsage> classUsages = new ArrayList<>();
 
-    public Workspace(Parser parser) {
+    public Workspace(Parser parser, Logger log) {
         this.parser = parser;
+        this.log = log;
     }
 
     public List<PhpFile> files() {
         return files;
     }
 
-    /** Every parameter and assignment anywhere in the workspace. */
     public List<PhpVarDefinition> varDefinitions() {
         return varDefinitions;
     }
 
-    /** Every plain variable read anywhere in the workspace. */
     public List<PhpVarUsage> varUsages() {
         return varUsages;
     }
 
-    /** Every plain function declared anywhere in the workspace. */
     public List<PhpFunctionDefinition> functions() {
         return functions;
     }
 
-    /** Every {@code foo()} called by name anywhere in the workspace. */
     public List<PhpFunctionUsage> functionUsages() {
         return functionUsages;
     }
 
-    /** Every method declared anywhere in the workspace. */
     public List<PhpMethodDefinition> methods() {
         return methods;
     }
 
-    /** Every {@code $obj->foo()} called anywhere in the workspace. */
     public List<PhpMethodUsage> methodUsages() {
         return methodUsages;
     }
 
-    /** Every property declared anywhere in the workspace. */
     public List<PhpPropertyDefinition> properties() {
         return properties;
     }
 
-    /** Every {@code $obj->x} read anywhere in the workspace. */
     public List<PhpPropertyUsage> propertyUsages() {
         return propertyUsages;
     }
 
-    /** Every class, interface, trait and enum declared anywhere in the workspace. */
-    public List<PhpClass> classes() {
+    public List<PhpClassDefinition> classes() {
         return classes;
+    }
+
+    public List<PhpClassUsage> classUsages() {
+        return classUsages;
     }
 
     public PhpFile file(int fileId) {
@@ -98,17 +98,19 @@ public final class Workspace implements AutoCloseable {
     }
 
     public void index(Path root) throws IOException {
+        log.log("index root: " + root);
+
         /* single file lsp */
         if (Files.isRegularFile(root)) {
             addFile(root);
-            return;
-        }
-
-        try (Stream<Path> paths = Files.walk(root)) {
-            for (Path path : paths.filter(path -> isPhpSource(root, path)).sorted().toList()) {
-                addFile(path);
+        } else {
+            try (Stream<Path> paths = Files.walk(root)) {
+                for (Path path : paths.filter(path -> isPhpSource(root, path)).sorted().toList()) {
+                    addFile(path);
+                }
             }
         }
+        log.log("indexed " + files.size() + " file(s)");
     }
 
     private boolean isPhpSource(Path root, Path path) {
@@ -124,14 +126,17 @@ public final class Workspace implements AutoCloseable {
     private void addFile(Path path) throws IOException {
         byte[] content = Files.readAllBytes(path);
         if (content.length == 0) {
+            log.log("index: " + path + " (empty, skipped)");
             return;
         }
+        /* before parsing, so a file that brings the scan down is named in the log */
+        log.log("index: " + path);
 
         Tree tree = parser.parse(content);
         int fileId = files.size();
 
         Indexer indexer = new Indexer(fileId, content);
-        indexer.parseProgram(tree.getRootNode());
+        indexer.index(tree.getRootNode());
         addSymbols(indexer);
 
         files.add(new PhpFile(fileId, pathToUri(path), path.toString(), content, tree,
@@ -142,7 +147,7 @@ public final class Workspace implements AutoCloseable {
         Tree tree = parser.parse(content);
 
         Indexer indexer = new Indexer(file.fileId(), content);
-        indexer.parseProgram(tree.getRootNode());
+        indexer.index(tree.getRootNode());
 
         forgetSymbols(file.fileId());
         addSymbols(indexer);
@@ -160,6 +165,7 @@ public final class Workspace implements AutoCloseable {
         properties.addAll(indexer.properties());
         propertyUsages.addAll(indexer.propertyUsages());
         classes.addAll(indexer.classes());
+        classUsages.addAll(indexer.classUsages());
     }
 
     private void forgetSymbols(int fileId) {
@@ -172,6 +178,7 @@ public final class Workspace implements AutoCloseable {
         properties.removeIf(symbol -> symbol.fileId() == fileId);
         propertyUsages.removeIf(symbol -> symbol.fileId() == fileId);
         classes.removeIf(symbol -> symbol.fileId() == fileId);
+        classUsages.removeIf(symbol -> symbol.fileId() == fileId);
     }
 
     private String pathToUri(Path path) {

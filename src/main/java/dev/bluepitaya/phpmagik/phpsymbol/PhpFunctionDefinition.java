@@ -9,8 +9,12 @@ import dev.bluepitaya.phpmagik.ts.Range;
  * is being indexed, so answering a query never has to go back to the tree.
  *
  * @param ns enclosing namespace, {@code null} at global scope
- * @param returnType declared, or inferred from the first {@code return};
- * {@code null} when neither is known
+ * @param returnType declared, or read off the first {@code return} that names
+ * one; {@code null} when no return does, and the expression needs
+ * {@code returnSource} followed instead
+ * @param returnSource where the first {@code return} pointing at something the
+ * index recorded takes its value from - a variable, a property read, a call -
+ * as the range of that usage, or {@code null} when none does
  * @param signature the declaration as written, up to but not including the
  * body, with an inferred return type appended when the source declares none
  * @param doc the PHPDoc block above it, markers stripped and tags left as
@@ -23,6 +27,7 @@ public record PhpFunctionDefinition(
         String name,
         String ns,
         String returnType,
+        Range returnSource,
         String signature,
         String doc,
         Range range,

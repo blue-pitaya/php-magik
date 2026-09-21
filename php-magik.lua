@@ -14,7 +14,7 @@ local function server_cmd(root)
   }
 end
 
-local function on_attach(client, bufnr)
+local function on_attach(_, bufnr)
   local function map(lhs, rhs, desc)
     vim.keymap.set("n", lhs, rhs, { buffer = bufnr, desc = "php-magik: " .. desc })
   end
@@ -27,12 +27,6 @@ local function on_attach(client, bufnr)
   map("<leader>ws", function()
     vim.lsp.buf.workspace_symbol("")
   end, "workspace symbols")
-
-  vim.bo[bufnr].omnifunc = "v:lua.vim.lsp.omnifunc"
-  if vim.lsp.completion then
-    -- the server's trigger characters are > $ :
-    vim.lsp.completion.enable(true, client.id, bufnr, { autotrigger = true })
-  end
 end
 
 vim.api.nvim_create_autocmd("FileType", {
@@ -50,9 +44,11 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
--- :PhpMagikLog  - the server's own request log
+-- :PhpMagikLog  - the server's own request log, appended to by every server
+-- that runs, so open it at the end
 vim.api.nvim_create_user_command("PhpMagikLog", function()
   vim.cmd.tabnew("/tmp/php-magik.log")
+  vim.cmd.normal({ "G", bang = true })
 end, { desc = "open the php-magik server log" })
 
 -- :PhpMagikRestart  - the index is built at startup, so anything created

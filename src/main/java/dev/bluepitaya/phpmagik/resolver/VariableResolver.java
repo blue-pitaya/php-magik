@@ -4,28 +4,26 @@ import dev.bluepitaya.phpmagik.Workspace;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpVarDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpVarUsage;
-import dev.bluepitaya.phpmagik.ts.Point;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * Pairs variable reads with the parameters and assignments that give them a
- * value, and answers what type a name holds at a point.
+ * value. What type that value has is {@link TypeInference}'s question.
  *
  * <p>A scope here is a file plus an enclosing function - PHP has no block
  * scope, and a local in one function says nothing about a same-named local in
  * another.
  *
- * <p>Not everything that binds a variable is indexed as a definition: a
- * {@code foreach} value, a {@code catch} variable and a {@code global} are all
- * recorded as reads. For those, the earliest occurrence stands in for a
- * declaration, which is the best the index can do and what the editor wants
+ * <p>Not everything that binds a variable is indexed as a definition: a list
+ * destructuring - {@code [$a, $b] = $pair;} - is recorded as reads, and nothing
+ * writes {@code $this} at all. For those, the earliest occurrence stands in for
+ * a declaration, which is the best the index can do and what the editor wants
  * anyway - somewhere to jump to.
  */
 @NullMarked
@@ -72,45 +70,6 @@ public final class VariableResolver {
 
     public List<PhpSymbol> occurrencesOf(PhpVarUsage usage, boolean includeDecl) {
         return occurrences(usage.fileId(), usage.functionName(), usage.name(), usage, includeDecl);
-    }
-
-    /**
-     * The type {@code name} holds at {@code at}: whatever the latest definition
-     * at or before it says, {@code null} if none of them says anything.
-     */
-    public @Nullable String typeAt(int fileId, @Nullable String functionName, String name,
-                                   Point at) {
-        PhpVarDefinition latest = null;
-        for (PhpVarDefinition def : workspace.varDefinitions()) {
-            if (def.type() == null || !def.name().equals(name)) continue;
-            if (!inSameScope(fileId, functionName, def.fileId(), def.functionName())) continue;
-            if (def.range().start().compareTo(at) > 0) continue;
-            if (latest == null || def.range().start().compareTo(latest.range().start()) > 0) {
-                latest = def;
-            }
-        }
-        return latest == null ? null : latest.type();
-    }
-
-    /** Whatever type is known for {@code name} anywhere in that scope. */
-    public @Nullable String typeAnywhere(int fileId, @Nullable String functionName, String name) {
-        return typeAt(fileId, functionName, name,
-                new Point(Integer.MAX_VALUE, Integer.MAX_VALUE));
-    }
-
-    /**
-     * Every variable that scope gives a value to, deduped by name, keeping the
-     * first. A variable only ever read is not one of them - nothing says what it
-     * would hold.
-     */
-    public List<PhpVarDefinition> inScope(int fileId, @Nullable String functionName) {
-        var seen = new LinkedHashSet<String>();
-        var found = new ArrayList<PhpVarDefinition>();
-        for (PhpVarDefinition def : workspace.varDefinitions()) {
-            if (!inSameScope(fileId, functionName, def.fileId(), def.functionName())) continue;
-            if (seen.add(def.name())) found.add(def);
-        }
-        return found;
     }
 
     private PhpSymbol anchor(int fileId, @Nullable String functionName, String name,
