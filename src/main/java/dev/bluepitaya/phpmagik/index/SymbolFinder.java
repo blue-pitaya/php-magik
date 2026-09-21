@@ -3,19 +3,17 @@ package dev.bluepitaya.phpmagik.index;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Point;
+import dev.bluepitaya.phpmagik.ts.Tree;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 
+@NullMarked
 public final class SymbolFinder {
-
-    /** What a position resolved to; at most one side is non-null. */
-    public record Resolved(PhpVar var, PhpFunction func) {
-
-        public static final Resolved NONE = new Resolved(null, null);
-    }
 
     private final Workspace workspace;
 
@@ -23,31 +21,32 @@ public final class SymbolFinder {
         this.workspace = ws;
     }
 
-    public Resolved resolveAt(PhpFile file, int line, int character) {
-        var pt = new Point(line, character);
-        var root = file.tree().getRootNode();
-        /* named variant: variable_name is ["$" (anonymous), name (named)], so
-         * the plain descendant lookup would land on the bare "$" leaf when
-         * hovering exactly on it instead of variable_name itself */
-        var node = root.getNamedDescendant(pt, pt);
-        if (node == null) return Resolved.NONE;
+    public @Nullable PhpSymbol resolveAt(PhpFile file, int line, int character) {
+        Point pt = new Point(line, character);
 
-        var t = node.getType();
-        var p = node.getStartPoint();
-        var text = node.getContent();
+        try (Tree tree = file.tree()) {
+            Node root = tree.getRootNode();
+            if (root == null) return null;
+            Node node = root.getNamedDescendant(pt, pt);
+            if (node == null) return null;
 
-        if (t.equals("variable_name")) {
-            return new Resolved(findVarAt(file.fileId(), p, text), null);
+            String t = node.getType();
+            Point p = node.getStartPoint();
+            String text = node.getContent();
+            if (t == null || p == null || text == null) return null;
+
+            return switch (t) {
+                case "variable_name" -> findVarAt(file.fileId(), p, text);
+                case "name", "qualified_name" -> {
+                    var func = findFuncAt(file.fileId(), p, text);
+                    yield func != null ? func : findVarAt(file.fileId(), p, "$" + text);
+                }
+                default -> null;
+            };
         }
-        if (t.equals("name") || t.equals("qualified_name")) {
-            var func = findFuncAt(file.fileId(), p, text);
-            if (func != null) return new Resolved(null, func);
-            return new Resolved(findVarAt(file.fileId(), p, "$" + text), null);
-        }
-        return Resolved.NONE;
     }
 
-    private PhpVar findVarAt(int fileId, Point p, String name) {
+    private @Nullable PhpVar findVarAt(int fileId, Point p, String name) {
         for (var v : workspace.vars()) {
             if (v.fileId() == fileId && v.line() == p.getRow() && v.col() == p.getColumn()
                     && v.name().equals(name)) {
@@ -57,7 +56,7 @@ public final class SymbolFinder {
         return null;
     }
 
-    private PhpFunction findFuncAt(int fileId, Point p, String name) {
+    private @Nullable PhpFunction findFuncAt(int fileId, Point p, String name) {
         for (var f : workspace.funcs()) {
             if (f.fileId() == fileId && f.line() == p.getRow() && f.col() == p.getColumn()
                     && f.name().equals(name)) {

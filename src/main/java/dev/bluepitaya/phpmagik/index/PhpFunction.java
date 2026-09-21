@@ -18,5 +18,5 @@ public record PhpFunction(
         String returnType,
         int line,
         int col,
-        int fileId) {
+        int fileId) implements PhpSymbol {
 }

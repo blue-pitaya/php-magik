@@ -1,5 +1,9 @@
 package dev.bluepitaya.phpmagik.ts;
 
+
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
@@ -27,6 +31,7 @@ import java.util.NoSuchElementException;
  * object and C reads the pointer back out of it, so a reachable node keeps the
  * tree it points into alive.
  */
+@NullMarked
 public class Node implements Iterable<Node> {
 
     static {
@@ -40,9 +45,9 @@ public class Node implements Iterable<Node> {
 
     private final long id;
 
-    private final Tree tree;
+    private final @Nullable Tree tree;
 
-    Node(int context0, int context1, int context2, int context3, long id, Tree tree) {
+    Node(int context0, int context1, int context2, int context3, long id, @Nullable Tree tree) {
         this.context0 = context0;
         this.context1 = context1;
         this.context2 = context2;
@@ -55,21 +60,21 @@ public class Node implements Iterable<Node> {
      * @throws IndexOutOfBoundsException if the index is negative, or greater than
      * or equal to the total number of children
      */
-    public Node getChild(int child) {
+    public @Nullable Node getChild(int child) {
         return getChild(child, false);
     }
 
-    public Node getNamedChild(int child) {
+    public @Nullable Node getNamedChild(int child) {
         return getChild(child, true);
     }
 
-    private native Node getChild(int child, boolean named);
+    private native @Nullable Node getChild(int child, boolean named);
 
     /**
      * @return the child in that field, {@code null} if there is none
      * @throws NullPointerException if {@code name} is {@code null}
      */
-    public native Node getChildByFieldName(String name);
+    public native @Nullable Node getChildByFieldName(@Nullable String name);
 
     public int getChildCount() {
         return getChildCount(false);
@@ -81,18 +86,18 @@ public class Node implements Iterable<Node> {
 
     private native int getChildCount(boolean named);
 
-    public List<Node> getChildren() {
+    public @Nullable List<Node> getChildren() {
         return List.of(getChildren(this, false));
     }
 
-    public List<Node> getNamedChildren() {
+    public @Nullable List<Node> getNamedChildren() {
         return List.of(getChildren(this, true));
     }
 
-    private static native Node[] getChildren(Node node, boolean named);
+    private static native Node[] getChildren(@Nullable Node node, boolean named);
 
     /** The source code this node spans, decoded from the tree's UTF-8 bytes. */
-    public String getContent() {
+    public @Nullable String getContent() {
         return isNull() ? null : tree.getSource(getStartByte(), getEndByte());
     }
 
@@ -102,109 +107,110 @@ public class Node implements Iterable<Node> {
      * @throws IllegalArgumentException if either offset is negative, or if
      * {@code startByte} is greater than {@code endByte}
      */
-    public Node getDescendant(int startByte, int endByte) {
+    public @Nullable Node getDescendant(int startByte, int endByte) {
         return getDescendant(startByte, endByte, false);
     }
 
-    public Node getNamedDescendant(int startByte, int endByte) {
+    public @Nullable Node getNamedDescendant(int startByte, int endByte) {
         return getDescendant(startByte, endByte, true);
     }
 
-    private native Node getDescendant(int startByte, int endByte, boolean named);
+    private native @Nullable Node getDescendant(int startByte, int endByte, boolean named);
 
     /**
      * The smallest node within this node spanning the given range of points.
      *
      * @throws NullPointerException if either point is {@code null}
      */
-    public Node getDescendant(Point startPoint, Point endPoint) {
+    public @Nullable Node getDescendant(@Nullable Point startPoint, @Nullable Point endPoint) {
         return getDescendant(startPoint, endPoint, false);
     }
 
-    public Node getNamedDescendant(Point startPoint, Point endPoint) {
+    public @Nullable Node getNamedDescendant(@Nullable Point startPoint, @Nullable Point endPoint) {
         return getDescendant(startPoint, endPoint, true);
     }
 
-    private native Node getDescendant(Point startPoint, Point endPoint, boolean named);
+    private native @Nullable Node getDescendant(@Nullable Point startPoint, @Nullable Point endPoint,
+                                                boolean named);
 
     /** Includes the node itself. */
     public native int getDescendantCount();
 
     public native int getEndByte();
 
-    public native Point getEndPoint();
+    public native @Nullable Point getEndPoint();
 
     /**
      * @return the field name, {@code null} if that child does not reside in a field
      * @throws IndexOutOfBoundsException if the index is negative, or greater than
      * or equal to the total number of children
      */
-    public native String getFieldNameForChild(int child);
+    public native @Nullable String getFieldNameForChild(int child);
 
     /**
      * The first child extending beyond the given byte offset.
      *
      * @throws IllegalArgumentException if the offset is outside this node's range
      */
-    public Node getFirstChildForByte(int offset) {
+    public @Nullable Node getFirstChildForByte(int offset) {
         return getFirstChildForByte(offset, false);
     }
 
-    public Node getFirstNamedChildForByte(int offset) {
+    public @Nullable Node getFirstNamedChildForByte(int offset) {
         return getFirstChildForByte(offset, true);
     }
 
-    private native Node getFirstChildForByte(int offset, boolean named);
+    private native @Nullable Node getFirstChildForByte(int offset, boolean named);
 
     /** @return the next sibling, {@code null} if there is none */
-    public Node getNextSibling() {
+    public @Nullable Node getNextSibling() {
         return getNextSibling(false);
     }
 
-    public Node getNextNamedSibling() {
+    public @Nullable Node getNextNamedSibling() {
         return getNextSibling(true);
     }
 
-    private native Node getNextSibling(boolean named);
+    private native @Nullable Node getNextSibling(boolean named);
 
     /** @return the previous sibling, {@code null} if there is none */
-    public Node getPrevSibling() {
+    public @Nullable Node getPrevSibling() {
         return getPrevSibling(false);
     }
 
-    public Node getPrevNamedSibling() {
+    public @Nullable Node getPrevNamedSibling() {
         return getPrevSibling(true);
     }
 
-    private native Node getPrevSibling(boolean named);
+    private native @Nullable Node getPrevSibling(boolean named);
 
     /** @return the parent, {@code null} if this is the root */
-    public native Node getParent();
+    public native @Nullable Node getParent();
 
     /**
      * The s-expression of this subtree. Not part of the upstream API - upstream
      * exposes {@code ts_node_string} through its printer classes instead.
      */
-    public native String getSexp();
+    public native @Nullable String getSexp();
 
     public native int getStartByte();
 
-    public native Point getStartPoint();
+    public native @Nullable Point getStartPoint();
 
-    public Tree getTree() {
+    public @Nullable Tree getTree() {
         return tree;
     }
 
-    public String getType() {
+    public @Nullable String getType() {
         return getType(false);
     }
 
     /** The type as it appears in the grammar, ignoring aliases. */
-    public String getGrammarType() {
+    public @Nullable String getGrammarType() {
         return getType(true);
     }
 
-    private native String getType(boolean grammar);
+    private native @Nullable String getType(boolean grammar);
 
     /** Whether this node or any node in its subtree has been edited. */
     public native boolean hasChanges();
@@ -227,13 +233,13 @@ public class Node implements Iterable<Node> {
 
     /** Delegates to {@code ts_node_eq}: the same id within the same tree. */
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (obj == this) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         return equals(this, (Node) obj);
     }
 
-    private static native boolean equals(Node node, Node other);
+    private static native boolean equals(@Nullable Node node, @Nullable Node other);
 
     @Override
     public int hashCode() {

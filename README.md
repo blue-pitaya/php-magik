@@ -47,11 +47,17 @@ gitignored.
 ./build.py build_native  # compile/link libtsjni.so only
 ./build.py build_all
 ./build.py clean
+./build.py compile_commands  # compile_commands.json for clangd
 ```
 
 Needs a JDK 21 (`JAVA_HOME`), `mvn`, and `cc`. Object files are cached by mtime
 against their source, `tsjni.h` and the generated headers, so only the first
 build pays for the 180k-line generated PHP parser.
+
+For editor support in `src/main/c`, run `build_java` once (it emits the headers
+the C sources include), then `compile_commands`. The database lands at the repo
+root where clangd finds it, and needs regenerating only when the include dirs
+or `JAVA_HOME` change.
 
 ## What was taken from upstream, and what changed
 
@@ -136,6 +142,12 @@ src/main/java/dev/bluepitaya/phpmagik/ts/
   Nodes.java                   bounds-safe child accessors
   Parser.java, Tree.java       owned pointers
   ParsingException.java
+src/main/java/dev/bluepitaya/phpmagik/lsp/
+  LspServer.java               framing, dispatch, responses
+  Json.java                    the shared mapper and JSON shapes
+  Logger.java                  /tmp/php-magik.log
+  dto/                         records the params bind to
+  handler/                     one class per LSP request
 test.py                        the C project's suite, pointed at the JVM
 lsp-tests/                     its fixtures, copied verbatim
 ```

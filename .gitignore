@@ -1,2 +1,3 @@
 java-tree-sitter/
 target/
+compile_commands.json

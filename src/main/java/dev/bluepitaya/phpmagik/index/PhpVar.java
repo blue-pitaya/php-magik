@@ -23,5 +23,5 @@ public record PhpVar(
         VarKind kind,
         int line,
         int col,
-        int fileId) {
+        int fileId) implements PhpSymbol {
 }

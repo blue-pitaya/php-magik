@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
 from pathlib import Path
+
+JNI_FLAGS = ["-O2", "-fPIC", "-Wall", "-Wextra"]
 
 
 class Paths:
@@ -17,6 +20,7 @@ class Paths:
         self.native = self.target / "native"
         self.objects = self.native / "obj"
         self.library = self.native / "libtsjni.so"
+        self.compile_commands = root / "compile_commands.json"
         self._tree_sitter = root / ".old-project" / "tree-sitter"
         self._tree_sitter_php = root / ".old-project" / "tree-sitter-php"
 
@@ -114,16 +118,34 @@ class Runner:
             for source in self.paths.vendor_sources()
         ]
         objects += [
-            self.compile_object(
-                source,
-                ["-O2", "-fPIC", "-Wall", "-Wextra"],
-                include_flags,
-                dependencies,
-            )
+            self.compile_object(source, JNI_FLAGS, include_flags, dependencies)
             for source in self.paths.jni_sources()
         ]
         self.run("cc", "-shared", "-o", self.paths.library, *objects)
         print(f"built {self.paths.library}")
+
+    def compile_commands(self):
+        """Compilation database for clangd; without it the editor cannot find
+        jni.h, tree_sitter/api.h or the javac-generated headers."""
+        include_flags = [f"-I{path}" for path in self.paths.include_dirs()]
+        entries = [
+            {
+                "directory": str(self.paths.root),
+                "file": str(source),
+                "arguments": [
+                    "cc",
+                    *JNI_FLAGS,
+                    *include_flags,
+                    "-c",
+                    str(source),
+                    "-o",
+                    str(self.paths.objects / (source.stem + ".o")),
+                ],
+            }
+            for source in self.paths.jni_sources()
+        ]
+        self.paths.compile_commands.write_text(json.dumps(entries, indent=2) + "\n")
+        print(f"wrote {self.paths.compile_commands}")
 
     def clean(self):
         shutil.rmtree(self.paths.target, ignore_errors=True)
@@ -153,6 +175,7 @@ def main():
         "build_java": runner.build_java,
         "build_native": runner.build_native,
         "build_all": runner.build_all,
+        "compile_commands": runner.compile_commands,
         "serve": runner.serve,
     }
     parser = argparse.ArgumentParser()
