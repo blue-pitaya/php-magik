@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.index.Workspace;
 import dev.bluepitaya.phpmagik.lsp.LspServer;
 import dev.bluepitaya.phpmagik.ts.Parser;
 

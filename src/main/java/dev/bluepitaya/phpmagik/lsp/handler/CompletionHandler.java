@@ -1,9 +1,10 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.index.*;
+import dev.bluepitaya.phpmagik.*;
+import dev.bluepitaya.phpmagik.phpsymbol.*;
+import dev.bluepitaya.phpmagik.resolver.*;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.*;
-import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Point;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -21,11 +22,18 @@ public final class CompletionHandler {
 
     private final Workspace app;
     private final SymbolFinder symbols;
+    private final VariableResolver variables;
+    private final MethodResolver methods;
+    private final PropertyResolver properties;
     private final Logger log;
 
-    public CompletionHandler(Workspace app, SymbolFinder symbols, Logger log) {
+    public CompletionHandler(Workspace app, SymbolFinder symbols, VariableResolver variables,
+                             MethodResolver methods, PropertyResolver properties, Logger log) {
         this.app = app;
         this.symbols = symbols;
+        this.variables = variables;
+        this.methods = methods;
+        this.properties = properties;
         this.log = log;
     }
 
@@ -50,25 +58,23 @@ public final class CompletionHandler {
         if (endsWith(content, off, "::")) return items;
 
         var pt = new Point(line, col);
-        Node at = file.tree().getRootNode().getNamedDescendant(pt, pt);
+        String fn = symbols.enclosingFunctionName(file.fileId(), pt);
+        PhpClass enclosingClass = symbols.enclosingClass(file.fileId(), pt);
 
         String obj = varBeforeArrow(content, off);
         if (obj != null) {
             String cls;
             if (obj.equals("$this")) {
-                cls = SymbolFinder.enclosingClassName(at);
+                cls = enclosingClass == null ? null : enclosingClass.name();
             } else {
-                String fn = SymbolFinder.enclosingFunctionName(at);
-                cls = SymbolFinder.stripNs(symbols.typeOfVarBefore(file.fileId(), fn, obj, pt));
+                cls = SymbolFinder.stripNs(variables.typeAt(file.fileId(), fn, obj, pt));
             }
             if (cls != null) addMemberCompletions(items, cls);
             return items;
         }
 
-        String fn = SymbolFinder.enclosingFunctionName(at);
-        String cls = SymbolFinder.enclosingClassName(at);
-        if (cls != null) {
-            items.add(new CompletionItem("$this", CIK_VARIABLE, cls));
+        if (enclosingClass != null) {
+            items.add(new CompletionItem("$this", CIK_VARIABLE, enclosingClass.name()));
         }
         addVarCompletions(items, file.fileId(), fn);
         return items;
@@ -80,25 +86,25 @@ public final class CompletionHandler {
      * than the usage.
      */
     private void addMemberCompletions(List<CompletionItem> items, String cls) {
-        for (PhpVar v : symbols.classProperties(cls)) {
-            /* v.name() is "$prop" (real, from the declaration); strip the "$"
+        for (PhpPropertyDefinition p : properties.declaredIn(cls)) {
+            /* p.name() is "$prop", as the declaration spells it; strip the "$"
              * since nothing is typed after "->" */
-            String label = v.name().startsWith("$") ? v.name().substring(1) : v.name();
-            items.add(new CompletionItem(label, CIK_FIELD, v.type()));
+            String label = p.name().startsWith("$") ? p.name().substring(1) : p.name();
+            items.add(new CompletionItem(label, CIK_FIELD, p.type()));
         }
-        for (PhpFunction f : symbols.classMethods(cls)) {
-            items.add(new CompletionItem(f.name(), CIK_METHOD, f.returnType()));
+        for (PhpMethodDefinition m : methods.declaredIn(cls)) {
+            items.add(new CompletionItem(m.name(), CIK_METHOD, m.returnType()));
         }
     }
 
     /** Each in-scope variable, with whatever type is known for it in that scope. */
     private void addVarCompletions(List<CompletionItem> items, int fileId, @Nullable String functionName) {
-        for (PhpVar v : symbols.varsInScope(fileId, functionName)) {
-            String type = v.type();
+        for (PhpVarDefinition def : variables.inScope(fileId, functionName)) {
+            String type = def.type();
             if (type == null) {
-                type = symbols.typeAnywhereInScope(fileId, functionName, v.name());
+                type = variables.typeAnywhere(fileId, functionName, def.name());
             }
-            items.add(new CompletionItem(v.name(), CIK_VARIABLE, type));
+            items.add(new CompletionItem(def.name(), CIK_VARIABLE, type));
         }
     }
 

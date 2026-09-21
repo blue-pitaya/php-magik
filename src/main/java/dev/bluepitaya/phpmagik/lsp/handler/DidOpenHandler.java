@@ -1,6 +1,6 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.index.*;
+import dev.bluepitaya.phpmagik.*;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.*;
 import org.jspecify.annotations.NullMarked;

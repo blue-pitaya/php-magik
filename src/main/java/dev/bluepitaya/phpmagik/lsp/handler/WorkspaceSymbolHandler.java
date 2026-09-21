@@ -1,10 +1,11 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.index.*;
+import dev.bluepitaya.phpmagik.*;
 import dev.bluepitaya.phpmagik.lsp.Json;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.*;
 import dev.bluepitaya.phpmagik.ts.Node;
+import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ArrayNode;
@@ -48,9 +49,7 @@ public final class WorkspaceSymbolHandler {
         ObjectNode sym = Json.object();
         sym.put("name", name);
         sym.put("kind", kind);
-        var p = nameNode.getStartPoint();
-        int len = nameNode.getEndByte() - nameNode.getStartByte();
-        sym.set("location", Json.location(uri, p.getRow(), p.getColumn(), len));
+        sym.set("location", Json.location(uri, Range.of(nameNode)));
         if (container != null) sym.put("containerName", container);
         return sym;
     }

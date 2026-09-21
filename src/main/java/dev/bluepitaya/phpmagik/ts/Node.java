@@ -136,7 +136,7 @@ public class Node implements Iterable<Node> {
 
     public native int getEndByte();
 
-    public native @Nullable Point getEndPoint();
+    public native Point getEndPoint();
 
     /**
      * @return the field name, {@code null} if that child does not reside in a field
@@ -193,7 +193,8 @@ public class Node implements Iterable<Node> {
 
     public native int getStartByte();
 
-    public native @Nullable Point getStartPoint();
+    /** The origin for a null node, which is also where a real node can start. */
+    public native Point getStartPoint();
 
     public @Nullable Tree getTree() {
         return tree;

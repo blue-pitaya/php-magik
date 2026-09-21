@@ -1,6 +1,8 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.index.*;
+import dev.bluepitaya.phpmagik.*;
+import dev.bluepitaya.phpmagik.phpsymbol.*;
+import dev.bluepitaya.phpmagik.resolver.*;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.*;
 import org.jspecify.annotations.NullMarked;
@@ -13,11 +15,21 @@ public final class HoverHandler {
 
     private final Workspace app;
     private final SymbolFinder symbols;
+    private final VariableResolver variables;
+    private final FunctionResolver functions;
+    private final MethodResolver methods;
+    private final PropertyResolver properties;
     private final Logger log;
 
-    public HoverHandler(Workspace app, SymbolFinder symbols, Logger log) {
+    public HoverHandler(Workspace app, SymbolFinder symbols, VariableResolver variables,
+                        FunctionResolver functions, MethodResolver methods,
+                        PropertyResolver properties, Logger log) {
         this.app = app;
         this.symbols = symbols;
+        this.variables = variables;
+        this.functions = functions;
+        this.methods = methods;
+        this.properties = properties;
         this.log = log;
     }
 
@@ -34,20 +46,42 @@ public final class HoverHandler {
 
         PhpSymbol sym = symbols.resolveAt(file, line, col);
         String text = null;
-        if (sym instanceof PhpVar var) {
-            String type = var.type() != null ? var.type() : symbols.latestVarType(var);
-            /* $this and any unresolved local have no type to show */
-            text = type != null
-                    ? "```php\n" + var.name() + ": " + type + "\n```"
-                    : "```php\n" + var.name() + "\n```";
-        } else if (sym instanceof PhpFunction func) {
-            /* the declaration carries the signature, the return type and the doc
-             * block, and findFuncDef hands back func itself when it already is
-             * one; a call to something unindexed leaves only the name */
-            PhpFunction def = symbols.findFuncDef(func);
-            PhpFunction shown = def != null ? def : func;
-            String signature = def != null ? symbols.signature(def) : null;
-            text = functionHover(shown, signature != null ? signature : nameOnly(shown));
+        if (sym instanceof PhpVarDefinition def) {
+            /* an assignment the indexer could not type still shows whatever an
+             * earlier one said the variable holds */
+            String type = def.type() != null
+                    ? def.type()
+                    : variables.typeAt(def.fileId(), def.functionName(), def.name(),
+                            def.range().start());
+            text = typedHover(def.name(), symbols.resolveType(def.fileId(), def.ns(), type));
+        } else if (sym instanceof PhpVarUsage usage) {
+            text = variableHover(usage);
+        } else if (sym instanceof PhpPropertyDefinition property) {
+            text = propertyHover(property);
+        } else if (sym instanceof PhpPropertyUsage usage) {
+            /* the access carries no type of its own: it is worth what the
+             * declaration it reads says, and just a name without one */
+            PhpPropertyDefinition declared = properties.definitionOf(usage);
+            text = declared != null ? propertyHover(declared) : typedHover(usage.name(), null);
+        } else if (sym instanceof PhpMethodDefinition method) {
+            text = methodHover(method);
+        } else if (sym instanceof PhpMethodUsage usage) {
+            /* the call site carries nothing but a name: everything worth showing
+             * - the signature, the return type, the doc block - is on the
+             * declaration, and a call to an unindexed method leaves only the name */
+            PhpMethodDefinition declared = methods.definitionOf(usage);
+            text = declared != null
+                    ? methodHover(declared)
+                    : callableHover(usage.className() + "::" + usage.name(),
+                            nameOnly(usage.name(), null), null);
+        } else if (sym instanceof PhpFunctionDefinition def) {
+            text = functionHover(def);
+        } else if (sym instanceof PhpFunctionUsage usage) {
+            PhpFunctionDefinition declared = functions.definitionOf(usage);
+            text = declared != null
+                    ? functionHover(declared)
+                    : callableHover(qualifiedName(usage.ns(), usage.name()),
+                            nameOnly(usage.name(), null), null);
         }
         if (text == null) return null;
 
@@ -55,15 +89,55 @@ public final class HoverHandler {
     }
 
     /**
+     * The type a variable holds where it is read: whatever the latest assignment
+     * or parameter before it says. A read of something never written - always
+     * {@code $this}, sometimes a global - has only a name to show.
+     */
+    private String variableHover(PhpVarUsage usage) {
+        String type = variables.typeAt(usage.fileId(), usage.functionName(), usage.name(),
+                usage.range().start());
+        return typedHover(usage.name(), symbols.resolveType(usage.fileId(), usage.ns(), type));
+    }
+
+    /** A type is resolved where it was written, which for a property is its class's file. */
+    private String propertyHover(PhpPropertyDefinition property) {
+        return typedHover(property.name(),
+                symbols.resolveType(property.fileId(), property.owner().ns(), property.type()));
+    }
+
+    /**
+     * {@code $name: type}, or just the name when nothing types it - {@code $this}
+     * and any unresolved local.
+     */
+    private static String typedHover(String name, @Nullable String type) {
+        return type != null
+                ? "```php\n" + name + ": " + type + "\n```"
+                : "```php\n" + name + "\n```";
+    }
+
+    private String methodHover(PhpMethodDefinition method) {
+        String signature = method.signature();
+        return callableHover(method.qualifiedName(),
+                signature != null ? signature : nameOnly(method.name(), method.returnType()),
+                method.doc());
+    }
+
+    private String functionHover(PhpFunctionDefinition func) {
+        String signature = func.signature();
+        return callableHover(func.qualifiedName(),
+                signature != null ? signature : nameOnly(func.name(), func.returnType()),
+                func.doc());
+    }
+
+    /**
      * Bold qualified name, the doc block's description, the declaration in a php
      * block, then one PHPDoc tag per paragraph.
      */
-    private String functionHover(PhpFunction shown, String signature) {
+    private String callableHover(String qualifiedName, String signature, @Nullable String doc) {
         var out = new StringBuilder();
         /* markdown would swallow a lone backslash between namespace segments */
-        out.append("__").append(qualifiedName(shown).replace("\\", "\\\\")).append("__\n");
+        out.append("__").append(qualifiedName.replace("\\", "\\\\")).append("__\n");
 
-        String doc = symbols.docComment(shown);
         String description = doc == null ? "" : description(doc);
         if (!description.isEmpty()) {
             out.append('\n').append(description).append('\n');
@@ -80,22 +154,15 @@ public final class HoverHandler {
         return out.toString().strip();
     }
 
-    private static String qualifiedName(PhpFunction func) {
-        var out = new StringBuilder();
-        if (func.ns() != null) {
-            out.append(func.ns()).append('\\');
-        }
-        if (func.className() != null) {
-            out.append(func.className()).append("::");
-        }
-        return out.append(func.name()).toString();
+    private static String qualifiedName(@Nullable String ns, String name) {
+        return ns == null ? name : ns + "\\" + name;
     }
 
     /** All that is left for a call whose declaration is not in the index. */
-    private static String nameOnly(PhpFunction func) {
-        return func.returnType() != null
-                ? "function " + func.name() + "(): " + func.returnType()
-                : "function " + func.name() + "()";
+    private static String nameOnly(String name, @Nullable String returnType) {
+        return returnType != null
+                ? "function " + name + "(): " + returnType
+                : "function " + name + "()";
     }
 
     /** The doc block down to its first tag line. */

@@ -1533,6 +1533,23 @@ def test_40():
     )
 
 
+def test_41():
+    # parameter types resolved through the file's use statements: an import, an
+    # "as" alias, a reserved name that must stay bare, and a same-namespace
+    # class that only resolves because the index declares it
+    hover_cases(
+        41,
+        [
+            (18, 31, php("$a: App\\NSA\\A")),
+            (18, 43, php("$b: App\\NSA\\A")),
+            (18, 51, php("$n: int")),
+            (18, 59, php("$self: App\\Foo")),
+            # the same type reached through a usage rather than the declaration
+            (20, 12, php("$a: App\\NSA\\A")),
+        ],
+    )
+
+
 TESTS = [
     test_1,
     test_2,
@@ -1574,6 +1591,7 @@ TESTS = [
     test_38,
     test_39,
     test_40,
+    test_41,
 ]
 
 

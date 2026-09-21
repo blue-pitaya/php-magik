@@ -1,10 +1,23 @@
-package dev.bluepitaya.phpmagik.index;
+package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.ClassKind;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClass;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionUsage;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodUsage;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyUsage;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpUseStatement;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpVarDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpVarUsage;
+import dev.bluepitaya.phpmagik.phpsymbol.UseKind;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Point;
+import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -26,28 +39,66 @@ public final class Indexer {
             "simple_parameter", "variadic_parameter", "property_promotion_parameter");
 
     private final int fileId;
-    private final List<PhpVar> vars = new ArrayList<>();
-    private final List<PhpFunction> funcs = new ArrayList<>();
+    private final byte[] source;
+    private final List<PhpVarDefinition> varDefinitions = new ArrayList<>();
+    private final List<PhpVarUsage> varUsages = new ArrayList<>();
+    private final List<PhpFunctionDefinition> functions = new ArrayList<>();
+    private final List<PhpFunctionUsage> functionUsages = new ArrayList<>();
+    private final List<PhpMethodDefinition> methods = new ArrayList<>();
+    private final List<PhpMethodUsage> methodUsages = new ArrayList<>();
+    private final List<PhpPropertyDefinition> properties = new ArrayList<>();
+    private final List<PhpPropertyUsage> propertyUsages = new ArrayList<>();
     private final List<PhpUseStatement> uses = new ArrayList<>();
+    private final List<PhpClass> classes = new ArrayList<>();
 
     private String ns;
-    private String className;
+    private PhpClass currentClass;
     private String functionName;
 
-    public Indexer(int fileId) {
+    /** {@code source} must be the bytes the tree was parsed from: nodes index into them. */
+    public Indexer(int fileId, byte[] source) {
         this.fileId = fileId;
+        this.source = source;
     }
 
-    public List<PhpVar> vars() {
-        return vars;
+    public List<PhpVarDefinition> varDefinitions() {
+        return varDefinitions;
     }
 
-    public List<PhpFunction> funcs() {
-        return funcs;
+    public List<PhpVarUsage> varUsages() {
+        return varUsages;
+    }
+
+    public List<PhpFunctionDefinition> functions() {
+        return functions;
+    }
+
+    public List<PhpFunctionUsage> functionUsages() {
+        return functionUsages;
+    }
+
+    public List<PhpMethodDefinition> methods() {
+        return methods;
+    }
+
+    public List<PhpMethodUsage> methodUsages() {
+        return methodUsages;
+    }
+
+    public List<PhpPropertyDefinition> properties() {
+        return properties;
+    }
+
+    public List<PhpPropertyUsage> propertyUsages() {
+        return propertyUsages;
     }
 
     public List<PhpUseStatement> uses() {
         return uses;
+    }
+
+    public List<PhpClass> classes() {
+        return classes;
     }
 
     public void parseProgram(Node root) {
@@ -107,7 +158,7 @@ public final class Indexer {
                 prefix == null ? path.getContent() : prefix + "\\" + path.getContent());
         String name = alias != null ? alias.getContent() : lastSegment(fqn);
 
-        uses.add(new PhpUseStatement(name, fqn, kind));
+        uses.add(new PhpUseStatement(name, fqn, kind, Range.of(clause), fileId));
     }
 
     private static UseKind useKind(Node node) {
@@ -136,21 +187,61 @@ public final class Indexer {
     }
 
     private void parseClassDeclaration(Node root) {
+        ClassKind kind = classKind(root.getType());
         for (Node node : root.getNamedChildren()) {
             switch (node.getType()) {
-                case "name" -> className = node.getContent();
+                /* the only bare name child: extends and implements keep theirs
+                 * inside a base_clause / class_interface_clause; it also comes
+                 * before the body, so members already have their owner */
+                case "name" -> currentClass = pushClass(node.getContent(), kind, node, root);
                 case "declaration_list", "enum_declaration_list" -> parseDeclarationList(node);
             }
         }
-        className = null;
+        currentClass = null;
+    }
+
+    private static ClassKind classKind(String nodeType) {
+        return switch (nodeType) {
+            case "interface_declaration" -> ClassKind.INTERFACE;
+            case "trait_declaration" -> ClassKind.TRAIT;
+            case "enum_declaration" -> ClassKind.ENUM;
+            default -> ClassKind.CLASS;
+        };
+    }
+
+    private PhpClass pushClass(String name, ClassKind kind, Node nameNode, Node declaration) {
+        String fqn = ns == null ? name : ns + "\\" + name;
+        PhpClass declared = new PhpClass(name, ns, fqn, kind, Range.of(nameNode),
+                Range.of(declaration), fileId);
+        classes.add(declared);
+        return declared;
+    }
+
+    /** The class being parsed, as the string the usage indexes store. */
+    private String className() {
+        return currentClass == null ? null : currentClass.name();
     }
 
     private void parseDeclarationList(Node root) {
         for (Node node : root.getNamedChildren()) {
             switch (node.getType()) {
                 case "method_declaration" -> parseFunctionLike(node);
-                case "property_declaration" -> collectVariables(node);
+                case "property_declaration" -> parsePropertyDeclaration(node);
             }
+        }
+    }
+
+    /** One {@code public int $a, $b;} declares a property per element, all of that type. */
+    private void parsePropertyDeclaration(Node root) {
+        if (currentClass == null) return;
+
+        String type = Nodes.text(root.getChildByFieldName("type"));
+        for (Node node : root.getNamedChildren()) {
+            if (!"property_element".equals(node.getType())) continue;
+            Node name = node.getChildByFieldName("name");
+            if (name == null) continue;
+            properties.add(new PhpPropertyDefinition(name.getContent(), currentClass, type,
+                    Range.of(name), fileId));
         }
     }
 
@@ -160,10 +251,87 @@ public final class Indexer {
 
         functionName = name.getContent();
         collectVariables(root);
-        /* position the def at its own name, not the declaration's start, so
-         * hovering/go-to-def on the name lines up like every other symbol */
-        pushFunction(functionName, inferReturnType(root), FuncKind.DEF, name, className);
+
+        String returnType = inferReturnType(root);
+        String signature = signature(root, returnType);
+        String doc = docComment(root);
+        /* position the declaration at its own name, not the declaration's
+         * start, so hovering/go-to-def on the name lines up like every other
+         * symbol */
+        Range range = Range.of(name);
+        Range scope = Range.of(root);
+
+        if (currentClass == null) {
+            functions.add(new PhpFunctionDefinition(functionName, ns, returnType,
+                    signature, doc, range, scope, fileId));
+        } else {
+            methods.add(new PhpMethodDefinition(functionName, currentClass, returnType,
+                    signature, doc, range, scope, fileId));
+        }
         functionName = null;
+    }
+
+    /**
+     * The declaration as written, from its modifiers up to but not including the
+     * body. Sliced out of the source rather than rebuilt, so types and defaults
+     * read exactly as the author wrote them - except that {@code returnType} is
+     * appended when the source declares none, which is the whole point of
+     * showing this on a hover.
+     */
+    private String signature(Node declaration, String returnType) {
+        Node body = declaration.getChildByFieldName("body");
+        int start = declaration.getStartByte();
+        int end = body != null ? body.getStartByte() : declaration.getEndByte();
+        if (start < 0 || end > source.length || end <= start) return null;
+
+        String text = new String(source, start, end - start, StandardCharsets.UTF_8).strip();
+        /* an abstract or interface method ends in ";" where a body would be */
+        if (text.endsWith(";")) {
+            text = text.substring(0, text.length() - 1).strip();
+        }
+        if (declaration.getChildByFieldName("return_type") == null && returnType != null) {
+            text = text + ": " + returnType;
+        }
+        return text;
+    }
+
+    /**
+     * The PHPDoc block above {@code declaration}, its {@code /**} and leading
+     * {@code *} markers stripped, or {@code null} if there is none. Tags are left
+     * exactly as written - this locates the block, it does not parse PHPDoc.
+     */
+    private static String docComment(Node declaration) {
+        Node prev = declaration.getPrevSibling();
+        /* attributes sit between the doc block and the declaration */
+        while (prev != null && "attribute_list".equals(prev.getType())) {
+            prev = prev.getPrevSibling();
+        }
+        if (prev == null || !"comment".equals(prev.getType())) return null;
+
+        String text = prev.getContent();
+        /* "/*" alone is an ordinary block comment, not a doc block */
+        if (text == null || !text.startsWith("/**")) return null;
+        return stripDocMarkers(text);
+    }
+
+    private static String stripDocMarkers(String comment) {
+        String body = comment.substring("/**".length());
+        if (body.endsWith("*/")) {
+            body = body.substring(0, body.length() - "*/".length());
+        }
+
+        var out = new StringBuilder();
+        for (String line : body.split("\n", -1)) {
+            String stripped = line.strip();
+            if (stripped.startsWith("*")) {
+                stripped = stripped.substring(1).strip();
+            }
+            if (out.isEmpty() && stripped.isEmpty()) continue;
+            out.append(stripped).append('\n');
+        }
+
+        String doc = out.toString().strip();
+        return doc.isEmpty() ? null : doc;
     }
 
     /** Records every {@code (variable_name)} in the subtree: declarations and usages. */
@@ -185,32 +353,38 @@ public final class Indexer {
         }
     }
 
-    /** {@code $obj->foo} becomes a property usage on the object's class. */
+    /**
+     * {@code $obj->foo} becomes a property usage on the object's class. An
+     * object of unknown class is skipped: there would be nothing to match the
+     * access against.
+     */
     private void collectPropertyAccess(Node node) {
         Node obj = node.getChildByFieldName("object");
         Node name = node.getChildByFieldName("name");
         if (!isVariableAccess(obj, name)) return;
 
-        String object = obj.getContent();
-        String cls = objectClass(object);
+        String cls = objectClass(obj.getContent());
         if (cls == null) return;
 
         /* "$"-prefixed to match the property declaration, though the source
          * text after -> has no "$" */
-        String prop = "$" + name.getContent();
-        VarKind kind = object.equals("$this") ? VarKind.THIS : VarKind.OBJ;
-        pushVar(prop, classPropType(cls, prop), kind, name, cls);
+        propertyUsages.add(new PhpPropertyUsage("$" + name.getContent(), cls,
+                Range.of(name), fileId));
     }
 
     private void collectFunctionCall(Node node) {
         Node fn = node.getChildByFieldName("function");
         String type = Nodes.type(fn);
         if ("name".equals(type) || "qualified_name".equals(type)) {
-            pushFunction(fn.getContent(), null, FuncKind.CALL, fn, className);
+            pushCall(fn.getContent(), fn);
         }
     }
 
-    /** {@code $obj->foo(...)} becomes a method usage on the object's class. */
+    /**
+     * {@code $obj->foo(...)} becomes a method usage on the object's class. An
+     * object of unknown class is skipped: there would be nothing to match the
+     * call against.
+     */
     private void collectMethodCall(Node node) {
         Node obj = node.getChildByFieldName("object");
         Node name = node.getChildByFieldName("name");
@@ -219,62 +393,52 @@ public final class Indexer {
         String cls = objectClass(obj.getContent());
         if (cls == null) return;
 
-        pushFunction(name.getContent(), null, FuncKind.METHOD, name, cls);
+        methodUsages.add(new PhpMethodUsage(name.getContent(), cls, Range.of(name), fileId));
     }
 
     private static boolean isVariableAccess(Node obj, Node name) {
         return "variable_name".equals(Nodes.type(obj)) && "name".equals(Nodes.type(name));
     }
 
+    /**
+     * A parameter or an assignment gives the variable a value, so it is a
+     * definition; everything else only reads it.
+     */
     private void addVar(Node node) {
         String parentType = Nodes.type(node.getParent());
-        VarKind kind;
-        if ("property_element".equals(parentType)) {
-            kind = VarKind.PROPERTY;
-        } else if (parentType != null && PARAMETER_TYPES.contains(parentType)) {
-            kind = VarKind.PARAM;
+        boolean parameter = parentType != null && PARAMETER_TYPES.contains(parentType);
+        if (parameter || isAssignmentTarget(node)) {
+            varDefinitions.add(new PhpVarDefinition(node.getContent(), ns, functionName,
+                    inferType(node), Range.of(node), fileId));
         } else {
-            kind = VarKind.USE;
+            varUsages.add(new PhpVarUsage(node.getContent(), ns, functionName, Range.of(node),
+                    fileId));
         }
-        pushVar(node.getContent(), inferType(node), kind, node, className);
     }
 
-    private void pushVar(String name, String type, VarKind kind, Node node, String owner) {
-        Point p = node.getStartPoint();
-        vars.add(new PhpVar(name, ns, owner, functionName, type, kind,
-                p.getRow(), p.getColumn(), fileId));
+    private static boolean isAssignmentTarget(Node node) {
+        Node parent = node.getParent();
+        if (parent == null || !"assignment_expression".equals(parent.getType())) return false;
+        Node left = parent.getChildByFieldName("left");
+        return left != null && left.equals(node);
     }
 
-    private void pushFunction(String name, String returnType, FuncKind kind, Node node,
-                              String owner) {
-        Point p = node.getStartPoint();
-        funcs.add(new PhpFunction(name, ns, owner, null, kind, returnType,
-                p.getRow(), p.getColumn(), fileId));
+    /** A usage: the call site says nothing about the function beyond its name. */
+    private void pushCall(String name, Node node) {
+        functionUsages.add(new PhpFunctionUsage(name, ns, Range.of(node), fileId));
     }
 
     private String inferType(Node node) {
         Node parent = node.getParent();
         if (parent == null) return null;
-        String pt = parent.getType();
 
         /* declared type on parameter (incl. variadic/promoted) */
-        if (pt.contains("parameter")) {
+        if (parent.getType().contains("parameter")) {
             return Nodes.text(parent.getChildByFieldName("type"));
         }
-        /* typed property: type field sits on property_declaration */
-        if (pt.equals("property_element")) {
-            Node declaration = parent.getParent();
-            if (declaration == null) return null;
-            return Nodes.text(declaration.getChildByFieldName("type"));
-        }
-        /* $x = <rhs>, only when we are the left side */
-        if (pt.equals("assignment_expression")) {
-            Node left = parent.getChildByFieldName("left");
-            if (left != null && left.equals(node)) {
-                return inferExprType(parent.getChildByFieldName("right"));
-            }
-        }
-        return null;
+        return isAssignmentTarget(node)
+                ? inferExprType(parent.getChildByFieldName("right"))
+                : null;
     }
 
     /** Type of an expression node: literal, {@code new X}, {@code $var}, {@code $obj->prop}. */
@@ -368,10 +532,10 @@ public final class Indexer {
 
     /** Latest known type of variable {@code name} in the current function scope. */
     private String scopeVarType(String name) {
-        for (PhpVar v : vars.reversed()) {
-            if (v.type() != null && v.name().equals(name)
-                    && Objects.equals(v.functionName(), functionName)) {
-                return v.type();
+        for (PhpVarDefinition def : varDefinitions.reversed()) {
+            if (def.type() != null && def.name().equals(name)
+                    && Objects.equals(def.functionName(), functionName)) {
+                return def.type();
             }
         }
         return null;
@@ -379,18 +543,15 @@ public final class Indexer {
 
     /** Declared type of property {@code prop} ({@code "$x"}) on already-collected class {@code cls}. */
     private String classPropType(String cls, String prop) {
-        for (PhpVar v : vars) {
-            if (v.kind() == VarKind.PROPERTY && v.className() != null
-                    && v.className().equals(cls) && v.name().equals(prop)) {
-                return v.type();
-            }
+        for (PhpPropertyDefinition p : properties) {
+            if (p.owner().name().equals(cls) && p.name().equals(prop)) return p.type();
         }
         return null;
     }
 
     /** Class behind {@code $var->}: the current class for {@code $this}, else a scope lookup. */
     private String objectClass(String obj) {
-        return obj.equals("$this") ? className : stripType(scopeVarType(obj));
+        return obj.equals("$this") ? className() : stripType(scopeVarType(obj));
     }
 
     /** {@code ?Foo}, {@code \Foo} become {@code Foo}. */

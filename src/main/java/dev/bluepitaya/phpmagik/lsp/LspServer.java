@@ -1,7 +1,7 @@
 package dev.bluepitaya.phpmagik.lsp;
 
-import dev.bluepitaya.phpmagik.index.SymbolFinder;
-import dev.bluepitaya.phpmagik.index.Workspace;
+import dev.bluepitaya.phpmagik.SymbolFinder;
+import dev.bluepitaya.phpmagik.Workspace;
 import dev.bluepitaya.phpmagik.lsp.dto.DidChangeParams;
 import dev.bluepitaya.phpmagik.lsp.dto.DidOpenParams;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
@@ -18,6 +18,10 @@ import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.InitializeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.WorkspaceSymbolHandler;
+import dev.bluepitaya.phpmagik.resolver.FunctionResolver;
+import dev.bluepitaya.phpmagik.resolver.MethodResolver;
+import dev.bluepitaya.phpmagik.resolver.PropertyResolver;
+import dev.bluepitaya.phpmagik.resolver.VariableResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
@@ -58,16 +62,22 @@ public final class LspServer {
         this.log = new Logger(Path.of("/tmp/php-magik.log"));
 
         var symbols = new SymbolFinder(app);
+        var variables = new VariableResolver(app);
+        var functions = new FunctionResolver(app);
+        var methods = new MethodResolver(app);
+        var properties = new PropertyResolver(app);
         this.initialize = new InitializeHandler();
         this.didOpen = new DidOpenHandler(app, log);
         this.didChange = new DidChangeHandler(app, log);
         this.didClose = new DidCloseHandler(log);
-        this.hover = new HoverHandler(app, symbols, log);
-        this.definition = new DefinitionHandler(app, symbols, log);
-        this.references = new ReferencesHandler(app, symbols, log);
+        this.hover = new HoverHandler(app, symbols, variables, functions, methods, properties, log);
+        this.definition =
+                new DefinitionHandler(app, symbols, variables, functions, methods, properties, log);
+        this.references =
+                new ReferencesHandler(app, symbols, variables, functions, methods, properties, log);
         this.documentSymbol = new DocumentSymbolHandler(app, log);
         this.workspaceSymbol = new WorkspaceSymbolHandler(app, log);
-        this.completion = new CompletionHandler(app, symbols, log);
+        this.completion = new CompletionHandler(app, symbols, variables, methods, properties, log);
     }
 
     public void run() throws IOException {

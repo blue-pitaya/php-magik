@@ -1,22 +1,36 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.index.*;
+import dev.bluepitaya.phpmagik.*;
+import dev.bluepitaya.phpmagik.phpsymbol.*;
+import dev.bluepitaya.phpmagik.resolver.*;
 import dev.bluepitaya.phpmagik.lsp.Json;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.*;
 import org.jspecify.annotations.NullMarked;
 import tools.jackson.databind.node.ArrayNode;
 
+import java.util.List;
+
 @NullMarked
 public final class ReferencesHandler {
 
     private final Workspace app;
     private final SymbolFinder symbols;
+    private final VariableResolver variables;
+    private final FunctionResolver functions;
+    private final MethodResolver methods;
+    private final PropertyResolver properties;
     private final Logger log;
 
-    public ReferencesHandler(Workspace app, SymbolFinder symbols, Logger log) {
+    public ReferencesHandler(Workspace app, SymbolFinder symbols, VariableResolver variables,
+                             FunctionResolver functions, MethodResolver methods,
+                             PropertyResolver properties, Logger log) {
         this.app = app;
         this.symbols = symbols;
+        this.variables = variables;
+        this.functions = functions;
+        this.methods = methods;
+        this.properties = properties;
         this.log = log;
     }
 
@@ -37,35 +51,34 @@ public final class ReferencesHandler {
 
         PhpSymbol sym = symbols.resolveAt(file, line, col);
 
-        if (sym instanceof PhpFunction func) {
-            PhpFunction def = symbols.findFuncDef(func);
-            if (def != null) collectFuncRefs(def, includeDecl, locs);
-        } else if (sym instanceof PhpVar var) {
-            PhpVar def = symbols.findVarDef(var);
-            if (def != null) collectVarRefs(def, includeDecl, locs);
+        if (sym instanceof PhpMethodDefinition method) {
+            collect(methods.usagesOf(method, includeDecl), locs);
+        } else if (sym instanceof PhpMethodUsage usage) {
+            PhpMethodDefinition declared = methods.definitionOf(usage);
+            if (declared != null) collect(methods.usagesOf(declared, includeDecl), locs);
+        } else if (sym instanceof PhpFunctionDefinition func) {
+            collect(functions.usagesOf(func, includeDecl), locs);
+        } else if (sym instanceof PhpFunctionUsage usage) {
+            PhpFunctionDefinition declared = functions.definitionOf(usage);
+            if (declared != null) collect(functions.usagesOf(declared, includeDecl), locs);
+        } else if (sym instanceof PhpPropertyDefinition property) {
+            collect(properties.usagesOf(property, includeDecl), locs);
+        } else if (sym instanceof PhpPropertyUsage usage) {
+            PhpPropertyDefinition declared = properties.definitionOf(usage);
+            if (declared != null) collect(properties.usagesOf(declared, includeDecl), locs);
+        } else if (sym instanceof PhpVarDefinition def) {
+            collect(variables.occurrencesOf(def, includeDecl), locs);
+        } else if (sym instanceof PhpVarUsage usage) {
+            collect(variables.occurrencesOf(usage, includeDecl), locs);
         }
 
         return locs;
     }
 
-    private void collectFuncRefs(PhpFunction def, boolean includeDecl, ArrayNode locs) {
-        for (PhpFunction f : symbols.funcRefs(def, includeDecl)) {
-            PhpFile file = app.file(f.fileId());
-            locs.add(Json.location(file.uri(), f.line(), f.col(), Json.byteLength(f.name())));
-        }
-    }
-
-    private void collectVarRefs(PhpVar def, boolean includeDecl, ArrayNode locs) {
-        for (PhpVar v : symbols.varRefs(def, includeDecl)) {
-            /* $this->prop / $obj->prop store a synthetic "$"-prefixed name (to
-             * match against property declarations), but the source text at this
-             * position is just the bare property name - there is no literal "$" */
-            int len = Json.byteLength(v.name());
-            if (v.kind() == VarKind.THIS || v.kind() == VarKind.OBJ) {
-                len -= 1;
-            }
-            PhpFile file = app.file(v.fileId());
-            locs.add(Json.location(file.uri(), v.line(), v.col(), len));
+    private void collect(List<? extends PhpSymbol> refs, ArrayNode locs) {
+        for (PhpSymbol ref : refs) {
+            PhpFile file = app.file(ref.fileId());
+            locs.add(Json.location(file.uri(), ref.range()));
         }
     }
 }

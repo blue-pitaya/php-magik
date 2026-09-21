@@ -1,5 +1,6 @@
-package dev.bluepitaya.phpmagik.index;
+package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.PhpUseStatement;
 import dev.bluepitaya.phpmagik.ts.Tree;
 
 import java.util.List;

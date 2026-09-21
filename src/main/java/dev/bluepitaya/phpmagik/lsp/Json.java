@@ -1,14 +1,14 @@
 package dev.bluepitaya.phpmagik.lsp;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import dev.bluepitaya.phpmagik.ts.Point;
+import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
-
-import java.nio.charset.StandardCharsets;
 
 @NullMarked
 public final class Json {
@@ -27,20 +27,19 @@ public final class Json {
         return RejectsNullFieldsMapper.createArrayNode();
     }
 
-    public static ObjectNode location(String uri, int line, int col, int len) {
+    public static ObjectNode location(String uri, Range range) {
         ObjectNode loc = object();
         loc.put("uri", uri);
-
-        ObjectNode range = object();
-        range.set("start", object().put("line", line).put("character", col));
-        range.set("end", object().put("line", line).put("character", col + len));
-        loc.set("range", range);
-
+        loc.set("range", range(range));
         return loc;
     }
 
-    /** Ranges are byte offsets into the UTF-8 source, so a name's length is its encoded length. */
-    public static int byteLength(String s) {
-        return s.getBytes(StandardCharsets.UTF_8).length;
+    public static ObjectNode range(Range range) {
+        Point start = range.start();
+        Point end = range.end();
+        ObjectNode out = object();
+        out.set("start", object().put("line", start.getRow()).put("character", start.getColumn()));
+        out.set("end", object().put("line", end.getRow()).put("character", end.getColumn()));
+        return out;
     }
 }

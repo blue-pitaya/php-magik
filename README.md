@@ -13,11 +13,12 @@ The whole LSP surface of the C version is ported: `initialize`, `didOpen`,
 ```
 src/main/java/dev/bluepitaya/phpmagik/
   Main.java              --path <dir|file>, indexes, then serves on stdio
-  json/Json.java         minimal JSON tree, standing in for the vendored yyjson
-  index/
-    Indexer.java         port of the C parser.c: walks a tree, records symbols
-    Workspace.java       port of app_ctx.c + fs.c: the file/var/func indexes
-    PhpFile, PhpVar, PhpFunction, VarKind, FuncKind
+  Indexer.java           port of the C parser.c: walks a tree, records symbols
+  Workspace.java         port of app_ctx.c + fs.c: the per-kind symbol indexes
+  PhpFile.java           one indexed file: source, tree, imports
+  SymbolFinder.java      what is written at a position, and what a type means
+  phpsymbol/             the symbols the index records, declarations and usages
+  resolver/              pairs a usage with the declaration it refers to
   lsp/LspServer.java     port of lsp.c: transport, dispatch, every handler
   ts/                    the tree-sitter binding (below)
 ```
@@ -139,9 +140,16 @@ src/main/java/dev/bluepitaya/phpmagik/ts/
   External.java                base for owned pointers
   Node.java                    the ported struct
   Point.java                   ditto, row/column
+  Range.java                   a start and an end point, as LSP wants them
   Nodes.java                   bounds-safe child accessors
   Parser.java, Tree.java       owned pointers
   ParsingException.java
+src/main/java/dev/bluepitaya/phpmagik/phpsymbol/
+  PhpSymbol.java               sealed over every kind, each with a range
+  Php{Var,Function,Method,Property}{Definition,Usage}.java
+  PhpClass.java, PhpUseStatement.java, ClassKind.java, UseKind.java
+src/main/java/dev/bluepitaya/phpmagik/resolver/
+  {Variable,Function,Method,Property}Resolver.java
 src/main/java/dev/bluepitaya/phpmagik/lsp/
   LspServer.java               framing, dispatch, responses
   Json.java                    the shared mapper and JSON shapes

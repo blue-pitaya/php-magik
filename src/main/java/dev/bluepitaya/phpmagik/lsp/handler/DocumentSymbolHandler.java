@@ -1,10 +1,11 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.index.*;
+import dev.bluepitaya.phpmagik.*;
 import dev.bluepitaya.phpmagik.lsp.Json;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.*;
 import dev.bluepitaya.phpmagik.ts.Node;
+import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -35,20 +36,6 @@ public final class DocumentSymbolHandler {
     }
 
     /**
-     * A bare {@code {start,end}} range spanning {@code node}. Unlike
-     * {@link Json#location} this reads a live tree node, so it gets the whole
-     * span - a function's entire body, say - rather than just a name's length.
-     */
-    private static ObjectNode rangeJson(Node node) {
-        var s = node.getStartPoint();
-        var e = node.getEndPoint();
-        ObjectNode range = Json.object();
-        range.set("start", Json.object().put("line", s.getRow()).put("character", s.getColumn()));
-        range.set("end", Json.object().put("line", e.getRow()).put("character", e.getColumn()));
-        return range;
-    }
-
-    /**
      * Builds a DocumentSymbol for {@code nameNode} (its own name becomes the
      * selectionRange) spanning {@code whole} (its full declaration becomes the
      * range), appends it to {@code parentChildren}, and returns it so the
@@ -59,8 +46,8 @@ public final class DocumentSymbolHandler {
         ObjectNode sym = Json.object();
         sym.put("name", name);
         sym.put("kind", kind);
-        sym.set("range", rangeJson(whole));
-        sym.set("selectionRange", rangeJson(nameNode));
+        sym.set("range", Json.range(Range.of(whole)));
+        sym.set("selectionRange", Json.range(Range.of(nameNode)));
         parentChildren.add(sym);
         return sym;
     }
