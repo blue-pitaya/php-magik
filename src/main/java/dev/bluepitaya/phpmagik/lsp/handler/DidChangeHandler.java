@@ -29,9 +29,13 @@ public final class DidChangeHandler {
         byte[] content = text.getBytes(StandardCharsets.UTF_8);
         log.log("didChange: " + uri + " (" + content.length + " bytes)");
 
-        /* textDocumentSync is Full (1): `text` is always the whole document */
-        if (!app.reparseFile(uri, content)) {
+        PhpFile file = app.findFile(uri);
+        if (file == null) {
             log.log("didChange: " + uri + " not in index, skipping reparse");
+            return;
         }
+
+        /* textDocumentSync is Full (1): `text` is always the whole document */
+        app.reparse(file, content);
     }
 }

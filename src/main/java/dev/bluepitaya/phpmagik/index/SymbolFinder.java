@@ -6,6 +6,7 @@ import dev.bluepitaya.phpmagik.ts.Point;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -96,13 +97,7 @@ public final class SymbolFinder {
      * it through {@link #findFuncDef} first.
      */
     public @Nullable String docComment(PhpFunction def) {
-        if (def.kind() != FuncKind.DEF) return null;
-
-        PhpFile file = workspace.file(def.fileId());
-        Node root = file.tree().getRootNode();
-        if (root == null) return null;
-        Node decl = enclosingDeclaration(root.getNamedDescendant(
-                new Point(def.line(), def.col()), new Point(def.line(), def.col())));
+        Node decl = declarationNode(def);
         if (decl == null) return null;
 
         Node prev = decl.getPrevSibling();
@@ -116,6 +111,43 @@ public final class SymbolFinder {
         /* "/*" alone is an ordinary block comment, not a doc block */
         if (text == null || !text.startsWith("/**")) return null;
         return stripDocMarkers(text);
+    }
+
+    /**
+     * The declaration as written, from its modifiers up to but not including the
+     * body: {@code public function query($key = null)}. Sliced out of the source
+     * rather than rebuilt, so types and defaults read exactly as the author wrote
+     * them - except that an inferred return type is appended when the source
+     * declares none, which is the whole point of hovering here.
+     */
+    public @Nullable String signature(PhpFunction def) {
+        Node decl = declarationNode(def);
+        if (decl == null) return null;
+
+        Node body = decl.getChildByFieldName("body");
+        int start = decl.getStartByte();
+        int end = body != null ? body.getStartByte() : decl.getEndByte();
+        byte[] content = workspace.file(def.fileId()).content();
+        if (start < 0 || end > content.length || end <= start) return null;
+
+        String text = new String(content, start, end - start, StandardCharsets.UTF_8).strip();
+        /* an abstract or interface method ends in ";" where a body would be */
+        if (text.endsWith(";")) {
+            text = text.substring(0, text.length() - 1).strip();
+        }
+        if (decl.getChildByFieldName("return_type") == null && def.returnType() != null) {
+            text = text + ": " + def.returnType();
+        }
+        return text;
+    }
+
+    private @Nullable Node declarationNode(PhpFunction def) {
+        if (def.kind() != FuncKind.DEF) return null;
+
+        Node root = workspace.file(def.fileId()).tree().getRootNode();
+        if (root == null) return null;
+        Point pt = new Point(def.line(), def.col());
+        return enclosingDeclaration(root.getNamedDescendant(pt, pt));
     }
 
     private static @Nullable Node enclosingDeclaration(@Nullable Node node) {

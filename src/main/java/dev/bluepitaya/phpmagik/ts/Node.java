@@ -47,6 +47,7 @@ public class Node implements Iterable<Node> {
 
     private final @Nullable Tree tree;
 
+    //TODO: many @Nullable here is not true
     Node(int context0, int context1, int context2, int context3, long id, @Nullable Tree tree) {
         this.context0 = context0;
         this.context1 = context1;
@@ -56,19 +57,15 @@ public class Node implements Iterable<Node> {
         this.tree = tree;
     }
 
-    /**
-     * @throws IndexOutOfBoundsException if the index is negative, or greater than
-     * or equal to the total number of children
-     */
-    public @Nullable Node getChild(int child) {
+    public Node getChild(int child) {
         return getChild(child, false);
     }
 
-    public @Nullable Node getNamedChild(int child) {
+    public Node getNamedChild(int child) {
         return getChild(child, true);
     }
 
-    private native @Nullable Node getChild(int child, boolean named);
+    private native Node getChild(int child, boolean named) throws IndexOutOfBoundsException;
 
     /**
      * @return the child in that field, {@code null} if there is none
@@ -86,15 +83,16 @@ public class Node implements Iterable<Node> {
 
     private native int getChildCount(boolean named);
 
-    public @Nullable List<Node> getChildren() {
+    /** Empty for a leaf; {@code List.of} means never null, and never a null element. */
+    public List<Node> getChildren() {
         return List.of(getChildren(this, false));
     }
 
-    public @Nullable List<Node> getNamedChildren() {
+    public List<Node> getNamedChildren() {
         return List.of(getChildren(this, true));
     }
 
-    private static native Node[] getChildren(@Nullable Node node, boolean named);
+    private static native Node[] getChildren(Node node, boolean named);
 
     /** The source code this node spans, decoded from the tree's UTF-8 bytes. */
     public @Nullable String getContent() {

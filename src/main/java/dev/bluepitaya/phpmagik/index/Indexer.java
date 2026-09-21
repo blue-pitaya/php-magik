@@ -3,27 +3,32 @@ package dev.bluepitaya.phpmagik.index;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Point;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
-/**
- * Walks one file's syntax tree and records every variable and function it finds,
- * declarations and usages alike, along with whatever type could be inferred.
- *
- * <p>One instance indexes one file: the namespace, class and function fields
- * track where the walk currently is, so entries can be attributed to their
- * enclosing scope as they are pushed.
- */
+@NullMarked
 public final class Indexer {
 
-    private static final String BOOL_OPS =
-            "== != === !== < > <= >= <=> && || and or xor instanceof";
+    private static final Set<String> BOOL_OPS = Set.of(
+            "==", "!=", "===", "!==", "<", ">", "<=", ">=", "<=>",
+            "&&", "||", "and", "or", "xor", "instanceof");
+
+    /** Integer whatever the operands are, unlike the arithmetic ops. */
+    private static final Set<String> INT_OPS = Set.of("%", "<<", ">>", "&", "|", "^");
+
+    private static final Set<String> ARITHMETIC_OPS = Set.of("+", "-", "*", "/", "**");
+
+    private static final Set<String> PARAMETER_TYPES = Set.of(
+            "simple_parameter", "variadic_parameter", "property_promotion_parameter");
 
     private final int fileId;
     private final List<PhpVar> vars = new ArrayList<>();
     private final List<PhpFunction> funcs = new ArrayList<>();
+    private final List<PhpUseStatement> uses = new ArrayList<>();
 
     private String ns;
     private String className;
@@ -41,57 +46,110 @@ public final class Indexer {
         return funcs;
     }
 
-    /** {@code root} is the {@code (program)} node. */
+    public List<PhpUseStatement> uses() {
+        return uses;
+    }
+
     public void parseProgram(Node root) {
-        int count = root.getNamedChildCount();
-        for (int i = 0; i < count; i++) {
-            Node node = root.getNamedChild(i);
+        for (Node node : root.getNamedChildren()) {
             switch (node.getType()) {
                 case "function_definition" -> parseFunctionLike(node);
                 case "class_declaration", "interface_declaration", "trait_declaration",
-                        "enum_declaration" -> parseClassDeclaration(node);
+                     "enum_declaration" -> parseClassDeclaration(node);
                 case "namespace_definition" -> parseNamespaceDefinition(node);
+                case "namespace_use_declaration" -> parseUseDeclaration(node);
                 default -> collectVariables(node);
             }
         }
     }
 
+    /**
+     * {@code use A\B, C\D;} lists its clauses directly; {@code use A\{B, C};}
+     * puts them in a group under a {@code namespace_name} prefix.
+     */
+    private void parseUseDeclaration(Node root) {
+        UseKind declared = useKind(root);
+        String prefix = null;
+        for (Node node : root.getNamedChildren()) {
+            switch (node.getType()) {
+                case "namespace_name" -> prefix = node.getContent();
+                case "namespace_use_clause" -> addUse(node, prefix, declared);
+            }
+        }
+
+        Node group = root.getChildByFieldName("body");
+        if (group == null) return;
+        for (Node node : group.getNamedChildren()) {
+            if ("namespace_use_clause".equals(node.getType())) {
+                addUse(node, prefix, declared);
+            }
+        }
+    }
+
+    private void addUse(Node clause, String prefix, UseKind declared) {
+        /* in "use A as B" the alias is a name node too, so it has to be told
+         * apart from the path rather than taken by position */
+        Node alias = clause.getChildByFieldName("alias");
+        Node path = null;
+        for (Node node : clause.getNamedChildren()) {
+            String type = node.getType();
+            boolean isPath = "name".equals(type) || "qualified_name".equals(type);
+            if (isPath && (alias == null || !node.equals(alias))) {
+                path = node;
+                break;
+            }
+        }
+        if (path == null) return;
+
+        /* a clause may narrow the declaration's kind inside a group */
+        UseKind kind = clause.getChildByFieldName("type") != null ? useKind(clause) : declared;
+        String fqn = stripLeadingSeparator(
+                prefix == null ? path.getContent() : prefix + "\\" + path.getContent());
+        String name = alias != null ? alias.getContent() : lastSegment(fqn);
+
+        uses.add(new PhpUseStatement(name, fqn, kind));
+    }
+
+    private static UseKind useKind(Node node) {
+        String type = Nodes.text(node.getChildByFieldName("type"));
+        if ("function".equals(type)) return UseKind.FUNCTION;
+        if ("const".equals(type)) return UseKind.CONST;
+        return UseKind.CLASS;
+    }
+
+    private static String stripLeadingSeparator(String fqn) {
+        return fqn.startsWith("\\") ? fqn.substring(1) : fqn;
+    }
+
+    private static String lastSegment(String fqn) {
+        int last = fqn.lastIndexOf('\\');
+        return last < 0 ? fqn : fqn.substring(last + 1);
+    }
+
     private void parseNamespaceDefinition(Node root) {
-        int count = root.getNamedChildCount();
-        for (int i = 0; i < count; i++) {
-            Node node = root.getNamedChild(i);
+        for (Node node : root.getNamedChildren()) {
             switch (node.getType()) {
                 case "namespace_name" -> ns = node.getContent();
                 case "compound_statement" -> parseProgram(node);
-                default -> {
-                }
             }
         }
     }
 
     private void parseClassDeclaration(Node root) {
-        int count = root.getNamedChildCount();
-        for (int i = 0; i < count; i++) {
-            Node node = root.getNamedChild(i);
+        for (Node node : root.getNamedChildren()) {
             switch (node.getType()) {
                 case "name" -> className = node.getContent();
                 case "declaration_list", "enum_declaration_list" -> parseDeclarationList(node);
-                default -> {
-                }
             }
         }
         className = null;
     }
 
     private void parseDeclarationList(Node root) {
-        int count = root.getNamedChildCount();
-        for (int i = 0; i < count; i++) {
-            Node node = root.getNamedChild(i);
+        for (Node node : root.getNamedChildren()) {
             switch (node.getType()) {
                 case "method_declaration" -> parseFunctionLike(node);
                 case "property_declaration" -> collectVariables(node);
-                default -> {
-                }
             }
         }
     }
@@ -99,58 +157,69 @@ public final class Indexer {
     private void parseFunctionLike(Node root) {
         Node name = root.getChildByFieldName("name");
         if (name == null) return;
+
         functionName = name.getContent();
         collectVariables(root);
         /* position the def at its own name, not the declaration's start, so
          * hovering/go-to-def on the name lines up like every other symbol */
-        pushFunction(functionName, inferReturnType(root), FuncKind.DEF, name);
+        pushFunction(functionName, inferReturnType(root), FuncKind.DEF, name, className);
         functionName = null;
     }
 
     /** Records every {@code (variable_name)} in the subtree: declarations and usages. */
     private void collectVariables(Node root) {
-        String t = root.getType();
-
-        if (t.equals("variable_name")) {
-            addVar(root);
-            return;
-        }
-        if (t.equals("member_access_expression")) {
-            Node obj = root.getChildByFieldName("object");
-            Node name = root.getChildByFieldName("name");
-            if (isVariableAccess(obj, name)) {
-                String o = obj.getContent();
-                String cls = objectClass(o);
-                if (cls != null) {
-                    addObjProp(name, cls, o.equals("$this") ? VarKind.THIS : VarKind.OBJ);
-                }
+        switch (root.getType()) {
+            case "variable_name" -> {
+                addVar(root);
+                return;
             }
-            /* fall through: recurse for the object var itself */
-        }
-        if (t.equals("function_call_expression")) {
-            Node fn = root.getChildByFieldName("function");
-            String ft = Nodes.type(fn);
-            if ("name".equals(ft) || "qualified_name".equals(ft)) {
-                pushFunction(fn.getContent(), null, FuncKind.CALL, fn);
-            }
-            /* fall through: recurse for arguments */
-        }
-        if (t.equals("member_call_expression")) {
-            Node obj = root.getChildByFieldName("object");
-            Node name = root.getChildByFieldName("name");
-            if (isVariableAccess(obj, name)) {
-                String cls = objectClass(obj.getContent());
-                if (cls != null) {
-                    addMethodCall(name, cls);
-                }
-            }
-            /* fall through: recurse for object and arguments */
+            case "member_access_expression" -> collectPropertyAccess(root);
+            case "function_call_expression" -> collectFunctionCall(root);
+            case "member_call_expression" -> collectMethodCall(root);
         }
 
-        int count = root.getNamedChildCount();
-        for (int i = 0; i < count; i++) {
-            collectVariables(root.getNamedChild(i));
+        /* the cases above record the access itself; their object and arguments
+         * hold variables of their own, so every node type still recurses */
+        for (Node child : root.getNamedChildren()) {
+            collectVariables(child);
         }
+    }
+
+    /** {@code $obj->foo} becomes a property usage on the object's class. */
+    private void collectPropertyAccess(Node node) {
+        Node obj = node.getChildByFieldName("object");
+        Node name = node.getChildByFieldName("name");
+        if (!isVariableAccess(obj, name)) return;
+
+        String object = obj.getContent();
+        String cls = objectClass(object);
+        if (cls == null) return;
+
+        /* "$"-prefixed to match the property declaration, though the source
+         * text after -> has no "$" */
+        String prop = "$" + name.getContent();
+        VarKind kind = object.equals("$this") ? VarKind.THIS : VarKind.OBJ;
+        pushVar(prop, classPropType(cls, prop), kind, name, cls);
+    }
+
+    private void collectFunctionCall(Node node) {
+        Node fn = node.getChildByFieldName("function");
+        String type = Nodes.type(fn);
+        if ("name".equals(type) || "qualified_name".equals(type)) {
+            pushFunction(fn.getContent(), null, FuncKind.CALL, fn, className);
+        }
+    }
+
+    /** {@code $obj->foo(...)} becomes a method usage on the object's class. */
+    private void collectMethodCall(Node node) {
+        Node obj = node.getChildByFieldName("object");
+        Node name = node.getChildByFieldName("name");
+        if (!isVariableAccess(obj, name)) return;
+
+        String cls = objectClass(obj.getContent());
+        if (cls == null) return;
+
+        pushFunction(name.getContent(), null, FuncKind.METHOD, name, cls);
     }
 
     private static boolean isVariableAccess(Node obj, Node name) {
@@ -158,47 +227,28 @@ public final class Indexer {
     }
 
     private void addVar(Node node) {
-        Node parent = node.getParent();
-        String ptype = Nodes.type(parent);
+        String parentType = Nodes.type(node.getParent());
         VarKind kind;
-        if ("property_element".equals(ptype)) {
+        if ("property_element".equals(parentType)) {
             kind = VarKind.PROPERTY;
-        } else if ("simple_parameter".equals(ptype) || "variadic_parameter".equals(ptype)
-                || "property_promotion_parameter".equals(ptype)) {
+        } else if (parentType != null && PARAMETER_TYPES.contains(parentType)) {
             kind = VarKind.PARAM;
         } else {
             kind = VarKind.USE;
         }
-        pushVar(node.getContent(), inferType(node), kind, node);
+        pushVar(node.getContent(), inferType(node), kind, node, className);
     }
 
-    /** {@code $obj->foo} becomes a property usage {@code "$foo"} on class {@code cls}. */
-    private void addObjProp(Node nameNode, String cls, VarKind kind) {
-        String name = "$" + nameNode.getContent();
-        String type = classPropType(cls, name);
-        String saved = className;
-        className = cls; /* attribute entry to owning class */
-        pushVar(name, type, kind, nameNode);
-        className = saved;
-    }
-
-    /** {@code $obj->foo(...)} becomes a method usage on class {@code cls}. */
-    private void addMethodCall(Node nameNode, String cls) {
-        String saved = className;
-        className = cls; /* attribute call to owning class */
-        pushFunction(nameNode.getContent(), null, FuncKind.METHOD, nameNode);
-        className = saved;
-    }
-
-    private void pushVar(String name, String type, VarKind kind, Node node) {
+    private void pushVar(String name, String type, VarKind kind, Node node, String owner) {
         Point p = node.getStartPoint();
-        vars.add(new PhpVar(name, ns, className, functionName, type, kind,
+        vars.add(new PhpVar(name, ns, owner, functionName, type, kind,
                 p.getRow(), p.getColumn(), fileId));
     }
 
-    private void pushFunction(String name, String returnType, FuncKind kind, Node node) {
+    private void pushFunction(String name, String returnType, FuncKind kind, Node node,
+                              String owner) {
         Point p = node.getStartPoint();
-        funcs.add(new PhpFunction(name, ns, className, null, kind, returnType,
+        funcs.add(new PhpFunction(name, ns, owner, null, kind, returnType,
                 p.getRow(), p.getColumn(), fileId));
     }
 
@@ -267,21 +317,16 @@ public final class Indexer {
         if (op == null) return null;
 
         if (op.equals(".")) return "string";
-        if (op.equals("%") || op.equals("<<") || op.equals(">>")
-                || op.equals("&") || op.equals("|") || op.equals("^")) {
-            return "int";
-        }
+        if (INT_OPS.contains(op)) return "int";
         if (BOOL_OPS.contains(op)) return "bool";
+        if (!ARITHMETIC_OPS.contains(op)) return null;
 
-        if (op.equals("+") || op.equals("-") || op.equals("*") || op.equals("/")
-                || op.equals("**")) {
-            String left = inferExprType(expr.getChildByFieldName("left"));
-            String right = inferExprType(expr.getChildByFieldName("right"));
-            if (left == null || right == null) return null;
-            boolean isFloat = left.equals("float") || right.equals("float") || op.equals("/");
-            return isFloat ? "float" : "int";
-        }
-        return null;
+        String left = inferExprType(expr.getChildByFieldName("left"));
+        String right = inferExprType(expr.getChildByFieldName("right"));
+        if (left == null || right == null) return null;
+
+        boolean isFloat = op.equals("/") || left.equals("float") || right.equals("float");
+        return isFloat ? "float" : "int";
     }
 
     private static String literalType(String t) {
@@ -314,18 +359,16 @@ public final class Indexer {
             return expr == null ? "void" : inferExprType(expr);
         }
 
-        int count = root.getNamedChildCount();
-        for (int i = 0; i < count; i++) {
-            String r = inferFromReturns(root.getNamedChild(i));
-            if (r != null) return r;
+        for (Node child : root.getNamedChildren()) {
+            String returnType = inferFromReturns(child);
+            if (returnType != null) return returnType;
         }
         return null;
     }
 
     /** Latest known type of variable {@code name} in the current function scope. */
     private String scopeVarType(String name) {
-        for (int i = vars.size() - 1; i >= 0; i--) {
-            PhpVar v = vars.get(i);
+        for (PhpVar v : vars.reversed()) {
             if (v.type() != null && v.name().equals(name)
                     && Objects.equals(v.functionName(), functionName)) {
                 return v.type();

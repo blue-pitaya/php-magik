@@ -74,10 +74,18 @@ def php(text: str) -> str:
     return f"```php\n{text}\n```"
 
 
-def php_doc(signature: str, doc: str) -> str:
-    """A hover for a documented declaration: the fenced signature, a rule, then
-    the PHPDoc body with a markdown hard break on every line."""
-    return php(signature) + "\n\n---\n\n" + doc.replace("\n", "  \n")
+def func(qualified: str, signature: str, description: str = "", *tags: str) -> str:
+    """The markdown a function hover renders: bold qualified name (backslashes
+    escaped for markdown), the doc description, the declaration in a php block,
+    then one PHPDoc tag per paragraph."""
+    out = "__" + qualified.replace("\\", "\\\\") + "__\n"
+    if description:
+        out += "\n" + description + "\n"
+    out += "\n```php\n<?php\n" + signature + " { }\n```\n"
+    for tag in tags:
+        name, _, rest = tag.partition(" ")
+        out += "\n_" + name + "_" + (f" `{rest}`" if rest else "") + "\n"
+    return out.strip()
 
 
 def sort_symbols(syms):
@@ -287,9 +295,9 @@ def test_1():
     hover_cases(
         1,
         [
-            (2, 9, php("function zero(): int")),
-            (7, 9, php("function zerof(): float")),
-            (12, 9, php("function empty_string(): string")),
+            (2, 9, func("zero", "function zero(): int")),
+            (7, 9, func("zerof", "function zerof(): float")),
+            (12, 9, func("empty_string", "function empty_string(): string")),
         ],
     )
 
@@ -299,9 +307,9 @@ def test_2():
     hover_cases(
         2,
         [
-            (2, 9, php("function add(): int")),
-            (7, 9, php("function add2(): int")),
-            (12, 9, php("function add3(): float")),
+            (2, 9, func("add", "function add(): int")),
+            (7, 9, func("add2", "function add2(): int")),
+            (12, 9, func("add3", "function add3(): float")),
         ],
     )
 
@@ -311,7 +319,7 @@ def test_3():
     hover_cases(
         3,
         [
-            (2, 9, php("function add(): int")),
+            (2, 9, func("add", "function add(int $a, int $b): int")),
             (2, 17, php("$a: int")),
             (2, 25, php("$b: int")),
             (4, 11, php("$a: int")),
@@ -325,7 +333,7 @@ def test_4():
     hover_cases(
         4,
         [
-            (2, 9, php("function add(): int")),
+            (2, 9, func("add", "function add(int $a, int $b): int")),
             (2, 17, php("$a: int")),
             (2, 25, php("$b: int")),
             (4, 4, php("$c: int")),
@@ -347,9 +355,10 @@ def test_5():
     hover_cases(
         5,
         [
-            (6, 20, php("function print(): int")),
-            (13, 20, php("function bar(): string")),
-            (21, 21, php("function ok(): float")),
+            (6, 20, func("App\\Example\\Foo::print",
+                         "public function print(int $a): int")),
+            (13, 20, func("App\\Example\\Foo::bar", "public function bar(): string")),
+            (21, 21, func("App\\Example\\Baz::ok", "private function ok(): float")),
             (6, 30, php("$a: int")),
             (8, 8, php("$b: int")),
             (8, 13, php("$a: int")),
@@ -363,8 +372,9 @@ def test_6():
     hover_cases(
         6,
         [
-            (12, 20, php("function print(): int")),
-            (21, 20, php("function xd(): string")),
+            (12, 20, func("App\\Example\\Foo::print",
+                          "public function print(int $a = 10): int")),
+            (21, 20, func("App\\Example\\Foo::xd", "public function xd(): string")),
             (6, 15, php("$bar: int")),
             (8, 18, php("$x1: string")),
             (10, 18, php("$x2: string")),
@@ -392,8 +402,8 @@ def test_7():
     hover_cases(
         7,
         [
-            (13, 20, php("function __construct()")),
-            (18, 20, php("function describe(): string")),
+            (13, 20, func("Car::__construct", "public function __construct(Engine $engine)")),
+            (18, 20, func("Car::describe", "public function describe(): string")),
             (4, 15, php("$power: int")),
             (6, 18, php("$fuel: string")),
             (11, 19, php("$engine: Engine")),
@@ -420,7 +430,7 @@ def test_8():
     check(
         "hover $a->get()",
         client.hover(uri, 14, 18),
-        php("function get(): string"),
+        func("App\\NSA\\A::get", "public function get(): string"),
     )
     check(
         "definition $a->get()",
@@ -1503,15 +1513,22 @@ def test_40():
     # PHPDoc in hover: shown for a declaration and for a call site (the block
     # lives on the declaration either way), absent when there is none, and not
     # picked up from an ordinary /* */ comment
-    add_doc = "Adds two numbers.\n\n@param int $a\n@return int"
+    add = func(
+        "add",
+        "function add(): int",
+        "Adds two numbers.",
+        "@param int $a",
+        "@return int",
+    )
     hover_cases(
         40,
         [
-            (8, 9, php_doc("function add(): int", add_doc)),
-            (35, 7, php_doc("function add(): int", add_doc)),
-            (14, 9, php("function plain(): int")),
-            (19, 9, php("function undocumented(): int")),
-            (29, 20, php_doc("function double(): int", "Doubles a value.")),
+            (8, 9, add),
+            (35, 7, add),
+            (14, 9, func("plain", "function plain(): int")),
+            (19, 9, func("undocumented", "function undocumented(): int")),
+            (29, 20, func("Calc::double", "public function double(): int",
+                          "Doubles a value.")),
         ],
     )
 

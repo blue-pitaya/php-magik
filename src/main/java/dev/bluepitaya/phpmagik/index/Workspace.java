@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -45,82 +44,63 @@ public final class Workspace implements AutoCloseable {
         return null;
     }
 
-    /**
-     * Indexes {@code root}: a single file is taken as-is, a directory is walked
-     * for {@code .php} files, skipping dot-entries.
-     */
     public void index(Path root) throws IOException {
+        /* single file lsp */
         if (Files.isRegularFile(root)) {
             addFile(root);
             return;
         }
-        walk(root);
-    }
 
-    private void walk(Path dir) throws IOException {
-        List<Path> entries;
-        /* sorted so the file ids, and anything that falls back to index order,
-         * do not depend on the filesystem's directory-listing order */
-        try (Stream<Path> stream = Files.list(dir)) {
-            entries = stream.sorted(Comparator.comparing(p -> p.getFileName().toString()))
-                    .toList();
-        }
-        for (Path path : entries) {
-            if (path.getFileName().toString().startsWith(".")) continue;
-            if (Files.isDirectory(path)) {
-                walk(path);
-            } else if (Files.isRegularFile(path)
-                    && path.getFileName().toString().endsWith(".php")) {
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path path : paths.filter(path -> isPhpSource(root, path)).sorted().toList()) {
                 addFile(path);
             }
         }
     }
 
+    private boolean isPhpSource(Path root, Path path) {
+        if (!path.getFileName().toString().endsWith(".php")) return false;
+        /* root name starting with dot must pass */
+        for (Path part : root.relativize(path)) {
+            if (part.toString().startsWith(".")) return false;
+        }
+
+        return Files.isRegularFile(path);
+    }
+
     private void addFile(Path path) throws IOException {
         byte[] content = Files.readAllBytes(path);
-        if (content.length == 0) return;
+        if (content.length == 0) {
+            return;
+        }
 
         Tree tree = parser.parse(content);
-        PhpFile file = new PhpFile(files.size(), pathToUri(path), path.toString(), content, tree);
+        int fileId = files.size();
 
-        Indexer indexer = new Indexer(file.fileId());
+        Indexer indexer = new Indexer(fileId);
         indexer.parseProgram(tree.getRootNode());
         vars.addAll(indexer.vars());
         funcs.addAll(indexer.funcs());
 
-        files.add(file);
+        files.add(new PhpFile(fileId, pathToUri(path), path.toString(), content, tree,
+                indexer.uses()));
     }
 
-    /**
-     * Reparses an already-indexed file's content in place - its tree, source
-     * buffer, and its variable and function entries - for {@code didOpen} and
-     * {@code didChange}.
-     *
-     * @return {@code false} if {@code uri} is not in the index, e.g. a file
-     * opened from outside the indexed root
-     */
-    public boolean reparseFile(String uri, byte[] content) {
-        PhpFile file = findFile(uri);
-        if (file == null) return false;
-
+    public void reparse(PhpFile file, byte[] content) {
         Tree tree = parser.parse(content);
 
         Indexer indexer = new Indexer(file.fileId());
         indexer.parseProgram(tree.getRootNode());
 
-        /* only drop the old entries once the new parse has fully succeeded, so
-         * a bad reparse cannot corrupt the index */
         vars.removeIf(v -> v.fileId() == file.fileId());
         funcs.removeIf(f -> f.fileId() == file.fileId());
         vars.addAll(indexer.vars());
         funcs.addAll(indexer.funcs());
 
-        file.replace(content, tree);
-        return true;
+        file.replace(content, tree, indexer.uses());
     }
 
-    /** {@code "file://"} plus an absolute path, matching the uris editors send. */
-    static String pathToUri(Path path) {
+    private String pathToUri(Path path) {
         Path absolute;
         try {
             absolute = path.toRealPath();

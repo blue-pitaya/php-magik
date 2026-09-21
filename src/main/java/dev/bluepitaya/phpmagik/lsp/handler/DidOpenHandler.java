@@ -26,8 +26,12 @@ public final class DidOpenHandler {
         byte[] content = text.getBytes(StandardCharsets.UTF_8);
         log.log("didOpen: " + uri + " (" + content.length + " bytes)");
 
-        if (!app.reparseFile(uri, content)) {
+        PhpFile file = app.findFile(uri);
+        if (file == null) {
             log.log("didOpen: " + uri + " not in index, skipping reparse");
+            return;
         }
+
+        app.reparse(file, content);
     }
 }
