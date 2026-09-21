@@ -3,7 +3,6 @@ package dev.bluepitaya.phpmagik.index;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Point;
-import dev.bluepitaya.phpmagik.ts.Tree;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -21,29 +20,29 @@ public final class SymbolFinder {
         this.workspace = ws;
     }
 
+    /* the tree belongs to the PhpFile and outlives this call, so it is borrowed,
+     * never closed here: closing would free it for every later request */
     public @Nullable PhpSymbol resolveAt(PhpFile file, int line, int character) {
         Point pt = new Point(line, character);
 
-        try (Tree tree = file.tree()) {
-            Node root = tree.getRootNode();
-            if (root == null) return null;
-            Node node = root.getNamedDescendant(pt, pt);
-            if (node == null) return null;
+        Node root = file.tree().getRootNode();
+        if (root == null) return null;
+        Node node = root.getNamedDescendant(pt, pt);
+        if (node == null) return null;
 
-            String t = node.getType();
-            Point p = node.getStartPoint();
-            String text = node.getContent();
-            if (t == null || p == null || text == null) return null;
+        String t = node.getType();
+        Point p = node.getStartPoint();
+        String text = node.getContent();
+        if (t == null || p == null || text == null) return null;
 
-            return switch (t) {
-                case "variable_name" -> findVarAt(file.fileId(), p, text);
-                case "name", "qualified_name" -> {
-                    var func = findFuncAt(file.fileId(), p, text);
-                    yield func != null ? func : findVarAt(file.fileId(), p, "$" + text);
-                }
-                default -> null;
-            };
-        }
+        return switch (t) {
+            case "variable_name" -> findVarAt(file.fileId(), p, text);
+            case "name", "qualified_name" -> {
+                var func = findFuncAt(file.fileId(), p, text);
+                yield func != null ? func : findVarAt(file.fileId(), p, "$" + text);
+            }
+            default -> null;
+        };
     }
 
     private @Nullable PhpVar findVarAt(int fileId, Point p, String name) {
@@ -70,7 +69,7 @@ public final class SymbolFinder {
      * Definition target for a function/method usage: the matching declaration,
      * same class for methods, no class for plain function calls.
      */
-    public PhpFunction findFuncDef(PhpFunction call) {
+    public @Nullable PhpFunction findFuncDef(PhpFunction call) {
         if (call.kind() == FuncKind.DEF) return call;
         for (var f : workspace.funcs()) {
             if (f.kind() != FuncKind.DEF || !f.name().equals(call.name())) continue;
@@ -88,11 +87,72 @@ public final class SymbolFinder {
     }
 
     /**
+     * The PHPDoc block above {@code def}'s declaration, its {@code /**} and
+     * leading {@code *} markers stripped, or {@code null} if the declaration has
+     * no doc comment. Tags are left exactly as written - this locates the block,
+     * it does not parse PHPDoc.
+     *
+     * <p>Only a declaration has one, so callers holding a call site should pass
+     * it through {@link #findFuncDef} first.
+     */
+    public @Nullable String docComment(PhpFunction def) {
+        if (def.kind() != FuncKind.DEF) return null;
+
+        PhpFile file = workspace.file(def.fileId());
+        Node root = file.tree().getRootNode();
+        if (root == null) return null;
+        Node decl = enclosingDeclaration(root.getNamedDescendant(
+                new Point(def.line(), def.col()), new Point(def.line(), def.col())));
+        if (decl == null) return null;
+
+        Node prev = decl.getPrevSibling();
+        /* attributes sit between the doc block and the declaration */
+        while (prev != null && "attribute_list".equals(prev.getType())) {
+            prev = prev.getPrevSibling();
+        }
+        if (prev == null || !"comment".equals(prev.getType())) return null;
+
+        String text = prev.getContent();
+        /* "/*" alone is an ordinary block comment, not a doc block */
+        if (text == null || !text.startsWith("/**")) return null;
+        return stripDocMarkers(text);
+    }
+
+    private static @Nullable Node enclosingDeclaration(@Nullable Node node) {
+        while (node != null) {
+            String t = node.getType();
+            if ("function_definition".equals(t) || "method_declaration".equals(t)) return node;
+            node = node.getParent();
+        }
+        return null;
+    }
+
+    private static @Nullable String stripDocMarkers(String comment) {
+        String body = comment.substring("/**".length());
+        if (body.endsWith("*/")) {
+            body = body.substring(0, body.length() - "*/".length());
+        }
+
+        var out = new StringBuilder();
+        for (String line : body.split("\n", -1)) {
+            String stripped = line.strip();
+            if (stripped.startsWith("*")) {
+                stripped = stripped.substring(1).strip();
+            }
+            if (out.isEmpty() && stripped.isEmpty()) continue;
+            out.append(stripped).append('\n');
+        }
+
+        String doc = out.toString().strip();
+        return doc.isEmpty() ? null : doc;
+    }
+
+    /**
      * Definition target for a variable usage: the class property for
      * {@code $this}/{@code $obj} access, else the earliest occurrence in the
      * same scope.
      */
-    public PhpVar findVarDef(PhpVar use) {
+    public @Nullable PhpVar findVarDef(PhpVar use) {
         if (use.kind() == VarKind.PROPERTY) return use;
         if (use.kind() == VarKind.OBJ || use.kind() == VarKind.THIS) {
             for (var v : workspace.vars()) {
@@ -170,7 +230,8 @@ public final class SymbolFinder {
      * indexer's scope lookup, but at query time over the whole index rather
      * than during a single parse pass.
      */
-    public String typeOfVarBefore(int fileId, String functionName, String name, Point before) {
+    public @Nullable String typeOfVarBefore(int fileId, @Nullable String functionName, String name,
+                                            Point before) {
         PhpVar best = null;
         for (var v : workspace.vars()) {
             if (v.fileId() != fileId || v.type() == null || !v.name().equals(name)) continue;
@@ -187,13 +248,13 @@ public final class SymbolFinder {
         return best == null ? null : best.type();
     }
 
-    public String latestVarType(PhpVar at) {
+    public @Nullable String latestVarType(PhpVar at) {
         return typeOfVarBefore(at.fileId(), at.functionName(), at.name(),
                 new Point(at.line(), at.col()));
     }
 
     /** Whatever type is known for {@code name} anywhere in that scope. */
-    public String typeAnywhereInScope(int fileId, String functionName, String name) {
+    public @Nullable String typeAnywhereInScope(int fileId, @Nullable String functionName, String name) {
         return typeOfVarBefore(fileId, functionName, name,
                 new Point(Integer.MAX_VALUE, Integer.MAX_VALUE));
     }
@@ -226,7 +287,7 @@ public final class SymbolFinder {
      * Every variable in scope - same file plus enclosing function - deduped by
      * name, keeping the first occurrence.
      */
-    public List<PhpVar> varsInScope(int fileId, String functionName) {
+    public List<PhpVar> varsInScope(int fileId, @Nullable String functionName) {
         var seen = new LinkedHashSet<String>();
         var found = new ArrayList<PhpVar>();
         for (var v : workspace.vars()) {
@@ -238,7 +299,7 @@ public final class SymbolFinder {
     }
 
     /** {@code ?Foo}, {@code \Foo} become {@code Foo}. */
-    public static String stripNs(String t) {
+    public static @Nullable String stripNs(@Nullable String t) {
         if (t == null) return null;
         var i = 0;
         while (i < t.length() && (t.charAt(i) == '?' || t.charAt(i) == '\\')) {
@@ -247,7 +308,7 @@ public final class SymbolFinder {
         return t.substring(i);
     }
 
-    public static String enclosingFunctionName(Node node) {
+    public static @Nullable String enclosingFunctionName(@Nullable Node node) {
         while (node != null) {
             var t = node.getType();
             if (t.equals("function_definition") || t.equals("method_declaration")) {
@@ -258,7 +319,7 @@ public final class SymbolFinder {
         return null;
     }
 
-    public static String enclosingClassName(Node node) {
+    public static @Nullable String enclosingClassName(@Nullable Node node) {
         while (node != null) {
             var t = node.getType();
             if (t.equals("class_declaration") || t.equals("interface_declaration")

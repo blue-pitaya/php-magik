@@ -34,16 +34,24 @@ public final class HoverHandler {
         String text = null;
         if (sym instanceof PhpVar var) {
             String type = var.type() != null ? var.type() : symbols.latestVarType(var);
-            text = "```php\n" + var.name() + ": " + type + "\n```";
+            /* $this and any unresolved local have no type to show */
+            text = type != null
+                    ? "```php\n" + var.name() + ": " + type + "\n```"
+                    : "```php\n" + var.name() + "\n```";
         } else if (sym instanceof PhpFunction func) {
+            PhpFunction def = symbols.findFuncDef(func);
             String ret = func.returnType();
-            if (ret == null && func.kind() != FuncKind.DEF) {
-                PhpFunction def = symbols.findFuncDef(func);
+            if (ret == null && def != null) {
                 ret = def.returnType();
             }
             text = ret != null
                     ? "```php\nfunction " + func.name() + "(): " + ret + "\n```"
                     : "```php\nfunction " + func.name() + "()\n```";
+
+            String doc = def != null ? symbols.docComment(def) : null;
+            if (doc != null) {
+                text += "\n\n---\n\n" + doc.replace("\n", "  \n");
+            }
         }
         if (text == null) return null;
 

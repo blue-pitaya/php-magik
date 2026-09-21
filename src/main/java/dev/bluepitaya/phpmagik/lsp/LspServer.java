@@ -87,44 +87,62 @@ public final class LspServer {
                     continue;
                 }
 
-                JsonNode id = getRequestIdOrThrow(request);
-                String method = getRequestMethodOrThrow(request);
-                JsonNode params = request.get("params");
-                if (params == null) {
-                    params = Json.object();
-                }
-
                 try {
-                    switch (method) {
-                        case "initialize" -> respond(id, initialize.handle());
-                        case "initialized" -> log.log("initialized");
-                        case "shutdown" -> respond(id, null);
-                        case "exit" -> running = false;
-                        case "textDocument/didOpen" -> didOpen.handle(bind(params, DidOpenParams.class));
-                        case "textDocument/didChange" -> didChange.handle(bind(params, DidChangeParams.class));
-                        case "textDocument/didClose" -> didClose.handle(bind(params, TextDocumentParams.class));
-                        case "textDocument/hover" ->
-                                respond(id, hover.handle(bind(params, TextDocumentPosition.class)));
-                        case "textDocument/definition" ->
-                                respond(id, definition.handle(bind(params, TextDocumentPosition.class)));
-                        case "textDocument/references" ->
-                                respond(id, references.handle(bind(params, ReferenceParams.class)));
-                        case "textDocument/documentSymbol" ->
-                                respond(id, documentSymbol.handle(bind(params, TextDocumentParams.class)));
-                        case "workspace/symbol" ->
-                                respond(id, workspaceSymbol.handle(bind(params, WorkspaceSymbolParams.class)));
-                        case "textDocument/completion" ->
-                                respond(id, completion.handle(bind(params, TextDocumentPosition.class)));
-                        default -> respondMethodNotFound(id);
-
-                    }
-                } catch (JacksonException badParams) {
-                    log.log("unbindable params for " + method + ": " + badParams.getMessage());
+                    running = dispatch(request);
+                } catch (IllegalArgumentException badRequest) {
+                    log.log("bad request: " + badRequest.getMessage());
                 }
             }
         } finally {
             log.close();
         }
+    }
+
+    private boolean dispatch(JsonNode request) throws IOException {
+        String method = getRequestMethodOrThrow(request);
+        JsonNode params = request.get("params");
+        if (params == null) {
+            params = Json.object();
+        }
+
+        try {
+            switch (method) {
+                case "initialize" -> respond(getRequestIdOrThrow(request), initialize.handle());
+                case "initialized" -> log.log("initialized");
+                case "shutdown" -> respond(getRequestIdOrThrow(request), null);
+                case "exit" -> {
+                    return false;
+                }
+                case "textDocument/didOpen" -> didOpen.handle(bind(params, DidOpenParams.class));
+                case "textDocument/didChange" -> didChange.handle(bind(params, DidChangeParams.class));
+                case "textDocument/didClose" -> didClose.handle(bind(params, TextDocumentParams.class));
+                case "textDocument/hover" -> respond(getRequestIdOrThrow(request),
+                        hover.handle(bind(params, TextDocumentPosition.class)));
+                case "textDocument/definition" -> respond(getRequestIdOrThrow(request),
+                        definition.handle(bind(params, TextDocumentPosition.class)));
+                case "textDocument/references" -> respond(getRequestIdOrThrow(request),
+                        references.handle(bind(params, ReferenceParams.class)));
+                case "textDocument/documentSymbol" -> respond(getRequestIdOrThrow(request),
+                        documentSymbol.handle(bind(params, TextDocumentParams.class)));
+                case "workspace/symbol" -> respond(getRequestIdOrThrow(request),
+                        workspaceSymbol.handle(bind(params, WorkspaceSymbolParams.class)));
+                case "textDocument/completion" -> respond(getRequestIdOrThrow(request),
+                        completion.handle(bind(params, TextDocumentPosition.class)));
+                default -> {
+                    JsonNode id = request.get("id");
+                    /* an unknown notification is still a notification: no reply */
+                    if (id == null) {
+                        log.log("ignoring notification " + method);
+                    } else {
+                        respondMethodNotFound(id);
+                    }
+                }
+            }
+        } catch (JacksonException badParams) {
+            log.log("unbindable params for " + method + ": " + badParams.getMessage());
+        }
+
+        return true;
     }
 
     private <T> T bind(JsonNode params, Class<T> type) throws JacksonException {

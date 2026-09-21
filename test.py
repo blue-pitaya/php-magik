@@ -74,6 +74,12 @@ def php(text: str) -> str:
     return f"```php\n{text}\n```"
 
 
+def php_doc(signature: str, doc: str) -> str:
+    """A hover for a documented declaration: the fenced signature, a rule, then
+    the PHPDoc body with a markdown hard break on every line."""
+    return php(signature) + "\n\n---\n\n" + doc.replace("\n", "  \n")
+
+
 def sort_symbols(syms):
     """Canonical order for workspace/symbol results spanning multiple
     files - same rationale as sort_locs, but the location is nested."""
@@ -1493,6 +1499,23 @@ def test_39():
     client.close()
 
 
+def test_40():
+    # PHPDoc in hover: shown for a declaration and for a call site (the block
+    # lives on the declaration either way), absent when there is none, and not
+    # picked up from an ordinary /* */ comment
+    add_doc = "Adds two numbers.\n\n@param int $a\n@return int"
+    hover_cases(
+        40,
+        [
+            (8, 9, php_doc("function add(): int", add_doc)),
+            (35, 7, php_doc("function add(): int", add_doc)),
+            (14, 9, php("function plain(): int")),
+            (19, 9, php("function undocumented(): int")),
+            (29, 20, php_doc("function double(): int", "Doubles a value.")),
+        ],
+    )
+
+
 TESTS = [
     test_1,
     test_2,
@@ -1533,6 +1556,7 @@ TESTS = [
     test_37,
     test_38,
     test_39,
+    test_40,
 ]
 
 
