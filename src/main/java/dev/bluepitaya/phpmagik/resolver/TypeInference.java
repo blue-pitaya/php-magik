@@ -147,16 +147,17 @@ public final class TypeInference {
     }
 
     private @Nullable String typeOf(PhpVarDefinition def, Set<PhpSymbol> visiting) {
-        /* a declared type is an answer on its own: nothing is followed to reach
-         * it, so there is no path it could close a loop on */
-        if (def.type() != null) return def.type();
-
         if (!visiting.add(def)) return null;
         try {
-            return sourceType(def.file(), def.valueSource(), visiting);
+            return definedType(def, visiting);
         } finally {
             visiting.remove(def);
         }
+    }
+
+    private @Nullable String definedType(PhpVarDefinition def, Set<PhpSymbol> visiting) {
+        if (def.type() != null) return def.type();
+        return sourceType(def.file(), def.valueSource(), visiting);
     }
 
     private @Nullable String sourceType(PhpFile file, @Nullable Range source,
@@ -243,30 +244,28 @@ public final class TypeInference {
     }
 
     private @Nullable String typeOfSymbol(PhpSymbol symbol, Set<PhpSymbol> visiting) {
-        if (symbol instanceof PhpVarDefinition def) {
-            return typeOf(def, visiting);
-        }
         if (!visiting.add(symbol)) return null;
         try {
-            if (symbol instanceof PhpVarUsage usage) {
-                return typeOfVariable(usage.file(), usage.functionName(), usage.name(),
+            return switch (symbol) {
+                case PhpVarDefinition def -> definedType(def, visiting);
+                case PhpVarUsage usage -> typeOfVariable(usage.file(), usage.functionName(), usage.name(),
                         usage.range().start(), visiting);
-            }
-            if (symbol instanceof PhpPropertyUsage usage) {
-                PhpPropertyDefinition declared = declarationOf(usage, visiting);
-                return declared == null ? null : declared.type();
-            }
-            if (symbol instanceof PhpFunctionUsage usage) {
-                PhpFunctionDefinition declared = functions.definitionOf(usage);
-                return declared == null ? null : returnType(declared.returnType(), declared.file(),
-                        declared.returnSource(), visiting);
-            }
-            if (symbol instanceof PhpMethodUsage usage) {
-                PhpMethodDefinition declared = declarationOf(usage, visiting);
-                return declared == null ? null : returnType(declared.returnType(), declared.file(),
-                        declared.returnSource(), visiting);
-            }
-            return null;
+                case PhpPropertyUsage usage -> {
+                    PhpPropertyDefinition declared = declarationOf(usage, visiting);
+                    yield declared == null ? null : declared.type();
+                }
+                case PhpFunctionUsage usage -> {
+                    PhpFunctionDefinition declared = functions.definitionOf(usage);
+                    yield declared == null ? null : returnType(declared.returnType(), declared.file(),
+                            declared.returnSource(), visiting);
+                }
+                case PhpMethodUsage usage -> {
+                    PhpMethodDefinition declared = declarationOf(usage, visiting);
+                    yield declared == null ? null : returnType(declared.returnType(), declared.file(),
+                            declared.returnSource(), visiting);
+                }
+                default -> null;
+            };
         } finally {
             visiting.remove(symbol);
         }
