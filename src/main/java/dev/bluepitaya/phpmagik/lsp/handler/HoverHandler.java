@@ -13,7 +13,7 @@ import java.util.List;
 @NullMarked
 public final class HoverHandler {
 
-    private final Workspace app;
+    private final Workspace workspace;
     private final SymbolFinder symbols;
     private final TypeInference types;
     private final FunctionResolver functions;
@@ -21,10 +21,10 @@ public final class HoverHandler {
     private final PropertyResolver properties;
     private final Logger log;
 
-    public HoverHandler(Workspace app, SymbolFinder symbols, TypeInference types,
+    public HoverHandler(Workspace workspace, SymbolFinder symbols, TypeInference types,
                         FunctionResolver functions, MethodResolver methods,
                         PropertyResolver properties, Logger log) {
-        this.app = app;
+        this.workspace = workspace;
         this.symbols = symbols;
         this.types = types;
         this.functions = functions;
@@ -34,66 +34,62 @@ public final class HoverHandler {
     }
 
     public @Nullable Hover handle(TextDocumentPosition params) {
-        TextDocumentIdentifier td = params.textDocument();
-        Position pos = params.position();
-        String uri = td.uri();
-        int line = pos.line();
-        int col = pos.character();
+        String uri = params.textDocument().uri();
+        int line = params.position().line();
+        int col = params.position().character();
+
         log.log("hover: " + uri + " " + line + ":" + col);
 
-        PhpFile file = app.findFile(uri);
-        if (file == null) return null;
+        PhpFile file = workspace.findFile(uri);
+        if (file == null) {
+            throw new AppException("file not found: " + uri);
+        }
 
         PhpSymbol sym = symbols.resolveAt(file, line, col);
-        String text = null;
-        if (sym instanceof PhpVarDefinition def) {
-            text = typedHover(def.name(),
-                    symbols.resolveType(def.file(), def.ns(), types.typeOf(def)));
-        } else if (sym instanceof PhpVarUsage usage) {
-            text = typedHover(usage.name(),
-                    symbols.resolveType(usage.file(), usage.ns(), types.typeOf(usage)));
-        } else if (sym instanceof PhpPropertyDefinition property) {
-            text = propertyHover(property);
-        } else if (sym instanceof PhpPropertyUsage usage) {
-            /* the access carries no type of its own: it is worth what the
-             * declaration it reads says, and just a name without one */
-            PhpPropertyDefinition declared = properties.definitionOf(usage);
-            text = declared != null ? propertyHover(declared) : typedHover(usage.name(), null);
-        } else if (sym instanceof PhpMethodDefinition method) {
-            text = methodHover(method);
-        } else if (sym instanceof PhpMethodUsage usage) {
-            /* the call site carries nothing but a name: everything worth showing
-             * - the signature, the return type, the doc block - is on the
-             * declaration, and a call to an unindexed method leaves only the name */
-            PhpMethodDefinition declared = methods.definitionOf(usage);
-            text = declared != null
-                    ? methodHover(declared)
-                    : callableHover(callName(types.classOf(usage), usage.name()),
-                            nameOnly(usage.name(), null), null);
-        } else if (sym instanceof PhpFunctionDefinition def) {
-            text = functionHover(def);
-        } else if (sym instanceof PhpFunctionUsage usage) {
-            PhpFunctionDefinition declared = functions.definitionOf(usage);
-            text = declared != null
-                    ? functionHover(declared)
-                    : callableHover(qualifiedName(usage.ns(), usage.name()),
-                            nameOnly(usage.name(), null), null);
+        if (sym == null) {
+            return null;
         }
+
+        @Nullable String text = switch (sym) {
+            case PhpVarDefinition def -> typedHover(def.name(),
+                    symbols.resolveType(def.file(), def.ns(), types.typeOf(def)));
+            case PhpVarUsage usage -> typedHover(usage.name(),
+                    symbols.resolveType(usage.file(), usage.ns(), types.typeOf(usage)));
+            case PhpPropertyDefinition property -> propertyHover(property);
+            case PhpPropertyUsage usage -> {
+                PhpPropertyDefinition declared = properties.definitionOf(usage);
+                yield declared != null ? propertyHover(declared) : typedHover(usage.name(), null);
+            }
+            case PhpMethodDefinition method -> methodHover(method);
+            case PhpMethodUsage usage -> {
+                PhpMethodDefinition declared = methods.definitionOf(usage);
+                yield declared != null
+                        ? methodHover(declared)
+                        : callableHover(callName(types.classOf(usage), usage.name()),
+                        nameOnly(usage.name(), null), null);
+            }
+            case PhpFunctionDefinition def -> functionHover(def);
+            case PhpFunctionUsage usage -> {
+                PhpFunctionDefinition declared = functions.definitionOf(usage);
+                yield declared != null
+                        ? functionHover(declared)
+                        : callableHover(qualifiedName(usage.ns(), usage.name()),
+                        nameOnly(usage.name(), null), null);
+            }
+            case PhpUseStatement use -> typedHover(use.alias(), use.fqn());
+            case PhpClassDefinition cls -> null;
+            case PhpClassUsage usage -> null;
+        };
         if (text == null) return null;
 
         return new Hover(new MarkupContent("markdown", text));
     }
 
-    /** A type is resolved where it was written, which for a property is its class's file. */
     private String propertyHover(PhpPropertyDefinition property) {
         return typedHover(property.name(), symbols.resolveType(property.file(),
                 property.owner().ns(), types.typeOf(property)));
     }
 
-    /**
-     * {@code $name: type}, or just the name when nothing types it - {@code $this}
-     * and any unresolved local.
-     */
     private static String typedHover(String name, @Nullable String type) {
         return type != null
                 ? "```php\n" + name + ": " + type + "\n```"
@@ -107,12 +103,6 @@ public final class HoverHandler {
                 method.doc());
     }
 
-    /**
-     * The declaration as the indexer sliced it out, with a return type appended
-     * when the source declared none and the indexer could not name one either -
-     * which is the whole point of inferring it from what the body returns. It
-     * appends at most once: a stored return type is already in the slice.
-     */
     private static String declaration(@Nullable String signature, String name,
                                       @Nullable String storedReturn,
                                       @Nullable String inferredReturn) {
@@ -129,10 +119,6 @@ public final class HoverHandler {
                 func.doc());
     }
 
-    /**
-     * Bold qualified name, the doc block's description, the declaration in a php
-     * block, then one PHPDoc tag per paragraph.
-     */
     private String callableHover(String qualifiedName, String signature, @Nullable String doc) {
         var out = new StringBuilder();
         /* markdown would swallow a lone backslash between namespace segments */
@@ -158,19 +144,16 @@ public final class HoverHandler {
         return ns == null ? name : ns + "\\" + name;
     }
 
-    /** {@code Cls::foo} when the call's object resolves to a class, else the bare name. */
     private static String callName(@Nullable String cls, String name) {
         return cls == null ? name : cls + "::" + name;
     }
 
-    /** All that is left for a call whose declaration is not in the index. */
     private static String nameOnly(String name, @Nullable String returnType) {
         return returnType != null
                 ? "function " + name + "(): " + returnType
                 : "function " + name + "()";
     }
 
-    /** The doc block down to its first tag line. */
     private static String description(String doc) {
         var out = new StringBuilder();
         for (String line : doc.lines().toList()) {
@@ -184,7 +167,6 @@ public final class HoverHandler {
         return doc.lines().filter(line -> line.startsWith("@")).toList();
     }
 
-    /** {@code @param int $a} becomes {@code _@param_ `int $a`}. */
     private static String formatTag(String tag) {
         int space = tag.indexOf(' ');
         if (space < 0) return "_" + tag + "_";
