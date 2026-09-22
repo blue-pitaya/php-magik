@@ -2,6 +2,7 @@ package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
+import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Parser;
 import dev.bluepitaya.phpmagik.ts.Tree;
 
@@ -92,11 +93,22 @@ public final class Workspace implements AutoCloseable {
     }
 
     private void indexSymbols(PhpFile file) {
-        Indexer indexer = new Indexer(file);
-        indexer.index(file.tree().getRootNode());
+        var collection = new PhpSymbolCollection();
+        var indexer = new CompleteIndexer();
+        var nsDefListener = new PhpNamespaceDefinitionListener(
+                collection,
+                file
+        );
+        try (Tree tree = file.tree()) {
+            Node root = tree.getRootNode();
+            if (root == null) {
+                return; //TODO: maybe throw?
+            }
 
-        symbols.addAll(indexer.symbols());
-        file.uses(indexer.symbols().uses());
+            indexer.walk(root, nsDefListener);
+        }
+
+        symbols.addAll(collection);
     }
 
     private String pathToUri(Path path) {
