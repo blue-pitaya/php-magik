@@ -1,7 +1,0 @@
-func def   print(): int @7:5 in App\Example\Foo
-func def   bar(): string @14:5 in App\Example\Foo
-func def   ok(): float @22:5 in App\Example\Baz
-var param    $a: int @7:31 in App\Example\Foo::print
-var use      $b: int @9:9 in App\Example\Foo::print
-var use      $a @9:14 in App\Example\Foo::print
-var use      $b @11:16 in App\Example\Foo::print

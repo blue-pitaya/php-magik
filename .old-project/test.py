@@ -14,32 +14,16 @@ The hover_cases() driven tests replace the old tests/test_N.php +
 test_N_ex.txt CLI-dump fixtures: instead of diffing a printed index dump,
 they hover at the start of each identifier the dump used to describe and
 check that the resolved signature/type still matches.
-
-This suite drives the Java rewrite over stdio, and the fixtures under
-lsp-tests/ are copies of the C project's, so results can be compared
-directly.
 """
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import IO
 
 ROOT = Path(__file__).resolve().parent
-CLASSES = ROOT / "target" / "classes"
-DEPENDENCY = ROOT / "target" / "dependency"
-NATIVE = ROOT / "target" / "native"
-# the trailing /* is expanded by the JVM itself, not the shell
-CLASSPATH = os.pathsep.join([str(CLASSES), f"{DEPENDENCY}/*"])
-SERVER = [
-    "java",
-    f"-Djava.library.path={NATIVE}",
-    "-cp",
-    CLASSPATH,
-    "dev.bluepitaya.phpmagik.Main",
-]
+BINARY = ROOT / "target" / "main"
 LSP_TEST_DIR = ROOT / "lsp-tests"
 
 SHOW_LOGS = False  # flip to True to see the server's stderr debug logs
@@ -74,18 +58,17 @@ def php(text: str) -> str:
     return f"```php\n{text}\n```"
 
 
-def func(qualified: str, signature: str, description: str = "", *tags: str) -> str:
-    """The markdown a function hover renders: bold qualified name (backslashes
-    escaped for markdown), the doc description, the declaration in a php block,
-    then one PHPDoc tag per paragraph."""
-    out = "__" + qualified.replace("\\", "\\\\") + "__\n"
-    if description:
-        out += "\n" + description + "\n"
-    out += "\n```php\n<?php\n" + signature + " { }\n```\n"
-    for tag in tags:
-        name, _, rest = tag.partition(" ")
-        out += "\n_" + name + "_" + (f" `{rest}`" if rest else "") + "\n"
-    return out.strip()
+def sort_symbols(syms):
+    """Canonical order for workspace/symbol results spanning multiple
+    files - same rationale as sort_locs, but the location is nested."""
+    return sorted(
+        syms,
+        key=lambda s: (
+            s["location"]["uri"],
+            s["location"]["range"]["start"]["line"],
+            s["location"]["range"]["start"]["character"],
+        ),
+    )
 
 
 def sort_locs(locs):
@@ -122,7 +105,7 @@ class LspClient:
         self.root = root
         self._id = 0
         self.proc = subprocess.Popen(
-            SERVER + ["--path", str(root)],
+            [str(BINARY), "--path", str(root)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=None if SHOW_LOGS else subprocess.DEVNULL,
@@ -143,16 +126,7 @@ class LspClient:
     def _read(self):
         header = b""
         while not header.endswith(b"\r\n\r\n"):
-            byte = self.stdout.read(1)
-            if not byte:
-                # read(1) keeps returning b"" at EOF, so without this a dead
-                # server spins here forever instead of failing
-                raise RuntimeError(
-                    f"server closed stdout after {header!r} "
-                    f"(exit code {self.proc.poll()}); "
-                    "set SHOW_LOGS = True to see its stderr"
-                )
-            header += byte
+            header += self.stdout.read(1)
         length = int(header.split(b":")[1])
         return json.loads(self.stdout.read(length))
 
@@ -216,6 +190,27 @@ class LspClient:
         )
         return result.get("result")
 
+    def completion(self, uri: str, line: int, character: int):
+        result = self.request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": uri},
+                "position": {"line": line, "character": character},
+            },
+        )
+        return result.get("result")
+
+    def workspace_symbol(self, query: str):
+        result = self.request("workspace/symbol", {"query": query})
+        return result.get("result")
+
+    def document_symbol(self, uri: str):
+        result = self.request(
+            "textDocument/documentSymbol",
+            {"textDocument": {"uri": uri}},
+        )
+        return result.get("result")
+
     def references(
         self, uri: str, line: int, character: int, include_declaration: bool = False
     ):
@@ -261,9 +256,9 @@ def test_1():
     hover_cases(
         1,
         [
-            (2, 9, func("zero", "function zero(): int")),
-            (7, 9, func("zerof", "function zerof(): float")),
-            (12, 9, func("empty_string", "function empty_string(): string")),
+            (2, 9, php("function zero(): int")),
+            (7, 9, php("function zerof(): float")),
+            (12, 9, php("function empty_string(): string")),
         ],
     )
 
@@ -273,9 +268,9 @@ def test_2():
     hover_cases(
         2,
         [
-            (2, 9, func("add", "function add(): int")),
-            (7, 9, func("add2", "function add2(): int")),
-            (12, 9, func("add3", "function add3(): float")),
+            (2, 9, php("function add(): int")),
+            (7, 9, php("function add2(): int")),
+            (12, 9, php("function add3(): float")),
         ],
     )
 
@@ -285,7 +280,7 @@ def test_3():
     hover_cases(
         3,
         [
-            (2, 9, func("add", "function add(int $a, int $b): int")),
+            (2, 9, php("function add(): int")),
             (2, 17, php("$a: int")),
             (2, 25, php("$b: int")),
             (4, 11, php("$a: int")),
@@ -299,7 +294,7 @@ def test_4():
     hover_cases(
         4,
         [
-            (2, 9, func("add", "function add(int $a, int $b): int")),
+            (2, 9, php("function add(): int")),
             (2, 17, php("$a: int")),
             (2, 25, php("$b: int")),
             (4, 4, php("$c: int")),
@@ -321,10 +316,9 @@ def test_5():
     hover_cases(
         5,
         [
-            (6, 20, func("App\\Example\\Foo::print",
-                         "public function print(int $a): int")),
-            (13, 20, func("App\\Example\\Foo::bar", "public function bar(): string")),
-            (21, 21, func("App\\Example\\Baz::ok", "private function ok(): float")),
+            (6, 20, php("function print(): int")),
+            (13, 20, php("function bar(): string")),
+            (21, 21, php("function ok(): float")),
             (6, 30, php("$a: int")),
             (8, 8, php("$b: int")),
             (8, 13, php("$a: int")),
@@ -338,9 +332,8 @@ def test_6():
     hover_cases(
         6,
         [
-            (12, 20, func("App\\Example\\Foo::print",
-                          "public function print(int $a = 10): int")),
-            (21, 20, func("App\\Example\\Foo::xd", "public function xd(): string")),
+            (12, 20, php("function print(): int")),
+            (21, 20, php("function xd(): string")),
             (6, 15, php("$bar: int")),
             (8, 18, php("$x1: string")),
             (10, 18, php("$x2: string")),
@@ -363,13 +356,13 @@ def test_6():
 
 
 def test_7():
-    # object-typed properties, and $this->engine->prop chains: the second hop
-    # resolves through the first one's declared type, in any number of steps
+    # object-typed properties and $this->engine->prop chains (the second
+    # hop, ->power/->fuel, isn't indexed - known gap)
     hover_cases(
         7,
         [
-            (13, 20, func("Car::__construct", "public function __construct(Engine $engine)")),
-            (18, 20, func("Car::describe", "public function describe(): string")),
+            (13, 20, php("function __construct()")),
+            (18, 20, php("function describe(): string")),
             (4, 15, php("$power: int")),
             (6, 18, php("$fuel: string")),
             (11, 19, php("$engine: Engine")),
@@ -377,14 +370,12 @@ def test_7():
             (15, 8, php("$this")),
             (15, 15, php("$engine: Engine")),
             (15, 24, php("$engine: Engine")),
-            (20, 8, php("$total: int")),
+            (20, 8, php("$total")),
             (20, 17, php("$this")),
             (20, 24, php("$engine: Engine")),
-            (20, 32, php("$power: int")),
             (22, 15, php("$this")),
             (22, 22, php("$engine: Engine")),
-            (22, 30, php("$fuel: string")),
-            (22, 39, php("$total: int")),
+            (22, 39, php("$total")),
         ],
     )
 
@@ -398,7 +389,7 @@ def test_8():
     check(
         "hover $a->get()",
         client.hover(uri, 14, 18),
-        func("App\\NSA\\A::get", "public function get(): string"),
+        php("function get(): string"),
     )
     check(
         "definition $a->get()",
@@ -485,6 +476,37 @@ def test_11():
     client.did_change(uri, "<?php\n\n$a = 'hi';\necho $a;\n")
 
     check("hover $a after edit", client.hover(uri, 3, 5), php("$a: string"))
+    client.close()
+
+
+def test_12():
+    # completion: $this-> member completion inside Box::get(), and plain
+    # local-variable completion inside the top-level main() function
+    root = LSP_TEST_DIR / "test_12"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    # position right after "->" in `return $this->value;` (line 9, 0-based
+    # line 8): $value (property) and get() (method) on class Box
+    check(
+        "completion $this-> in Box::get()",
+        client.completion(uri, 8, 22),
+        [
+            {"label": "value", "kind": 5, "detail": "int"},
+            {"label": "get", "kind": 2, "detail": "int"},
+        ],
+    )
+    # blank line inside main()'s body (line 17, 0-based line 16): local
+    # vars only, no $this (main() isn't a method)
+    check(
+        "completion local vars in main()",
+        client.completion(uri, 16, 0),
+        [
+            {"label": "$b", "kind": 6, "detail": "Box"},
+            {"label": "$x", "kind": 6, "detail": "int"},
+        ],
+    )
     client.close()
 
 
@@ -618,6 +640,101 @@ def test_17():
             },
         },
     )
+    client.close()
+
+
+# ---------------------------------------------------------------------------
+# More completion cases: a non-$this object, an object held in a typed
+# parameter, scope isolation between sibling methods, cross-file member
+# lookup, and the documented "::" limitation.
+# ---------------------------------------------------------------------------
+
+
+def test_18():
+    # member completion on a regular local object variable (not $this),
+    # in a plain function - test_12 only exercised the $this path
+    root = LSP_TEST_DIR / "test_18"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    check(
+        "completion $p-> (local object var)",
+        client.completion(uri, 15, 8),
+        [
+            {"label": "x", "kind": 5, "detail": "int"},
+            {"label": "len", "kind": 2, "detail": "int"},
+        ],
+    )
+    client.close()
+
+
+def test_19():
+    # member completion on an object held in a typed parameter, inside a
+    # class method - combines param-typing with member completion
+    root = LSP_TEST_DIR / "test_19"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    check(
+        "completion $e-> (typed param)",
+        client.completion(uri, 11, 19),
+        [
+            {"label": "power", "kind": 5, "detail": "int"},
+        ],
+    )
+    client.close()
+
+
+def test_20():
+    # local-variable completion inside a class method: $this + param + a
+    # local all show up, but a sibling method's local ($other) and the
+    # class's own property (only reachable via $this->) do not
+    root = LSP_TEST_DIR / "test_20"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    check(
+        "completion inside Calc::add()",
+        client.completion(uri, 9, 0),
+        [
+            {"label": "$this", "kind": 6, "detail": "Calc"},
+            {"label": "$n", "kind": 6, "detail": "int"},
+            {"label": "$tmp", "kind": 6, "detail": "int"},
+        ],
+    )
+    client.close()
+
+
+def test_21():
+    # member completion where the class is defined in a different file
+    # than the completion request (mirrors test_8's cross-file definition)
+    root = LSP_TEST_DIR / "test_21"
+    client = LspClient(root)
+    uri = client.did_open(root / "main.php")
+
+    check(
+        "completion $w-> (class in another file)",
+        client.completion(uri, 4, 15),
+        [
+            {"label": "label", "kind": 5, "detail": "string"},
+            {"label": "render", "kind": 2, "detail": "string"},
+        ],
+    )
+    client.close()
+
+
+def test_22():
+    # "ClassName::" - static member completion isn't supported; this
+    # locks in the documented behavior (empty list, not misleading locals)
+    root = LSP_TEST_DIR / "test_22"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    check("completion Foo:: (unsupported)", client.completion(uri, 12, 9), [])
     client.close()
 
 
@@ -1128,140 +1245,225 @@ def test_35():
     client.close()
 
 
-def test_40():
-    # PHPDoc in hover: shown for a declaration and for a call site (the block
-    # lives on the declaration either way), absent when there is none, and not
-    # picked up from an ordinary /* */ comment
-    add = func(
-        "add",
-        "function add(): int",
-        "Adds two numbers.",
-        "@param int $a",
-        "@return int",
-    )
-    hover_cases(
-        40,
+# ---------------------------------------------------------------------------
+# documentSymbol: a plain function, a class with a property/constructor/
+# method, and a braced namespace nesting a function.
+# ---------------------------------------------------------------------------
+
+
+def test_36():
+    # a single top-level function: range covers the whole declaration,
+    # selectionRange just the name
+    root = LSP_TEST_DIR / "test_36"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    check(
+        "documentSymbol: top-level function",
+        client.document_symbol(uri),
         [
-            (8, 9, add),
-            (35, 7, add),
-            (14, 9, func("plain", "function plain(): int")),
-            (19, 9, func("undocumented", "function undocumented(): int")),
-            (29, 20, func("Calc::double", "public function double(): int",
-                          "Doubles a value.")),
+            {
+                "name": "add",
+                "kind": 12,
+                "range": {
+                    "start": {"line": 2, "character": 0},
+                    "end": {"line": 5, "character": 1},
+                },
+                "selectionRange": {
+                    "start": {"line": 2, "character": 9},
+                    "end": {"line": 2, "character": 12},
+                },
+            }
         ],
-    )
-
-
-def test_41():
-    # parameter types resolved through the file's use statements: an import, an
-    # "as" alias, a reserved name that must stay bare, and a same-namespace
-    # class that only resolves because the index declares it
-    hover_cases(
-        41,
-        [
-            (18, 31, php("$a: App\\NSA\\A")),
-            (18, 43, php("$b: App\\NSA\\A")),
-            (18, 51, php("$n: int")),
-            (18, 59, php("$self: App\\Foo")),
-            # the same type reached through a usage rather than the declaration
-            (20, 12, php("$a: App\\NSA\\A")),
-        ],
-    )
-
-
-def test_42():
-    # the object of an access typed by a call into another file: nothing in
-    # main.php says what $e is, so $c has to be typed from its parameter,
-    # Container::engine() found in Container.php, and its return type read
-    # off that declaration - all of it at query time, since the indexer sees
-    # one file at a time
-    root = LSP_TEST_DIR / "test_42"
-    client = LspClient(root)
-    uri = client.did_open(root / "main.php")
-    container_uri = f"file://{root / 'Container.php'}"
-
-    check("hover $e (typed by a cross-file call)", client.hover(uri, 4, 4), php("$e: Engine"))
-    check(
-        "hover $c->engine() (cross-file method)",
-        client.hover(uri, 4, 13),
-        func("Container::engine", "public function engine(): Engine"),
-    )
-    check(
-        "hover $e->power (property of the returned class)",
-        client.hover(uri, 6, 15),
-        php("$power: int"),
-    )
-    check(
-        "definition $e->power (cross-file)",
-        client.definition(uri, 6, 15),
-        {
-            "uri": container_uri,
-            "range": {
-                "start": {"line": 4, "character": 15},
-                "end": {"line": 4, "character": 21},
-            },
-        },
     )
     client.close()
 
 
-def test_43():
-    # a class named rather than declared: "new Square()", the ": Square"
-    # return type and "implements Shape" are all references to a declaration,
-    # the last of them in another file
-    root = LSP_TEST_DIR / "test_43"
-    client = LspClient(root)
-    uri = client.did_open(root / "main.php")
-    shape_uri = f"file://{root / 'Shape.php'}"
+def test_37():
+    # a class with a property, a constructor (its own SymbolKind), and a
+    # regular method - nested as "children" of the class symbol
+    root = LSP_TEST_DIR / "test_37"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
 
-    square_decl = {
-        "uri": uri,
-        "range": {
-            "start": {"line": 2, "character": 6},
-            "end": {"line": 2, "character": 12},
-        },
-    }
-    shape_decl = {
-        "uri": shape_uri,
-        "range": {
-            "start": {"line": 2, "character": 10},
-            "end": {"line": 2, "character": 15},
-        },
-    }
-    implements = {
-        "uri": uri,
-        "range": {
-            "start": {"line": 2, "character": 24},
-            "end": {"line": 2, "character": 29},
-        },
-    }
-    return_type = {
-        "uri": uri,
-        "range": {
-            "start": {"line": 6, "character": 17},
-            "end": {"line": 6, "character": 23},
-        },
-    }
-    created = {
-        "uri": uri,
-        "range": {
-            "start": {"line": 8, "character": 15},
-            "end": {"line": 8, "character": 21},
-        },
-    }
-
-    check("definition new Square()", client.definition(uri, 8, 15), square_decl)
-    check("definition ': Square' return type", client.definition(uri, 6, 17), square_decl)
-    check("definition implements Shape (cross-file)", client.definition(uri, 2, 24), shape_decl)
     check(
-        "references Square (declaration, return type, new)",
-        client.references(uri, 2, 6, include_declaration=True),
-        [square_decl, return_type, created],
+        "documentSymbol: class with property/constructor/method",
+        client.document_symbol(uri),
+        [
+            {
+                "name": "Box",
+                "kind": 5,
+                "range": {
+                    "start": {"line": 2, "character": 0},
+                    "end": {"line": 15, "character": 1},
+                },
+                "selectionRange": {
+                    "start": {"line": 2, "character": 6},
+                    "end": {"line": 2, "character": 9},
+                },
+                "children": [
+                    {
+                        "name": "$value",
+                        "kind": 7,
+                        "range": {
+                            "start": {"line": 4, "character": 4},
+                            "end": {"line": 4, "character": 22},
+                        },
+                        "selectionRange": {
+                            "start": {"line": 4, "character": 15},
+                            "end": {"line": 4, "character": 21},
+                        },
+                    },
+                    {
+                        "name": "__construct",
+                        "kind": 9,
+                        "range": {
+                            "start": {"line": 6, "character": 4},
+                            "end": {"line": 9, "character": 5},
+                        },
+                        "selectionRange": {
+                            "start": {"line": 6, "character": 20},
+                            "end": {"line": 6, "character": 31},
+                        },
+                    },
+                    {
+                        "name": "get",
+                        "kind": 6,
+                        "range": {
+                            "start": {"line": 11, "character": 4},
+                            "end": {"line": 14, "character": 5},
+                        },
+                        "selectionRange": {
+                            "start": {"line": 11, "character": 20},
+                            "end": {"line": 11, "character": 23},
+                        },
+                    },
+                ],
+            }
+        ],
+    )
+    client.close()
+
+
+def test_38():
+    # a braced namespace nests its contents under a Namespace symbol;
+    # the unbraced `namespace X;` form intentionally does not (see the
+    # comment on collect_document_symbols)
+    root = LSP_TEST_DIR / "test_38"
+    path = root / "main.php"
+    client = LspClient(path)
+    uri = client.did_open(path)
+
+    check(
+        "documentSymbol: braced namespace",
+        client.document_symbol(uri),
+        [
+            {
+                "name": "App",
+                "kind": 3,
+                "range": {
+                    "start": {"line": 2, "character": 0},
+                    "end": {"line": 7, "character": 1},
+                },
+                "selectionRange": {
+                    "start": {"line": 2, "character": 10},
+                    "end": {"line": 2, "character": 13},
+                },
+                "children": [
+                    {
+                        "name": "greet",
+                        "kind": 12,
+                        "range": {
+                            "start": {"line": 3, "character": 4},
+                            "end": {"line": 6, "character": 5},
+                        },
+                        "selectionRange": {
+                            "start": {"line": 3, "character": 13},
+                            "end": {"line": 3, "character": 18},
+                        },
+                    }
+                ],
+            }
+        ],
+    )
+    client.close()
+
+
+# ---------------------------------------------------------------------------
+# workspace/symbol: search by name across every indexed file, not just one.
+# ---------------------------------------------------------------------------
+
+
+def test_39():
+    # two files: Models.php (two classes, one with a property + method)
+    # and Helpers.php (a plain function) - no didOpen needed, since the
+    # search runs over the startup index, not any particular open buffer
+    root = LSP_TEST_DIR / "test_39"
+    client = LspClient(root)
+    models_uri = f"file://{root / 'Models.php'}"
+    helpers_uri = f"file://{root / 'Helpers.php'}"
+
+    check(
+        "workspace/symbol 'User' (single match, no container)",
+        client.workspace_symbol("User"),
+        [
+            {
+                "name": "UserAccount",
+                "kind": 5,
+                "location": {
+                    "uri": models_uri,
+                    "range": {
+                        "start": {"line": 2, "character": 6},
+                        "end": {"line": 2, "character": 17},
+                    },
+                },
+            }
+        ],
     )
     check(
-        "references Shape across files",
-        sort_locs(client.references(shape_uri, 2, 10, include_declaration=True)),
-        sort_locs([shape_decl, implements]),
+        "workspace/symbol 'id' (case-insensitive, cross-file, containerName)",
+        sort_symbols(client.workspace_symbol("id")),
+        sort_symbols(
+            [
+                {
+                    "name": "$id",
+                    "kind": 7,
+                    "location": {
+                        "uri": models_uri,
+                        "range": {
+                            "start": {"line": 4, "character": 15},
+                            "end": {"line": 4, "character": 18},
+                        },
+                    },
+                    "containerName": "UserAccount",
+                },
+                {
+                    "name": "getId",
+                    "kind": 6,
+                    "location": {
+                        "uri": models_uri,
+                        "range": {
+                            "start": {"line": 6, "character": 20},
+                            "end": {"line": 6, "character": 25},
+                        },
+                    },
+                    "containerName": "UserAccount",
+                },
+                {
+                    "name": "formatId",
+                    "kind": 12,
+                    "location": {
+                        "uri": helpers_uri,
+                        "range": {
+                            "start": {"line": 2, "character": 9},
+                            "end": {"line": 2, "character": 17},
+                        },
+                    },
+                },
+            ]
+        ),
     )
     client.close()
 
@@ -1278,11 +1480,17 @@ TESTS = [
     test_9,
     test_10,
     test_11,
+    test_12,
     test_13,
     test_14,
     test_15,
     test_16,
     test_17,
+    test_18,
+    test_19,
+    test_20,
+    test_21,
+    test_22,
     test_23,
     test_24,
     test_25,
@@ -1296,10 +1504,10 @@ TESTS = [
     test_33,
     test_34,
     test_35,
-    test_40,
-    test_41,
-    test_42,
-    test_43,
+    test_36,
+    test_37,
+    test_38,
+    test_39,
 ]
 
 
@@ -1310,7 +1518,7 @@ def run_lsp_tests():
 
 
 def main():
-    subprocess.run([sys.executable, "build.py", "build_all"], check=True, cwd=ROOT)
+    subprocess.run(["make"], check=True, cwd=ROOT)
 
     run_lsp_tests()
 
