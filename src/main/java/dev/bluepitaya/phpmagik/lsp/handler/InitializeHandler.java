@@ -14,8 +14,6 @@ public final class InitializeHandler {
         caps.put("hoverProvider", true);
         caps.put("definitionProvider", true);
         caps.put("referencesProvider", true);
-        caps.put("documentSymbolProvider", true);
-        caps.put("workspaceSymbolProvider", true);
 
         result.set("capabilities", caps);
         return result;

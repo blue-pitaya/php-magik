@@ -13,16 +13,14 @@ public final class PhpFile {
 
     private byte[] content;
     private Tree tree;
-    private List<PhpUseStatement> uses;
+    private List<PhpUseStatement> uses = List.of();
 
-    PhpFile(int fileId, String uri, String path, byte[] content, Tree tree,
-            List<PhpUseStatement> uses) {
+    PhpFile(int fileId, String uri, String path, byte[] content, Tree tree) {
         this.fileId = fileId;
         this.uri = uri;
         this.path = path;
         this.content = content;
         this.tree = tree;
-        this.uses = List.copyOf(uses);
     }
 
     public int fileId() {
@@ -45,15 +43,17 @@ public final class PhpFile {
         return tree;
     }
 
-    /** What this file imports, in source order. */
     public List<PhpUseStatement> uses() {
         return uses;
     }
 
-    void replace(byte[] content, Tree tree, List<PhpUseStatement> uses) {
+    void uses(List<PhpUseStatement> uses) {
+        this.uses = List.copyOf(uses);
+    }
+
+    void replace(byte[] content, Tree tree) {
         this.tree.close();
         this.content = content;
         this.tree = tree;
-        this.uses = List.copyOf(uses);
     }
 }

@@ -1,5 +1,7 @@
 package dev.bluepitaya.phpmagik.resolver;
 
+import dev.bluepitaya.phpmagik.PhpFile;
+import dev.bluepitaya.phpmagik.PhpNodes;
 import dev.bluepitaya.phpmagik.Workspace;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionUsage;
@@ -10,6 +12,8 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpVarDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpVarUsage;
+import dev.bluepitaya.phpmagik.ts.Node;
+import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
@@ -22,31 +26,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/**
- * What type a thing holds, worked out by following the index.
- *
- * <p>The indexer names the types it can see outright: a declared parameter or
- * property type, a literal, a {@code new X}, the result of an operator. What is
- * left over is a chain, and this walks it - a read to the definitions that give
- * it a value, a definition to whatever it was assigned from, a call to the
- * declaration it calls, a declaration to what it returns - until something along
- * the way names a type or the chain runs out.
- *
- * <p>Which class {@code $obj->foo} is on is the same question asked of the
- * object, so it is answered here too, and {@link #declarationOf} is what a
- * member access resolves through. That is what lets an access reach a
- * declaration in another file: the indexer only ever sees one.
- *
- * <p>Types come back as the source wrote them, so {@code A} rather than
- * {@code App\NSA\A}. Turning one into a qualified name needs the file's
- * {@code use} statements, which is {@code SymbolFinder.resolveType}'s job.
- *
- * <p>Nothing is cached. Every answer is only as good as the index it was read
- * from, and that is rebuilt for a file on each keystroke; a cache would have to
- * be invalidated exactly as often as it would be used.
- */
 @NullMarked
 public final class TypeInference {
+
+    private static final Set<String> BOOL_OPS = Set.of(
+            "==", "!=", "===", "!==", "<", ">", "<=", ">=", "<=>",
+            "&&", "||", "and", "or", "xor", "instanceof");
+
+    private static final Set<String> INT_OPS = Set.of("%", "<<", ">>", "&", "|", "^");
+
+    private static final Set<String> ARITHMETIC_OPS = Set.of("+", "-", "*", "/", "**");
 
     private final Workspace workspace;
     private final FunctionResolver functions;
@@ -56,18 +45,15 @@ public final class TypeInference {
         this.functions = functions;
     }
 
-    /** The type a read holds: whatever the definitions before it work out to. */
     public @Nullable String typeOf(PhpVarUsage usage) {
-        return typeOfVariable(usage.fileId(), usage.functionName(), usage.name(),
+        return typeOfVariable(usage.file(), usage.functionName(), usage.name(),
                 usage.range().start(), new HashSet<>());
     }
 
-    /** The type a parameter or assignment gives its variable. */
     public @Nullable String typeOf(PhpVarDefinition def) {
         return typeOf(def, new HashSet<>());
     }
 
-    /** The declared type of the property this access reads. */
     public @Nullable String typeOf(PhpPropertyUsage usage) {
         return typeOfSymbol(usage, new HashSet<>());
     }
@@ -76,45 +62,37 @@ public final class TypeInference {
         return def.type();
     }
 
-    /** What a call to this gets back: the declared type, or what it returns. */
     public @Nullable String returnTypeOf(PhpFunctionDefinition func) {
-        return returnType(func.returnType(), func.fileId(), func.returnSource(), new HashSet<>());
+        return returnType(func.returnType(), func.file(), func.returnSource(), new HashSet<>());
     }
 
     public @Nullable String returnTypeOf(PhpMethodDefinition method) {
-        return returnType(method.returnType(), method.fileId(), method.returnSource(),
+        return returnType(method.returnType(), method.file(), method.returnSource(),
                 new HashSet<>());
     }
 
-    /**
-     * The property this access reads, wherever in the workspace it is declared,
-     * or {@code null} when the object's class cannot be named or declares no such
-     * property - an inherited one, or a class nothing indexed.
-     */
     public @Nullable PhpPropertyDefinition declarationOf(PhpPropertyUsage usage) {
         return declarationOf(usage, new HashSet<>());
     }
 
-    /** The method this call invokes, on the same terms. */
     public @Nullable PhpMethodDefinition declarationOf(PhpMethodUsage usage) {
         return declarationOf(usage, new HashSet<>());
     }
 
-    /** The class an access is on, by the simple name a declaration goes by. */
     public @Nullable String classOf(PhpPropertyUsage usage) {
-        return classOf(usage.className(), usage.fileId(), usage.objectSource(), new HashSet<>());
+        return classOf(usage.className(), usage.file(), usage.objectSource(), new HashSet<>());
     }
 
     public @Nullable String classOf(PhpMethodUsage usage) {
-        return classOf(usage.className(), usage.fileId(), usage.objectSource(), new HashSet<>());
+        return classOf(usage.className(), usage.file(), usage.objectSource(), new HashSet<>());
     }
 
     private @Nullable PhpPropertyDefinition declarationOf(PhpPropertyUsage usage,
                                                           Set<PhpSymbol> visiting) {
-        String cls = classOf(usage.className(), usage.fileId(), usage.objectSource(), visiting);
+        String cls = classOf(usage.className(), usage.file(), usage.objectSource(), visiting);
         if (cls == null) return null;
 
-        for (PhpPropertyDefinition declared : workspace.properties()) {
+        for (PhpPropertyDefinition declared : workspace.symbols().properties()) {
             if (declared.name().equals(usage.name()) && declared.owner().name().equals(cls)) {
                 return declared;
             }
@@ -123,11 +101,11 @@ public final class TypeInference {
     }
 
     private @Nullable PhpMethodDefinition declarationOf(PhpMethodUsage usage,
-                                                       Set<PhpSymbol> visiting) {
-        String cls = classOf(usage.className(), usage.fileId(), usage.objectSource(), visiting);
+                                                        Set<PhpSymbol> visiting) {
+        String cls = classOf(usage.className(), usage.file(), usage.objectSource(), visiting);
         if (cls == null) return null;
 
-        for (PhpMethodDefinition declared : workspace.methods()) {
+        for (PhpMethodDefinition declared : workspace.symbols().methods()) {
             if (declared.name().equals(usage.name()) && declared.owner().name().equals(cls)) {
                 return declared;
             }
@@ -135,38 +113,25 @@ public final class TypeInference {
         return null;
     }
 
-    /**
-     * {@code $this} was settled when the file was indexed; any other object is
-     * whatever its own type works out to.
-     */
-    private @Nullable String classOf(@Nullable String className, int fileId,
+    private @Nullable String classOf(@Nullable String className, PhpFile file,
                                      @Nullable Range objectSource, Set<PhpSymbol> visiting) {
         if (className != null) return className;
 
-        String type = sourceType(fileId, objectSource, visiting);
+        String type = sourceType(file, objectSource, visiting);
         return type == null ? null : simpleClassName(type);
     }
 
-    /**
-     * {@code ?App\NSA\A} is the class {@code A}: a declaration is joined by the
-     * name it was written under, and that is all an access has to go on.
-     */
     private static String simpleClassName(String type) {
         int last = type.lastIndexOf('\\');
         String name = last < 0 ? type : type.substring(last + 1);
         return name.startsWith("?") ? name.substring(1) : name;
     }
 
-    /**
-     * The type the name holds at that point, which is what the latest definition
-     * at or before it works out to - so a reassignment retypes what follows it.
-     * Earlier definitions are tried when a later one works out to nothing.
-     */
-    private @Nullable String typeOfVariable(int fileId, @Nullable String functionName, String name,
+    private @Nullable String typeOfVariable(PhpFile file, @Nullable String functionName, String name,
                                             Point at, Set<PhpSymbol> visiting) {
         var candidates = new ArrayList<PhpVarDefinition>();
-        for (PhpVarDefinition def : workspace.varDefinitions()) {
-            if (def.fileId() != fileId || !def.name().equals(name)) continue;
+        for (PhpVarDefinition def : workspace.symbols().varDefinitions()) {
+            if (def.file() != file || !def.name().equals(name)) continue;
             if (!Objects.equals(def.functionName(), functionName)) continue;
             if (def.range().start().compareTo(at) > 0) continue;
             candidates.add(def);
@@ -182,20 +147,99 @@ public final class TypeInference {
     }
 
     private @Nullable String typeOf(PhpVarDefinition def, Set<PhpSymbol> visiting) {
-        if (!visiting.add(def)) return null;
+        /* a declared type is an answer on its own: nothing is followed to reach
+         * it, so there is no path it could close a loop on */
         if (def.type() != null) return def.type();
-        return sourceType(def.fileId(), def.valueSource(), visiting);
+
+        if (!visiting.add(def)) return null;
+        try {
+            return sourceType(def.file(), def.valueSource(), visiting);
+        } finally {
+            visiting.remove(def);
+        }
     }
 
-    /**
-     * The type of whatever the index recorded at that range - the far end of one
-     * link in the chain.
-     */
-    private @Nullable String sourceType(int fileId, @Nullable Range source,
+    private @Nullable String sourceType(PhpFile file, @Nullable Range source,
                                         Set<PhpSymbol> visiting) {
         if (source == null) return null;
-        PhpSymbol symbol = symbolAt(fileId, source);
-        return symbol == null ? null : typeOfSymbol(symbol, visiting);
+
+        PhpSymbol symbol = symbolAt(file, source);
+        if (symbol != null) return typeOfSymbol(symbol, visiting);
+
+        return inferExprType(file, nodeAt(file, source), visiting);
+    }
+
+    private @Nullable String inferExprType(PhpFile file, @Nullable Node expr,
+                                           Set<PhpSymbol> visiting) {
+        if (expr == null) return null;
+        String type = expr.getType();
+        if (type == null) return null;
+
+        String literal = literalType(type);
+        if (literal != null) return literal;
+
+        return switch (type) {
+            case "object_creation_expression" -> createdClass(expr);
+            /* the statement stands in for a "return;", which returns nothing */
+            case "return_statement" -> "void";
+            case "parenthesized_expression" -> subExprType(file, Nodes.namedChild(expr, 0), visiting);
+            case "unary_op_expression" -> unaryType(file, expr, visiting);
+            case "binary_expression" -> binaryType(file, expr, visiting);
+            default -> null;
+        };
+    }
+
+    private @Nullable String subExprType(PhpFile file, @Nullable Node expr,
+                                         Set<PhpSymbol> visiting) {
+        return expr == null ? null : sourceType(file, PhpNodes.valueSource(expr), visiting);
+    }
+
+    private static @Nullable String literalType(String nodeType) {
+        return switch (nodeType) {
+            case "integer" -> "int";
+            case "float" -> "float";
+            case "string", "encapsed_string", "heredoc", "nowdoc" -> "string";
+            case "boolean" -> "bool";
+            case "null" -> "null";
+            case "array_creation_expression" -> "array";
+            case "anonymous_function", "arrow_function" -> "Closure";
+            default -> null;
+        };
+    }
+
+    private static @Nullable String createdClass(Node expr) {
+        Node reference = Nodes.namedChild(expr, 0);
+        String type = Nodes.type(reference);
+        return type != null && PhpNodes.NAME_TYPES.contains(type) ? reference.getContent() : null;
+    }
+
+    private @Nullable String unaryType(PhpFile file, Node expr, Set<PhpSymbol> visiting) {
+        String op = Nodes.type(expr.getChildByFieldName("operator"));
+        if ("!".equals(op)) return "bool";
+        if ("~".equals(op)) return "int";
+        return subExprType(file, expr.getChildByFieldName("argument"), visiting);
+    }
+
+    private @Nullable String binaryType(PhpFile file, Node expr, Set<PhpSymbol> visiting) {
+        String op = Nodes.type(expr.getChildByFieldName("operator"));
+        if (op == null) return null;
+
+        if (op.equals(".")) return "string";
+        if (INT_OPS.contains(op)) return "int";
+        if (BOOL_OPS.contains(op)) return "bool";
+        if (!ARITHMETIC_OPS.contains(op)) return null;
+
+        String left = subExprType(file, expr.getChildByFieldName("left"), visiting);
+        String right = subExprType(file, expr.getChildByFieldName("right"), visiting);
+        if (left == null || right == null) return null;
+
+        boolean isFloat = op.equals("/") || left.equals("float") || right.equals("float");
+        return isFloat ? "float" : "int";
+    }
+
+    private static @Nullable Node nodeAt(PhpFile file, Range range) {
+        Node found = file.tree().getRootNode().getNamedDescendant(range.start(), range.end());
+        return found == null || found.isNull() ? null : found;
     }
 
     private @Nullable String typeOfSymbol(PhpSymbol symbol, Set<PhpSymbol> visiting) {
@@ -203,50 +247,48 @@ public final class TypeInference {
             return typeOf(def, visiting);
         }
         if (!visiting.add(symbol)) return null;
-
-        if (symbol instanceof PhpVarUsage usage) {
-            return typeOfVariable(usage.fileId(), usage.functionName(), usage.name(),
-                    usage.range().start(), visiting);
+        try {
+            if (symbol instanceof PhpVarUsage usage) {
+                return typeOfVariable(usage.file(), usage.functionName(), usage.name(),
+                        usage.range().start(), visiting);
+            }
+            if (symbol instanceof PhpPropertyUsage usage) {
+                PhpPropertyDefinition declared = declarationOf(usage, visiting);
+                return declared == null ? null : declared.type();
+            }
+            if (symbol instanceof PhpFunctionUsage usage) {
+                PhpFunctionDefinition declared = functions.definitionOf(usage);
+                return declared == null ? null : returnType(declared.returnType(), declared.file(),
+                        declared.returnSource(), visiting);
+            }
+            if (symbol instanceof PhpMethodUsage usage) {
+                PhpMethodDefinition declared = declarationOf(usage, visiting);
+                return declared == null ? null : returnType(declared.returnType(), declared.file(),
+                        declared.returnSource(), visiting);
+            }
+            return null;
+        } finally {
+            visiting.remove(symbol);
         }
-        if (symbol instanceof PhpPropertyUsage usage) {
-            PhpPropertyDefinition declared = declarationOf(usage, visiting);
-            return declared == null ? null : declared.type();
-        }
-        if (symbol instanceof PhpFunctionUsage usage) {
-            PhpFunctionDefinition declared = functions.definitionOf(usage);
-            return declared == null ? null : returnType(declared.returnType(), declared.fileId(),
-                    declared.returnSource(), visiting);
-        }
-        if (symbol instanceof PhpMethodUsage usage) {
-            PhpMethodDefinition declared = declarationOf(usage, visiting);
-            return declared == null ? null : returnType(declared.returnType(), declared.fileId(),
-                    declared.returnSource(), visiting);
-        }
-        return null;
     }
 
-    private @Nullable String returnType(@Nullable String declared, int fileId,
-                                       @Nullable Range source, Set<PhpSymbol> visiting) {
-        return declared != null ? declared : sourceType(fileId, source, visiting);
+    private @Nullable String returnType(@Nullable String declared, PhpFile file,
+                                        @Nullable Range source, Set<PhpSymbol> visiting) {
+        return declared != null ? declared : sourceType(file, source, visiting);
     }
 
-    /**
-     * The usage recorded at exactly that range. Only usages can be the source of
-     * a value, and no two of them share a range in one file, so this is the one
-     * the indexer meant.
-     */
-    private @Nullable PhpSymbol symbolAt(int fileId, Range range) {
-        PhpSymbol found = firstAt(workspace.varUsages(), fileId, range);
-        if (found == null) found = firstAt(workspace.propertyUsages(), fileId, range);
-        if (found == null) found = firstAt(workspace.functionUsages(), fileId, range);
-        if (found == null) found = firstAt(workspace.methodUsages(), fileId, range);
+    private @Nullable PhpSymbol symbolAt(PhpFile file, Range range) {
+        PhpSymbol found = firstAt(workspace.symbols().varUsages(), file, range);
+        if (found == null) found = firstAt(workspace.symbols().propertyUsages(), file, range);
+        if (found == null) found = firstAt(workspace.symbols().functionUsages(), file, range);
+        if (found == null) found = firstAt(workspace.symbols().methodUsages(), file, range);
         return found;
     }
 
-    private static @Nullable PhpSymbol firstAt(List<? extends PhpSymbol> symbols, int fileId,
+    private static @Nullable PhpSymbol firstAt(List<? extends PhpSymbol> symbols, PhpFile file,
                                                Range range) {
         for (PhpSymbol symbol : symbols) {
-            if (symbol.fileId() == fileId && symbol.range().equals(range)) return symbol;
+            if (symbol.file() == file && symbol.range().equals(range)) return symbol;
         }
         return null;
     }

@@ -7,16 +7,13 @@ import dev.bluepitaya.phpmagik.lsp.dto.DidOpenParams;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
-import dev.bluepitaya.phpmagik.lsp.dto.WorkspaceSymbolParams;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidChangeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidCloseHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidOpenHandler;
-import dev.bluepitaya.phpmagik.lsp.handler.DocumentSymbolHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.InitializeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
-import dev.bluepitaya.phpmagik.lsp.handler.WorkspaceSymbolHandler;
 import dev.bluepitaya.phpmagik.resolver.ClassResolver;
 import dev.bluepitaya.phpmagik.resolver.FunctionResolver;
 import dev.bluepitaya.phpmagik.resolver.MethodResolver;
@@ -52,8 +49,6 @@ public final class LspServer {
     private final HoverHandler hover;
     private final DefinitionHandler definition;
     private final ReferencesHandler references;
-    private final DocumentSymbolHandler documentSymbol;
-    private final WorkspaceSymbolHandler workspaceSymbol;
 
     public LspServer(Workspace app, Logger log) {
         this.in = new BufferedInputStream(System.in);
@@ -78,8 +73,6 @@ public final class LspServer {
                 properties, classes, log);
         this.references = new ReferencesHandler(app, symbols, variables, functions, methods,
                 properties, classes, log);
-        this.documentSymbol = new DocumentSymbolHandler(app, log);
-        this.workspaceSymbol = new WorkspaceSymbolHandler(app, log);
     }
 
     public void run() throws IOException {
@@ -130,10 +123,6 @@ public final class LspServer {
                         definition.handle(bind(params, TextDocumentPosition.class)));
                 case "textDocument/references" -> respond(getRequestIdOrThrow(request),
                         references.handle(bind(params, ReferenceParams.class)));
-                case "textDocument/documentSymbol" -> respond(getRequestIdOrThrow(request),
-                        documentSymbol.handle(bind(params, TextDocumentParams.class)));
-                case "workspace/symbol" -> respond(getRequestIdOrThrow(request),
-                        workspaceSymbol.handle(bind(params, WorkspaceSymbolParams.class)));
                 default -> {
                     JsonNode id = request.get("id");
                     /* an unknown notification is still a notification: no reply */

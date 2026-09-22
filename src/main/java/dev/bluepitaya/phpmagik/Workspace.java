@@ -1,16 +1,7 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.lsp.Logger;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDefinition;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpClassUsage;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionUsage;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDefinition;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodUsage;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDefinition;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyUsage;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpVarDefinition;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpVarUsage;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Parser;
 import dev.bluepitaya.phpmagik.ts.Tree;
 
@@ -26,16 +17,7 @@ public final class Workspace implements AutoCloseable {
     private final Parser parser;
     private final Logger log;
     private final List<PhpFile> files = new ArrayList<>();
-    private final List<PhpVarDefinition> varDefinitions = new ArrayList<>();
-    private final List<PhpVarUsage> varUsages = new ArrayList<>();
-    private final List<PhpFunctionDefinition> functions = new ArrayList<>();
-    private final List<PhpFunctionUsage> functionUsages = new ArrayList<>();
-    private final List<PhpMethodDefinition> methods = new ArrayList<>();
-    private final List<PhpMethodUsage> methodUsages = new ArrayList<>();
-    private final List<PhpPropertyDefinition> properties = new ArrayList<>();
-    private final List<PhpPropertyUsage> propertyUsages = new ArrayList<>();
-    private final List<PhpClassDefinition> classes = new ArrayList<>();
-    private final List<PhpClassUsage> classUsages = new ArrayList<>();
+    private final PhpSymbolCollection symbols = new PhpSymbolCollection();
 
     public Workspace(Parser parser, Logger log) {
         this.parser = parser;
@@ -46,48 +28,8 @@ public final class Workspace implements AutoCloseable {
         return files;
     }
 
-    public List<PhpVarDefinition> varDefinitions() {
-        return varDefinitions;
-    }
-
-    public List<PhpVarUsage> varUsages() {
-        return varUsages;
-    }
-
-    public List<PhpFunctionDefinition> functions() {
-        return functions;
-    }
-
-    public List<PhpFunctionUsage> functionUsages() {
-        return functionUsages;
-    }
-
-    public List<PhpMethodDefinition> methods() {
-        return methods;
-    }
-
-    public List<PhpMethodUsage> methodUsages() {
-        return methodUsages;
-    }
-
-    public List<PhpPropertyDefinition> properties() {
-        return properties;
-    }
-
-    public List<PhpPropertyUsage> propertyUsages() {
-        return propertyUsages;
-    }
-
-    public List<PhpClassDefinition> classes() {
-        return classes;
-    }
-
-    public List<PhpClassUsage> classUsages() {
-        return classUsages;
-    }
-
-    public PhpFile file(int fileId) {
-        return files.get(fileId);
+    public PhpSymbolCollection symbols() {
+        return symbols;
     }
 
     public PhpFile findFile(String uri) {
@@ -133,52 +75,28 @@ public final class Workspace implements AutoCloseable {
         log.log("index: " + path);
 
         Tree tree = parser.parse(content);
-        int fileId = files.size();
 
-        Indexer indexer = new Indexer(fileId, content);
-        indexer.index(tree.getRootNode());
-        addSymbols(indexer);
+        /* the file first: every symbol the walk records points back at it */
+        PhpFile file = new PhpFile(files.size(), pathToUri(path), path.toString(), content, tree);
+        files.add(file);
 
-        files.add(new PhpFile(fileId, pathToUri(path), path.toString(), content, tree,
-                indexer.uses()));
+        indexSymbols(file);
     }
 
     public void reparse(PhpFile file, byte[] content) {
-        Tree tree = parser.parse(content);
+        /* the file takes the new source before the walk, which reads both off it */
+        file.replace(content, parser.parse(content));
 
-        Indexer indexer = new Indexer(file.fileId(), content);
-        indexer.index(tree.getRootNode());
-
-        forgetSymbols(file.fileId());
-        addSymbols(indexer);
-
-        file.replace(content, tree, indexer.uses());
+        symbols.removeFile(file);
+        indexSymbols(file);
     }
 
-    private void addSymbols(Indexer indexer) {
-        varDefinitions.addAll(indexer.varDefinitions());
-        varUsages.addAll(indexer.varUsages());
-        functions.addAll(indexer.functions());
-        functionUsages.addAll(indexer.functionUsages());
-        methods.addAll(indexer.methods());
-        methodUsages.addAll(indexer.methodUsages());
-        properties.addAll(indexer.properties());
-        propertyUsages.addAll(indexer.propertyUsages());
-        classes.addAll(indexer.classes());
-        classUsages.addAll(indexer.classUsages());
-    }
+    private void indexSymbols(PhpFile file) {
+        Indexer indexer = new Indexer(file);
+        indexer.index(file.tree().getRootNode());
 
-    private void forgetSymbols(int fileId) {
-        varDefinitions.removeIf(symbol -> symbol.fileId() == fileId);
-        varUsages.removeIf(symbol -> symbol.fileId() == fileId);
-        functions.removeIf(symbol -> symbol.fileId() == fileId);
-        functionUsages.removeIf(symbol -> symbol.fileId() == fileId);
-        methods.removeIf(symbol -> symbol.fileId() == fileId);
-        methodUsages.removeIf(symbol -> symbol.fileId() == fileId);
-        properties.removeIf(symbol -> symbol.fileId() == fileId);
-        propertyUsages.removeIf(symbol -> symbol.fileId() == fileId);
-        classes.removeIf(symbol -> symbol.fileId() == fileId);
-        classUsages.removeIf(symbol -> symbol.fileId() == fileId);
+        symbols.addAll(indexer.symbols());
+        file.uses(indexer.symbols().uses());
     }
 
     private String pathToUri(Path path) {

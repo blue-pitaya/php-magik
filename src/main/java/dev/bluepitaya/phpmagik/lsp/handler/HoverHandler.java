@@ -48,10 +48,10 @@ public final class HoverHandler {
         String text = null;
         if (sym instanceof PhpVarDefinition def) {
             text = typedHover(def.name(),
-                    symbols.resolveType(def.fileId(), def.ns(), types.typeOf(def)));
+                    symbols.resolveType(def.file(), def.ns(), types.typeOf(def)));
         } else if (sym instanceof PhpVarUsage usage) {
             text = typedHover(usage.name(),
-                    symbols.resolveType(usage.fileId(), usage.ns(), types.typeOf(usage)));
+                    symbols.resolveType(usage.file(), usage.ns(), types.typeOf(usage)));
         } else if (sym instanceof PhpPropertyDefinition property) {
             text = propertyHover(property);
         } else if (sym instanceof PhpPropertyUsage usage) {
@@ -86,7 +86,7 @@ public final class HoverHandler {
 
     /** A type is resolved where it was written, which for a property is its class's file. */
     private String propertyHover(PhpPropertyDefinition property) {
-        return typedHover(property.name(), symbols.resolveType(property.fileId(),
+        return typedHover(property.name(), symbols.resolveType(property.file(),
                 property.owner().ns(), types.typeOf(property)));
     }
 

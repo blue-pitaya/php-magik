@@ -82,10 +82,9 @@ public final class ReferencesHandler {
         return locs;
     }
 
-    private void collect(List<? extends PhpSymbol> refs, ArrayNode locs) {
+    private static void collect(List<? extends PhpSymbol> refs, ArrayNode locs) {
         for (PhpSymbol ref : refs) {
-            PhpFile file = app.file(ref.fileId());
-            locs.add(Json.location(file.uri(), ref.range()));
+            locs.add(Json.location(ref.file().uri(), ref.range()));
         }
     }
 }

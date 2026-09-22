@@ -88,19 +88,6 @@ def func(qualified: str, signature: str, description: str = "", *tags: str) -> s
     return out.strip()
 
 
-def sort_symbols(syms):
-    """Canonical order for workspace/symbol results spanning multiple
-    files - same rationale as sort_locs, but the location is nested."""
-    return sorted(
-        syms,
-        key=lambda s: (
-            s["location"]["uri"],
-            s["location"]["range"]["start"]["line"],
-            s["location"]["range"]["start"]["character"],
-        ),
-    )
-
-
 def sort_locs(locs):
     """Canonical order for a list of Locations spanning multiple files.
 
@@ -226,17 +213,6 @@ class LspClient:
                 "textDocument": {"uri": uri},
                 "position": {"line": line, "character": character},
             },
-        )
-        return result.get("result")
-
-    def workspace_symbol(self, query: str):
-        result = self.request("workspace/symbol", {"query": query})
-        return result.get("result")
-
-    def document_symbol(self, uri: str):
-        result = self.request(
-            "textDocument/documentSymbol",
-            {"textDocument": {"uri": uri}},
         )
         return result.get("result")
 
@@ -1152,229 +1128,6 @@ def test_35():
     client.close()
 
 
-# ---------------------------------------------------------------------------
-# documentSymbol: a plain function, a class with a property/constructor/
-# method, and a braced namespace nesting a function.
-# ---------------------------------------------------------------------------
-
-
-def test_36():
-    # a single top-level function: range covers the whole declaration,
-    # selectionRange just the name
-    root = LSP_TEST_DIR / "test_36"
-    path = root / "main.php"
-    client = LspClient(path)
-    uri = client.did_open(path)
-
-    check(
-        "documentSymbol: top-level function",
-        client.document_symbol(uri),
-        [
-            {
-                "name": "add",
-                "kind": 12,
-                "range": {
-                    "start": {"line": 2, "character": 0},
-                    "end": {"line": 5, "character": 1},
-                },
-                "selectionRange": {
-                    "start": {"line": 2, "character": 9},
-                    "end": {"line": 2, "character": 12},
-                },
-            }
-        ],
-    )
-    client.close()
-
-
-def test_37():
-    # a class with a property, a constructor (its own SymbolKind), and a
-    # regular method - nested as "children" of the class symbol
-    root = LSP_TEST_DIR / "test_37"
-    path = root / "main.php"
-    client = LspClient(path)
-    uri = client.did_open(path)
-
-    check(
-        "documentSymbol: class with property/constructor/method",
-        client.document_symbol(uri),
-        [
-            {
-                "name": "Box",
-                "kind": 5,
-                "range": {
-                    "start": {"line": 2, "character": 0},
-                    "end": {"line": 15, "character": 1},
-                },
-                "selectionRange": {
-                    "start": {"line": 2, "character": 6},
-                    "end": {"line": 2, "character": 9},
-                },
-                "children": [
-                    {
-                        "name": "$value",
-                        "kind": 7,
-                        "range": {
-                            "start": {"line": 4, "character": 4},
-                            "end": {"line": 4, "character": 22},
-                        },
-                        "selectionRange": {
-                            "start": {"line": 4, "character": 15},
-                            "end": {"line": 4, "character": 21},
-                        },
-                    },
-                    {
-                        "name": "__construct",
-                        "kind": 9,
-                        "range": {
-                            "start": {"line": 6, "character": 4},
-                            "end": {"line": 9, "character": 5},
-                        },
-                        "selectionRange": {
-                            "start": {"line": 6, "character": 20},
-                            "end": {"line": 6, "character": 31},
-                        },
-                    },
-                    {
-                        "name": "get",
-                        "kind": 6,
-                        "range": {
-                            "start": {"line": 11, "character": 4},
-                            "end": {"line": 14, "character": 5},
-                        },
-                        "selectionRange": {
-                            "start": {"line": 11, "character": 20},
-                            "end": {"line": 11, "character": 23},
-                        },
-                    },
-                ],
-            }
-        ],
-    )
-    client.close()
-
-
-def test_38():
-    # a braced namespace nests its contents under a Namespace symbol;
-    # the unbraced `namespace X;` form intentionally does not (see the
-    # comment on collect_document_symbols)
-    root = LSP_TEST_DIR / "test_38"
-    path = root / "main.php"
-    client = LspClient(path)
-    uri = client.did_open(path)
-
-    check(
-        "documentSymbol: braced namespace",
-        client.document_symbol(uri),
-        [
-            {
-                "name": "App",
-                "kind": 3,
-                "range": {
-                    "start": {"line": 2, "character": 0},
-                    "end": {"line": 7, "character": 1},
-                },
-                "selectionRange": {
-                    "start": {"line": 2, "character": 10},
-                    "end": {"line": 2, "character": 13},
-                },
-                "children": [
-                    {
-                        "name": "greet",
-                        "kind": 12,
-                        "range": {
-                            "start": {"line": 3, "character": 4},
-                            "end": {"line": 6, "character": 5},
-                        },
-                        "selectionRange": {
-                            "start": {"line": 3, "character": 13},
-                            "end": {"line": 3, "character": 18},
-                        },
-                    }
-                ],
-            }
-        ],
-    )
-    client.close()
-
-
-# ---------------------------------------------------------------------------
-# workspace/symbol: search by name across every indexed file, not just one.
-# ---------------------------------------------------------------------------
-
-
-def test_39():
-    # two files: Models.php (two classes, one with a property + method)
-    # and Helpers.php (a plain function) - no didOpen needed, since the
-    # search runs over the startup index, not any particular open buffer
-    root = LSP_TEST_DIR / "test_39"
-    client = LspClient(root)
-    models_uri = f"file://{root / 'Models.php'}"
-    helpers_uri = f"file://{root / 'Helpers.php'}"
-
-    check(
-        "workspace/symbol 'User' (single match, no container)",
-        client.workspace_symbol("User"),
-        [
-            {
-                "name": "UserAccount",
-                "kind": 5,
-                "location": {
-                    "uri": models_uri,
-                    "range": {
-                        "start": {"line": 2, "character": 6},
-                        "end": {"line": 2, "character": 17},
-                    },
-                },
-            }
-        ],
-    )
-    check(
-        "workspace/symbol 'id' (case-insensitive, cross-file, containerName)",
-        sort_symbols(client.workspace_symbol("id")),
-        sort_symbols(
-            [
-                {
-                    "name": "$id",
-                    "kind": 7,
-                    "location": {
-                        "uri": models_uri,
-                        "range": {
-                            "start": {"line": 4, "character": 15},
-                            "end": {"line": 4, "character": 18},
-                        },
-                    },
-                    "containerName": "UserAccount",
-                },
-                {
-                    "name": "getId",
-                    "kind": 6,
-                    "location": {
-                        "uri": models_uri,
-                        "range": {
-                            "start": {"line": 6, "character": 20},
-                            "end": {"line": 6, "character": 25},
-                        },
-                    },
-                    "containerName": "UserAccount",
-                },
-                {
-                    "name": "formatId",
-                    "kind": 12,
-                    "location": {
-                        "uri": helpers_uri,
-                        "range": {
-                            "start": {"line": 2, "character": 9},
-                            "end": {"line": 2, "character": 17},
-                        },
-                    },
-                },
-            ]
-        ),
-    )
-    client.close()
-
-
 def test_40():
     # PHPDoc in hover: shown for a declaration and for a call site (the block
     # lives on the declaration either way), absent when there is none, and not
@@ -1543,10 +1296,6 @@ TESTS = [
     test_33,
     test_34,
     test_35,
-    test_36,
-    test_37,
-    test_38,
-    test_39,
     test_40,
     test_41,
     test_42,

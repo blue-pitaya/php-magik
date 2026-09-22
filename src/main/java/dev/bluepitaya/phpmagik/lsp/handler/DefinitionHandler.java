@@ -83,7 +83,7 @@ public final class DefinitionHandler {
         return null;
     }
 
-    private ObjectNode locationOf(PhpSymbol sym) {
-        return Json.location(app.file(sym.fileId()).uri(), sym.range());
+    private static ObjectNode locationOf(PhpSymbol sym) {
+        return Json.location(sym.file().uri(), sym.range());
     }
 }

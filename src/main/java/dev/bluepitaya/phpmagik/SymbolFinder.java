@@ -39,28 +39,15 @@ public final class SymbolFinder {
 
     private List<PhpSymbol> symbolsIn(PhpFile file) {
         var found = new ArrayList<PhpSymbol>();
-        collectIn(file, workspace.varDefinitions(), found);
-        collectIn(file, workspace.varUsages(), found);
-        collectIn(file, workspace.functions(), found);
-        collectIn(file, workspace.functionUsages(), found);
-        collectIn(file, workspace.methods(), found);
-        collectIn(file, workspace.methodUsages(), found);
-        collectIn(file, workspace.properties(), found);
-        collectIn(file, workspace.propertyUsages(), found);
-        collectIn(file, workspace.classes(), found);
-        collectIn(file, workspace.classUsages(), found);
-        found.addAll(file.uses());
+        for (List<? extends PhpSymbol> symbols : workspace.symbols().lists()) {
+            for (PhpSymbol symbol : symbols) {
+                if (symbol.file() == file) found.add(symbol);
+            }
+        }
         return found;
     }
 
-    private static void collectIn(PhpFile file, List<? extends PhpSymbol> symbols,
-                                  List<PhpSymbol> into) {
-        for (PhpSymbol symbol : symbols) {
-            if (symbol.fileId() == file.fileId()) into.add(symbol);
-        }
-    }
-
-    public @Nullable String resolveType(int fileId, @Nullable String ns, @Nullable String type) {
+    public @Nullable String resolveType(PhpFile file, @Nullable String ns, @Nullable String type) {
         if (type == null || type.isEmpty()) return type;
 
         String prefix = type.startsWith("?") ? "?" : "";
@@ -72,7 +59,7 @@ public final class SymbolFinder {
         int sep = name.indexOf('\\');
         String head = sep < 0 ? name : name.substring(0, sep);
         String tail = sep < 0 ? "" : name.substring(sep);
-        for (PhpUseStatement use : workspace.file(fileId).uses()) {
+        for (PhpUseStatement use : file.uses()) {
             if (use.kind() == UseKind.CLASS && use.alias().equals(head)) {
                 return prefix + use.fqn() + tail;
             }
@@ -84,7 +71,7 @@ public final class SymbolFinder {
     }
 
     private boolean declaresClass(String fqn) {
-        for (PhpClassDefinition declared : workspace.classes()) {
+        for (PhpClassDefinition declared : workspace.symbols().classes()) {
             if (declared.fqn().equals(fqn)) return true;
         }
         return false;

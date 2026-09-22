@@ -1,5 +1,7 @@
 package dev.bluepitaya.phpmagik.lsp.dto;
 
-/** Shared by hover and definition. */
+import org.jspecify.annotations.NullMarked;
+
+@NullMarked
 public record TextDocumentPosition(TextDocumentIdentifier textDocument, Position position) {
 }
