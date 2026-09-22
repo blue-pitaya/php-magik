@@ -47,9 +47,29 @@ gitignored.
 ./build.py build_java    # mvn package only (also emits the JNI headers)
 ./build.py build_native  # compile/link libtsjni.so only
 ./build.py build_all
+./build.py test          # the java suite (src/test/java)
 ./build.py clean
 ./build.py compile_commands  # compile_commands.json for clangd
 ```
+
+## Tests
+
+Two suites, and they are not the same kind of test.
+
+`test.py` drives a built server over stdio and asserts on LSP responses. It is
+end to end: it covers the wire format and the handlers along with everything
+underneath.
+
+`src/test/java` asserts against the classes directly - that indexing a directory
+produces a given `PhpClassDefinition`, that a resolver joins a usage to the
+declaration it should. `Fixture` indexes an `lsp-tests/` directory and wires the
+resolvers the way `LspServer` does, so a test asks what a request would ask
+without a process in between, and a failure names the class that produced it.
+
+`build_java` skips them, because they index real files and so need
+`libtsjni.so`, which is built from the headers that step emits. `./build.py
+test` builds both halves first and then runs `mvn test`; surefire puts
+`target/native` on `java.library.path`.
 
 Needs a JDK 21 (`JAVA_HOME`), `mvn`, and `cc`. Object files are cached by mtime
 against their source, `tsjni.h` and the generated headers, so only the first

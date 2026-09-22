@@ -107,7 +107,15 @@ class Runner:
     def build_java(self):
         # javac -h will not create it
         self.paths.headers.mkdir(parents=True, exist_ok=True)
-        self.run("mvn", "package", cwd=self.paths.pom().parent)
+        # the java tests index real files, so they need libtsjni.so, which is
+        # built from the headers this step emits: they cannot run yet
+        self.run("mvn", "package", "-DskipTests", cwd=self.paths.pom().parent)
+
+    def test(self):
+        """The java suite: unit/integration tests against the classes, as
+        opposed to test.py, which drives a server over stdio."""
+        self.build_all()
+        self.run("mvn", "test", cwd=self.paths.pom().parent)
 
     def build_native(self):
         self.paths.objects.mkdir(parents=True, exist_ok=True)
@@ -175,6 +183,7 @@ def main():
         "build_java": runner.build_java,
         "build_native": runner.build_native,
         "build_all": runner.build_all,
+        "test": runner.test,
         "compile_commands": runner.compile_commands,
         "serve": runner.serve,
     }
