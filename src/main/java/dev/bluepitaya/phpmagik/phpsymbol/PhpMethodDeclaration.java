@@ -24,6 +24,15 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
         return depth;
     }
 
+    public @Nullable String hover() {
+        if (name == null) return null;
+
+        String ownerName = owner == null ? null : owner.name();
+        String qualified = ownerName == null ? name : ownerName + "::" + name;
+
+        return "```php\n" + qualified + "\n```";
+    }
+
     public @Nullable PhpClassDeclaration owner() {
         return owner;
     }

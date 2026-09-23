@@ -1,9 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpUseStatement;
-import dev.bluepitaya.phpmagik.phpsymbol.UseKind;
 import dev.bluepitaya.phpmagik.ts.Point;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -45,35 +42,5 @@ public final class SymbolFinder {
             }
         }
         return found;
-    }
-
-    public @Nullable String resolveType(PhpFile file, @Nullable String ns, @Nullable String type) {
-        if (type == null || type.isEmpty()) return type;
-
-        String prefix = type.startsWith("?") ? "?" : "";
-        String name = type.substring(prefix.length());
-        if (name.startsWith("\\")) return prefix + name.substring(1);
-        if (RESERVED_TYPES.contains(name.toLowerCase())) return type;
-
-        /* only the first segment can be an alias: "NS\A" with "use App\NS" */
-        int sep = name.indexOf('\\');
-        String head = sep < 0 ? name : name.substring(0, sep);
-        String tail = sep < 0 ? "" : name.substring(sep);
-        for (PhpUseStatement use : file.uses()) {
-            if (use.kind() == UseKind.CLASS && use.alias().equals(head)) {
-                return prefix + use.fqn() + tail;
-            }
-        }
-
-        if (ns == null) return type;
-        String qualified = ns + "\\" + name;
-        return declaresClass(qualified) ? prefix + qualified : type;
-    }
-
-    private boolean declaresClass(String fqn) {
-        for (PhpClassDefinition declared : workspace.symbols().classes()) {
-            if (declared.fqn().equals(fqn)) return true;
-        }
-        return false;
     }
 }
