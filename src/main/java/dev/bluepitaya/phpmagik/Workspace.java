@@ -103,6 +103,10 @@ public final class Workspace implements AutoCloseable {
                 collection,
                 file
         );
+        var propDeclListener = new PhpPropertyDeclarationListener(
+                collection,
+                file
+        );
         try (Tree tree = file.tree()) {
             Node root = tree.getRootNode();
             if (root == null) {
@@ -111,6 +115,7 @@ public final class Workspace implements AutoCloseable {
 
             indexer.walk(root, nsDefListener);
             indexer.walk(root, clsDeclListener);
+            indexer.walk(root, propDeclListener);
         }
 
         symbols.addAll(collection);

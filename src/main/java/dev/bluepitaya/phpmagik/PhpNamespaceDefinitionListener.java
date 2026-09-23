@@ -7,20 +7,15 @@ import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
-/**
- * The name field of a namespace_definition is a namespace_name, a subtree of
- * one name per segment - never a leaf, and so never a {@code leaf} callback.
- * Its own text is the qualified name, which is what gets recorded, taken when
- * the subtree opens one level below the definition that owns it.
- */
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 @NullMarked
 public final class PhpNamespaceDefinitionListener implements CompleteIndexer.Listener {
 
-    private static final int NONE = -1;
-
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private int depth = NONE;
+    private final Deque<PhpNamespaceDefinition> definitions = new ArrayDeque<>();
 
     public PhpNamespaceDefinitionListener(
             PhpSymbolCollection collection, PhpFile file
@@ -31,26 +26,35 @@ public final class PhpNamespaceDefinitionListener implements CompleteIndexer.Lis
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "namespace_definition" -> depth = ctx.depth();
+            case "namespace_definition" -> definitions.push(new PhpNamespaceDefinition(file, ctx.depth()));
             case "namespace_name" -> {
-                if (ctx.depth() != depth + 1) {
+                PhpNamespaceDefinition definition = definitions.peek();
+                /* the first such subtree names it; anything later belongs to
+                 * whatever the body holds */
+                if (definition == null || definition.name() != null
+                        || ctx.depth() != definition.depth() + 1) {
                     return;
                 }
-                depth = NONE;
 
                 String name = Nodes.text(node);
                 if (name != null) {
-                    collection.add(new PhpNamespaceDefinition(
-                            name,
-                            Range.of(node),
-                            file
-                    ));
+                    definition.name(name);
+                    definition.range(Range.of(node));
                 }
             }
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
+        if ("namespace_definition".equals(node.getType())) {
+            PhpNamespaceDefinition definition = definitions.poll();
+            if (definition == null || definition.name() == null
+                    || definition.range() == null) {
+                return;
+            }
+
+            collection.add(definition);
+        }
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {

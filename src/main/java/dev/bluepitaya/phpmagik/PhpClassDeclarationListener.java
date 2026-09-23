@@ -6,7 +6,6 @@ import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -14,21 +13,9 @@ import java.util.Deque;
 @NullMarked
 public final class PhpClassDeclarationListener implements CompleteIndexer.Listener {
 
-    private static final class Frame {
-
-        private final int depth;
-        private String modifier = "";
-        private @Nullable String name;
-        private @Nullable Range range;
-
-        private Frame(int depth) {
-            this.depth = depth;
-        }
-    }
-
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private final Deque<Frame> frames = new ArrayDeque<>();
+    private final Deque<PhpClassDeclaration> declarations = new ArrayDeque<>();
 
     public PhpClassDeclarationListener(
             PhpSymbolCollection collection, PhpFile file
@@ -39,30 +26,26 @@ public final class PhpClassDeclarationListener implements CompleteIndexer.Listen
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         if ("class_declaration".equals(node.getType())) {
-            frames.push(new Frame(ctx.depth()));
+            declarations.push(new PhpClassDeclaration(file, ctx.depth()));
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         if ("class_declaration".equals(node.getType())) {
-            Frame frame = frames.poll();
-            if (frame == null || frame.name == null || frame.range == null) {
+            PhpClassDeclaration declaration = declarations.poll();
+            if (declaration == null || declaration.name() == null
+                    || declaration.range() == null) {
                 return;
             }
 
-            collection.add(new PhpClassDeclaration(
-                    frame.modifier,
-                    frame.name,
-                    frame.range,
-                    Range.of(node),
-                    file
-            ));
+            declaration.scope(Range.of(node));
+            collection.add(declaration);
         }
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        Frame frame = frames.peek();
-        if (frame == null || ctx.depth() != frame.depth + 1) {
+        PhpClassDeclaration declaration = declarations.peek();
+        if (declaration == null || ctx.depth() != declaration.depth() + 1) {
             return;
         }
 
@@ -70,12 +53,17 @@ public final class PhpClassDeclarationListener implements CompleteIndexer.Listen
             case "abstract_modifier", "final_modifier", "readonly_modifier" -> {
                 String text = Nodes.text(node);
                 if (text != null) {
-                    frame.modifier = frame.modifier.isEmpty() ? text : frame.modifier + " " + text;
+                    String modifier = declaration.$modifier();
+                    declaration.$modifier(
+                            modifier.isEmpty() ? text : modifier + " " + text);
                 }
             }
             case "name" -> {
-                frame.name = Nodes.text(node);
-                frame.range = Range.of(node);
+                String text = Nodes.text(node);
+                if (text != null) {
+                    declaration.name(text);
+                    declaration.range(Range.of(node));
+                }
             }
         }
     }
