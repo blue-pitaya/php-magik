@@ -61,6 +61,10 @@ public final class Fixture implements AutoCloseable {
         return finder;
     }
 
+    public Logger log() {
+        return log;
+    }
+
     @Override
     public void close() throws IOException {
         workspace.close();

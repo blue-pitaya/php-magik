@@ -135,6 +135,8 @@ public final class Workspace implements AutoCloseable {
             ));
         }
 
+        new DefinitionFiller().fill(collection);
+
         symbols.addAll(collection);
     }
 

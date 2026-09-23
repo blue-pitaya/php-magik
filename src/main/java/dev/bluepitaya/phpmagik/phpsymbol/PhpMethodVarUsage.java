@@ -11,6 +11,7 @@ public final class PhpMethodVarUsage implements PhpSymbol {
     private final PhpFile file;
 
     private @Nullable PhpMethodDeclaration owner;
+    private @Nullable PhpSymbol definition;
     private @Nullable String name;
     private @Nullable Range range;
 
@@ -33,6 +34,14 @@ public final class PhpMethodVarUsage implements PhpSymbol {
 
     public void owner(PhpMethodDeclaration owner) {
         this.owner = owner;
+    }
+
+    public @Nullable PhpSymbol definition() {
+        return definition;
+    }
+
+    public void definition(PhpSymbol definition) {
+        this.definition = definition;
     }
 
     public @Nullable String name() {

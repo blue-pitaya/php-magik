@@ -6,6 +6,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.DidChangeParams;
 import dev.bluepitaya.phpmagik.lsp.dto.DidOpenParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
+import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidChangeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidCloseHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidOpenHandler;
@@ -39,6 +40,7 @@ public final class LspServer {
     private final DidChangeHandler didChange;
     private final DidCloseHandler didClose;
     private final HoverHandler hover;
+    private final DefinitionHandler definition;
 
     public LspServer(Workspace app, Logger log) {
         this.in = new BufferedInputStream(System.in);
@@ -51,6 +53,7 @@ public final class LspServer {
         this.didChange = new DidChangeHandler(app, log);
         this.didClose = new DidCloseHandler(log);
         this.hover = new HoverHandler(app, symbols, new PhpMethodDeclarationResolver(app), log);
+        this.definition = new DefinitionHandler(app, symbols, log);
     }
 
     public void run() throws IOException {
@@ -97,8 +100,8 @@ public final class LspServer {
                 case "textDocument/didClose" -> didClose.handle(bind(params, TextDocumentParams.class));
                 case "textDocument/hover" -> respond(getRequestIdOrThrow(request),
                         hover.handle(bind(params, TextDocumentPosition.class)));
-                //case "textDocument/definition" -> respond(getRequestIdOrThrow(request),
-                //        definition.handle(bind(params, TextDocumentPosition.class)));
+                case "textDocument/definition" -> respond(getRequestIdOrThrow(request),
+                        definition.handle(bind(params, TextDocumentPosition.class)));
                 //case "textDocument/references" -> respond(getRequestIdOrThrow(request),
                 //        references.handle(bind(params, ReferenceParams.class)));
                 default -> {
