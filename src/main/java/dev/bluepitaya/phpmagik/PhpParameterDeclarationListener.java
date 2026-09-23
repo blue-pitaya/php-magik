@@ -3,6 +3,7 @@ package dev.bluepitaya.phpmagik;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -72,6 +73,21 @@ public final class PhpParameterDeclarationListener implements CompleteIndexer.Li
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
+        if ("primitive_type".equals(node.getType())) {
+            fillType(ctx, node);
+        }
+    }
+
+    private void fillType(CompleteIndexer.Ctx ctx, Node node) {
+        PhpParameterDeclaration declaration = declarations.peek();
+        if (declaration == null || ctx.depth() != declaration.depth() + 1) {
+            return;
+        }
+
+        PhpType phpType = PhpType.of(Nodes.text(node));
+        if (phpType != null) {
+            declaration.phpType(phpType);
+        }
     }
 
     public void token(CompleteIndexer.Ctx ctx, Node node, String field) {

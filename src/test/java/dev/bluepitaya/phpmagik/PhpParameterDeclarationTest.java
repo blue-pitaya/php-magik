@@ -1,6 +1,7 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,12 @@ class PhpParameterDeclarationTest {
                     List.of("two", "two"),
                     parameterDeclarations.stream()
                             .map(parameter -> parameter.owner().name())
+                            .toList()
+            );
+            assertEquals(
+                    List.of(PhpType.String, PhpType.Integer),
+                    parameterDeclarations.stream()
+                            .map(PhpParameterDeclaration::phpType)
                             .toList()
             );
         }
