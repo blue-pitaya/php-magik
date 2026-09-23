@@ -1,8 +1,10 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -42,7 +44,12 @@ public final class PhpPropertyDeclarationListener implements CompleteIndexer.Lis
 
     private void open(CompleteIndexer.Ctx ctx) {
         PhpPropertyDeclaration declaration = new PhpPropertyDeclaration(file, ctx.depth());
-        if (ctx.peek() instanceof PhpClassDeclaration owner) {
+        PhpSymbolOwner enclosing = ctx.peek();
+        /* a promoted parameter sits in the constructor, which sits in the class */
+        if (enclosing instanceof PhpMethodDeclaration method) {
+            enclosing = method.owner();
+        }
+        if (enclosing instanceof PhpClassDeclaration owner) {
             declaration.owner(owner);
         }
 

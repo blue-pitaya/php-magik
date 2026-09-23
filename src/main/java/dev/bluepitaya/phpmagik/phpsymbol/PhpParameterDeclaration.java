@@ -6,16 +6,16 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
+public final class PhpParameterDeclaration implements PhpSymbol {
 
     private final PhpFile file;
     private final int depth;
 
-    private @Nullable PhpClassDeclaration owner;
+    private @Nullable PhpMethodDeclaration owner;
     private @Nullable String name;
     private @Nullable Range range;
 
-    public PhpMethodDeclaration(PhpFile file, int depth) {
+    public PhpParameterDeclaration(PhpFile file, int depth) {
         this.file = file;
         this.depth = depth;
     }
@@ -24,11 +24,11 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
         return depth;
     }
 
-    public @Nullable PhpClassDeclaration owner() {
+    public @Nullable PhpMethodDeclaration owner() {
         return owner;
     }
 
-    public void owner(PhpClassDeclaration owner) {
+    public void owner(PhpMethodDeclaration owner) {
         this.owner = owner;
     }
 

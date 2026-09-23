@@ -9,5 +9,5 @@ class Service1
         return 1;
     }
 
-    private function two(string $a): void {}
+    private function two(string $a, int $b): void {}
 }

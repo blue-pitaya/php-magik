@@ -111,6 +111,10 @@ public final class Workspace implements AutoCloseable {
                 collection,
                 file
         );
+        var paramDeclListener = new PhpParameterDeclarationListener(
+                collection,
+                file
+        );
         try (Tree tree = file.tree()) {
             Node root = tree.getRootNode();
             if (root == null) {
@@ -121,7 +125,8 @@ public final class Workspace implements AutoCloseable {
                     nsDefListener,
                     clsDeclListener,
                     propDeclListener,
-                    methodDeclListener
+                    methodDeclListener,
+                    paramDeclListener
             ));
         }
 

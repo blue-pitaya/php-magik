@@ -18,7 +18,8 @@ public sealed interface PhpSymbol permits
         PhpNamespaceDefinition,
         PhpClassDeclaration,
         PhpPropertyDeclaration,
-        PhpMethodDeclaration {
+        PhpMethodDeclaration,
+        PhpParameterDeclaration {
 
     Range range();
 
