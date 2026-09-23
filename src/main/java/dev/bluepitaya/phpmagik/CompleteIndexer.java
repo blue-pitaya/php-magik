@@ -69,6 +69,18 @@ public final class CompleteIndexer {
             return path.size() < 2 ? null : path.stream().skip(1).findFirst().orElse(null);
         }
 
+        public void push(PhpSymbolOwner owner) {
+            owners.push(owner);
+        }
+
+        public @Nullable PhpSymbolOwner pop() {
+            return owners.poll();
+        }
+
+        public @Nullable PhpSymbolOwner peek() {
+            return owners.peek();
+        }
+
         public List<Slot> slots(Node node) {
             List<Slot> slots = new ArrayList<>();
             int count = node.getChildCount();

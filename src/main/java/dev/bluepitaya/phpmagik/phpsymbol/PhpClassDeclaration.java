@@ -6,7 +6,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public final class PhpClassDeclaration implements PhpSymbol {
+public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
 
     private final PhpFile file;
     private final int depth;

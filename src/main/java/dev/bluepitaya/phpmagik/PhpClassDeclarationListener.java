@@ -26,13 +26,16 @@ public final class PhpClassDeclarationListener implements CompleteIndexer.Listen
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         if ("class_declaration".equals(node.getType())) {
-            declarations.push(new PhpClassDeclaration(file, ctx.depth()));
+            PhpClassDeclaration declaration = new PhpClassDeclaration(file, ctx.depth());
+            declarations.push(declaration);
+            ctx.push(declaration);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         if ("class_declaration".equals(node.getType())) {
             PhpClassDeclaration declaration = declarations.poll();
+            ctx.pop();
             if (declaration == null || declaration.name() == null
                     || declaration.range() == null) {
                 return;
