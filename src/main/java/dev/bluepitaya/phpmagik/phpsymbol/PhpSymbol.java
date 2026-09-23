@@ -9,7 +9,9 @@ public sealed interface PhpSymbol permits
         PhpClassDeclaration,
         PhpPropertyDeclaration,
         PhpMethodDeclaration,
-        PhpParameterDeclaration {
+        PhpParameterDeclaration,
+        PhpMethodLocalVarDeclaration,
+        PhpMethodVarUsage {
 
     static String code(String php) {
         return "```php\n" + php + "\n```";
