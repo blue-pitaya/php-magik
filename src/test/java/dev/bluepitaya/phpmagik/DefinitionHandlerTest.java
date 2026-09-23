@@ -14,7 +14,6 @@ import tools.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DefinitionHandlerTest {
 
@@ -37,14 +36,20 @@ class DefinitionHandlerTest {
     }
 
     @Test
-    void aParameterUsageHasNoDefinitionYet() throws IOException {
+    void jumpsFromAVariableUsageToItsParameter() throws IOException {
         try (Fixture fixture = Fixture.index("php_vars")) {
             var handler = new DefinitionHandler(fixture.workspace(), fixture.finder(),
                     fixture.log());
             String uri = fixture.file("Service1.php").uri();
 
             /* the "$a" of "$c = $a + $b;" */
-            assertNull(handler.handle(at(uri, 10, 13)));
+            ObjectNode location = handler.handle(at(uri, 10, 13));
+
+            /* the "$a" of "public function foo(int $a, int $b)" */
+            assertEquals(
+                    Json.location(uri, new Range(new Point(6, 28), new Point(6, 30))),
+                    location
+            );
         }
     }
 

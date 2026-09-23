@@ -2,6 +2,8 @@ package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -13,14 +15,39 @@ public final class DefinitionFiller {
 
     public void fill(PhpSymbolCollection symbols) {
         for (PhpMethodVarUsage usage : symbols.varUsages()) {
-            PhpMethodLocalVarDeclaration definition = definitionOf(usage, symbols);
+            PhpSymbol definition = definitionOf(usage, symbols);
             if (definition != null) {
                 usage.definition(definition);
             }
         }
     }
 
-    private static @Nullable PhpMethodLocalVarDeclaration definitionOf(
+    private static @Nullable PhpSymbol definitionOf(
+            PhpMethodVarUsage usage, PhpSymbolCollection symbols
+    ) {
+        PhpMethodLocalVarDeclaration assigned = assignedAbove(usage, symbols);
+
+        return assigned != null ? assigned : parameterOf(usage, symbols);
+    }
+
+    private static @Nullable PhpParameterDeclaration parameterOf(
+            PhpMethodVarUsage usage, PhpSymbolCollection symbols
+    ) {
+        String name = usage.name();
+        if (name == null || usage.owner() == null) {
+            return null;
+        }
+
+        for (PhpParameterDeclaration declared : symbols.parameterDeclarations()) {
+            if (declared.owner() == usage.owner() && name.equals(declared.name())) {
+                return declared;
+            }
+        }
+
+        return null;
+    }
+
+    private static @Nullable PhpMethodLocalVarDeclaration assignedAbove(
             PhpMethodVarUsage usage, PhpSymbolCollection symbols
     ) {
         Range range = usage.range();
