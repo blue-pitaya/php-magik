@@ -2,14 +2,22 @@ package dev.bluepitaya.phpmagik.phpsymbol;
 
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.ts.Range;
+import org.jspecify.annotations.Nullable;
 
 public sealed interface PhpSymbol permits
-        PhpVarDefinition, PhpVarUsage,
-        PhpFunctionDefinition, PhpFunctionUsage,
-        PhpMethodDefinition, PhpMethodUsage,
-        PhpPropertyDefinition, PhpPropertyUsage,
-        PhpClassDefinition, PhpClassUsage,
-        PhpUseStatement {
+        PhpNamespaceDefinition,
+        PhpClassDeclaration,
+        PhpPropertyDeclaration,
+        PhpMethodDeclaration,
+        PhpParameterDeclaration,
+        PhpMethodLocalVarDeclaration,
+        PhpMethodVarUsage {
+
+    static String code(String php) {
+        return "```php\n" + php + "\n```";
+    }
+
+    @Nullable String hover();
 
     Range range();
 

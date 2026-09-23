@@ -7,74 +7,42 @@ import java.util.List;
 
 public final class PhpSymbolCollection {
 
-    private final List<PhpVarDefinition> varDefinitions = new ArrayList<>();
-    private final List<PhpVarUsage> varUsages = new ArrayList<>();
-    private final List<PhpFunctionDefinition> functions = new ArrayList<>();
-    private final List<PhpFunctionUsage> functionUsages = new ArrayList<>();
-    private final List<PhpMethodDefinition> methods = new ArrayList<>();
-    private final List<PhpMethodUsage> methodUsages = new ArrayList<>();
-    private final List<PhpPropertyDefinition> properties = new ArrayList<>();
-    private final List<PhpPropertyUsage> propertyUsages = new ArrayList<>();
-    private final List<PhpClassDefinition> classes = new ArrayList<>();
-    private final List<PhpClassUsage> classUsages = new ArrayList<>();
-    private final List<PhpUseStatement> uses = new ArrayList<>();
+    private final List<PhpNamespaceDefinition> nsDefinitions = new ArrayList<>();
+    private final List<PhpClassDeclaration> classDeclarations = new ArrayList<>();
+    private final List<PhpPropertyDeclaration> propertyDeclarations = new ArrayList<>();
+    private final List<PhpMethodDeclaration> methodDeclarations = new ArrayList<>();
+    private final List<PhpParameterDeclaration> parameterDeclarations = new ArrayList<>();
+    private final List<PhpMethodLocalVarDeclaration> localVarDeclarations = new ArrayList<>();
+    private final List<PhpMethodVarUsage> varUsages = new ArrayList<>();
 
-    public void add(PhpVarDefinition symbol) {
-        varDefinitions.add(symbol);
+    public void add(PhpSymbol symbol) {
+        switch (symbol) {
+            case PhpNamespaceDefinition x -> nsDefinitions.add(x);
+            case PhpClassDeclaration x -> classDeclarations.add(x);
+            case PhpPropertyDeclaration x -> propertyDeclarations.add(x);
+            case PhpMethodDeclaration x -> methodDeclarations.add(x);
+            case PhpParameterDeclaration x -> parameterDeclarations.add(x);
+            case PhpMethodLocalVarDeclaration x -> localVarDeclarations.add(x);
+            case PhpMethodVarUsage x -> varUsages.add(x);
+        }
     }
 
-    public void add(PhpVarUsage symbol) {
-        varUsages.add(symbol);
-    }
-
-    public void add(PhpFunctionDefinition symbol) {
-        functions.add(symbol);
-    }
-
-    public void add(PhpFunctionUsage symbol) {
-        functionUsages.add(symbol);
-    }
-
-    public void add(PhpMethodDefinition symbol) {
-        methods.add(symbol);
-    }
-
-    public void add(PhpMethodUsage symbol) {
-        methodUsages.add(symbol);
-    }
-
-    public void add(PhpPropertyDefinition symbol) {
-        properties.add(symbol);
-    }
-
-    public void add(PhpPropertyUsage symbol) {
-        propertyUsages.add(symbol);
-    }
-
-    public void add(PhpClassDefinition symbol) {
-        classes.add(symbol);
-    }
-
-    public void add(PhpClassUsage symbol) {
-        classUsages.add(symbol);
-    }
-
-    public void add(PhpUseStatement symbol) {
-        uses.add(symbol);
+    public List<List<? extends PhpSymbol>> lists() {
+        return List.of(
+                nsDefinitions,
+                classDeclarations,
+                propertyDeclarations,
+                methodDeclarations,
+                parameterDeclarations,
+                localVarDeclarations,
+                varUsages
+        );
     }
 
     public void addAll(PhpSymbolCollection other) {
-        varDefinitions.addAll(other.varDefinitions);
-        varUsages.addAll(other.varUsages);
-        functions.addAll(other.functions);
-        functionUsages.addAll(other.functionUsages);
-        methods.addAll(other.methods);
-        methodUsages.addAll(other.methodUsages);
-        properties.addAll(other.properties);
-        propertyUsages.addAll(other.propertyUsages);
-        classes.addAll(other.classes);
-        classUsages.addAll(other.classUsages);
-        uses.addAll(other.uses);
+        for (List<? extends PhpSymbol> symbols : other.lists()) {
+            symbols.forEach(this::add);
+        }
     }
 
     public void removeFile(PhpFile file) {
@@ -83,52 +51,31 @@ public final class PhpSymbolCollection {
         }
     }
 
-    public List<PhpVarDefinition> varDefinitions() {
-        return varDefinitions;
+    public List<PhpNamespaceDefinition> nsDefinitions() {
+        return nsDefinitions;
     }
 
-    public List<PhpVarUsage> varUsages() {
+    public List<PhpClassDeclaration> classDeclarations() {
+        return classDeclarations;
+    }
+
+    public List<PhpPropertyDeclaration> propertyDeclarations() {
+        return propertyDeclarations;
+    }
+
+    public List<PhpMethodDeclaration> methodDeclarations() {
+        return methodDeclarations;
+    }
+
+    public List<PhpParameterDeclaration> parameterDeclarations() {
+        return parameterDeclarations;
+    }
+
+    public List<PhpMethodLocalVarDeclaration> localVarDeclarations() {
+        return localVarDeclarations;
+    }
+
+    public List<PhpMethodVarUsage> varUsages() {
         return varUsages;
-    }
-
-    public List<PhpFunctionDefinition> functions() {
-        return functions;
-    }
-
-    public List<PhpFunctionUsage> functionUsages() {
-        return functionUsages;
-    }
-
-    public List<PhpMethodDefinition> methods() {
-        return methods;
-    }
-
-    public List<PhpMethodUsage> methodUsages() {
-        return methodUsages;
-    }
-
-    public List<PhpPropertyDefinition> properties() {
-        return properties;
-    }
-
-    public List<PhpPropertyUsage> propertyUsages() {
-        return propertyUsages;
-    }
-
-    public List<PhpClassDefinition> classes() {
-        return classes;
-    }
-
-    public List<PhpClassUsage> classUsages() {
-        return classUsages;
-    }
-
-    public List<PhpUseStatement> uses() {
-        return uses;
-    }
-
-    public List<List<? extends PhpSymbol>> lists() {
-        return List.of(varDefinitions, varUsages, functions, functionUsages, methods,
-                methodUsages, properties, propertyUsages, classes, classUsages, uses);
     }
 }

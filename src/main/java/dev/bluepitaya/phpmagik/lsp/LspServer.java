@@ -4,7 +4,6 @@ import dev.bluepitaya.phpmagik.SymbolFinder;
 import dev.bluepitaya.phpmagik.Workspace;
 import dev.bluepitaya.phpmagik.lsp.dto.DidChangeParams;
 import dev.bluepitaya.phpmagik.lsp.dto.DidOpenParams;
-import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
@@ -13,13 +12,7 @@ import dev.bluepitaya.phpmagik.lsp.handler.DidCloseHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidOpenHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.InitializeHandler;
-import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
-import dev.bluepitaya.phpmagik.resolver.ClassResolver;
-import dev.bluepitaya.phpmagik.resolver.FunctionResolver;
-import dev.bluepitaya.phpmagik.resolver.MethodResolver;
-import dev.bluepitaya.phpmagik.resolver.PropertyResolver;
-import dev.bluepitaya.phpmagik.resolver.TypeInference;
-import dev.bluepitaya.phpmagik.resolver.VariableResolver;
+import dev.bluepitaya.phpmagik.resolver.PhpMethodDeclarationResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
@@ -48,7 +41,6 @@ public final class LspServer {
     private final DidCloseHandler didClose;
     private final HoverHandler hover;
     private final DefinitionHandler definition;
-    private final ReferencesHandler references;
 
     public LspServer(Workspace app, Logger log) {
         this.in = new BufferedInputStream(System.in);
@@ -56,23 +48,12 @@ public final class LspServer {
         this.log = log;
 
         var symbols = new SymbolFinder(app);
-        var variables = new VariableResolver(app);
-        var functions = new FunctionResolver(app);
-        /* the member resolvers ask it which class an access is on, so it comes
-         * first and knows nothing of them */
-        var types = new TypeInference(app, functions);
-        var methods = new MethodResolver(app, types);
-        var properties = new PropertyResolver(app, types);
-        var classes = new ClassResolver(app, symbols);
         this.initialize = new InitializeHandler();
         this.didOpen = new DidOpenHandler(app, log);
         this.didChange = new DidChangeHandler(app, log);
         this.didClose = new DidCloseHandler(log);
-        this.hover = new HoverHandler(app, symbols, types, functions, methods, properties, log);
-        this.definition = new DefinitionHandler(app, symbols, variables, functions, methods,
-                properties, classes, log);
-        this.references = new ReferencesHandler(app, symbols, variables, functions, methods,
-                properties, classes, log);
+        this.hover = new HoverHandler(app, symbols, new PhpMethodDeclarationResolver(app), log);
+        this.definition = new DefinitionHandler(app, symbols, log);
     }
 
     public void run() throws IOException {
@@ -121,8 +102,8 @@ public final class LspServer {
                         hover.handle(bind(params, TextDocumentPosition.class)));
                 case "textDocument/definition" -> respond(getRequestIdOrThrow(request),
                         definition.handle(bind(params, TextDocumentPosition.class)));
-                case "textDocument/references" -> respond(getRequestIdOrThrow(request),
-                        references.handle(bind(params, ReferenceParams.class)));
+                //case "textDocument/references" -> respond(getRequestIdOrThrow(request),
+                //        references.handle(bind(params, ReferenceParams.class)));
                 default -> {
                     JsonNode id = request.get("id");
                     /* an unknown notification is still a notification: no reply */

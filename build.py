@@ -111,11 +111,34 @@ class Runner:
         # built from the headers this step emits: they cannot run yet
         self.run("mvn", "package", "-DskipTests", cwd=self.paths.pom().parent)
 
-    def test(self):
+    def test(self, test: str | None = None):
         """The java suite: unit/integration tests against the classes, as
-        opposed to test.py, which drives a server over stdio."""
+        opposed to test.py, which drives a server over stdio. `test` is a
+        surefire filter, Class or Class#method, and selects the whole suite
+        when absent."""
         self.build_all()
-        self.run("mvn", "test", cwd=self.paths.pom().parent)
+        self.run(*self._test_command(test), cwd=self.paths.pom().parent)
+
+    def debug_test(self, test: str | None = None, port: int = 5005):
+        """The same run under jdwp, suspended until a debugger attaches.
+
+        The agent goes through maven.surefire.debug rather than -DargLine,
+        which the pom's own argLine would win over - and that argLine is what
+        points the forked jvm at libtsjni.so, so it has to stay."""
+        agent = f"-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:{port}"
+        self.build_all()
+        print(f"jdwp listening on {port}, the run starts once a debugger attaches")
+        self.run(
+            *self._test_command(test),
+            f"-Dmaven.surefire.debug={agent}",
+            cwd=self.paths.pom().parent,
+        )
+
+    def _test_command(self, test: str | None) -> list[str]:
+        command = ["mvn", "test"]
+        if test is not None:
+            command.append(f"-Dtest={test}")
+        return command
 
     def build_native(self):
         self.paths.objects.mkdir(parents=True, exist_ok=True)
@@ -184,21 +207,34 @@ def main():
         "build_native": runner.build_native,
         "build_all": runner.build_all,
         "test": runner.test,
+        "debug_test": runner.debug_test,
         "compile_commands": runner.compile_commands,
         "serve": runner.serve,
     }
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=list(cmds))
     parser.add_argument(
-        "path",
+        "target",
         nargs="?",
-        help="project root to index; required by serve",
+        help="project root to index, required by serve; "
+        "for test and debug_test a surefire filter like Class#method, "
+        "defaulting to the whole suite",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5005,
+        help="port the debugger attaches to; debug_test only",
     )
     args = parser.parse_args()
     if args.command == "serve":
-        if args.path is None:
+        if args.target is None:
             parser.error("serve needs a path to index")
-        runner.serve(args.path)
+        runner.serve(args.target)
+    elif args.command == "test":
+        runner.test(args.target)
+    elif args.command == "debug_test":
+        runner.debug_test(args.target, args.port)
     else:
         cmds[args.command]()
 

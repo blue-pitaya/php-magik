@@ -5,12 +5,6 @@ import dev.bluepitaya.phpmagik.SymbolFinder;
 import dev.bluepitaya.phpmagik.Workspace;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
-import dev.bluepitaya.phpmagik.resolver.ClassResolver;
-import dev.bluepitaya.phpmagik.resolver.FunctionResolver;
-import dev.bluepitaya.phpmagik.resolver.MethodResolver;
-import dev.bluepitaya.phpmagik.resolver.PropertyResolver;
-import dev.bluepitaya.phpmagik.resolver.TypeInference;
-import dev.bluepitaya.phpmagik.resolver.VariableResolver;
 import dev.bluepitaya.phpmagik.ts.Parser;
 
 import java.io.IOException;
@@ -27,12 +21,6 @@ public final class Fixture implements AutoCloseable {
     private final Workspace workspace;
 
     private final SymbolFinder finder;
-    private final VariableResolver variables;
-    private final FunctionResolver functions;
-    private final TypeInference types;
-    private final MethodResolver methods;
-    private final PropertyResolver properties;
-    private final ClassResolver classes;
 
     private Fixture(Path root) throws IOException {
         this.parser = new Parser();
@@ -44,12 +32,6 @@ public final class Fixture implements AutoCloseable {
         this.workspace.index(root);
 
         this.finder = new SymbolFinder(workspace);
-        this.variables = new VariableResolver(workspace);
-        this.functions = new FunctionResolver(workspace);
-        this.types = new TypeInference(workspace, functions);
-        this.methods = new MethodResolver(workspace, types);
-        this.properties = new PropertyResolver(workspace, types);
-        this.classes = new ClassResolver(workspace, finder);
     }
 
     public static Fixture index(String name) {
@@ -61,10 +43,10 @@ public final class Fixture implements AutoCloseable {
     }
 
     public PhpFile file(String fileName) {
-        for (PhpFile file : workspace.files()) {
-            if (file.path().endsWith(fileName)) return file;
-        }
-        throw new AssertionError("no indexed file named " + fileName);
+        return workspace.files().stream()
+                .filter(f -> f.path().endsWith(fileName))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no indexed file named " + fileName));
     }
 
     public Workspace workspace() {
@@ -79,28 +61,8 @@ public final class Fixture implements AutoCloseable {
         return finder;
     }
 
-    public VariableResolver variables() {
-        return variables;
-    }
-
-    public FunctionResolver functions() {
-        return functions;
-    }
-
-    public TypeInference types() {
-        return types;
-    }
-
-    public MethodResolver methods() {
-        return methods;
-    }
-
-    public PropertyResolver properties() {
-        return properties;
-    }
-
-    public ClassResolver classes() {
-        return classes;
+    public Logger log() {
+        return log;
     }
 
     @Override
