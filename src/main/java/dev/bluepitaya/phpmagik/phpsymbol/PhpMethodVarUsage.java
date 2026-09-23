@@ -12,6 +12,7 @@ public final class PhpMethodVarUsage implements PhpSymbol {
 
     private @Nullable PhpMethodDeclaration owner;
     private @Nullable PhpSymbol definition;
+    private @Nullable PhpType phpType;
     private @Nullable String name;
     private @Nullable Range range;
 
@@ -23,9 +24,10 @@ public final class PhpMethodVarUsage implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
+        String declared = phpType == null ? name : phpType.php() + " " + name;
         String ownerName = owner == null ? null : owner.name();
 
-        return PhpSymbol.code(ownerName == null ? name : ownerName + "(): " + name);
+        return PhpSymbol.code(ownerName == null ? declared : ownerName + "(): " + declared);
     }
 
     public @Nullable PhpMethodDeclaration owner() {
@@ -42,6 +44,14 @@ public final class PhpMethodVarUsage implements PhpSymbol {
 
     public void definition(PhpSymbol definition) {
         this.definition = definition;
+    }
+
+    public @Nullable PhpType phpType() {
+        return phpType;
+    }
+
+    public void phpType(PhpType phpType) {
+        this.phpType = phpType;
     }
 
     public @Nullable String name() {
