@@ -21,6 +21,7 @@ public final class PhpSymbolCollection {
     private final List<PhpNamespaceDefinition> nsDefinitions = new ArrayList<>();
     private final List<PhpClassDeclaration> classDeclarations = new ArrayList<>();
     private final List<PhpPropertyDeclaration> propertyDeclarations = new ArrayList<>();
+    private final List<PhpMethodDeclaration> methodDeclarations = new ArrayList<>();
 
     public void add(PhpSymbol symbol) {
         switch (symbol) {
@@ -38,6 +39,7 @@ public final class PhpSymbolCollection {
             case PhpNamespaceDefinition x -> nsDefinitions.add(x);
             case PhpClassDeclaration x -> classDeclarations.add(x);
             case PhpPropertyDeclaration x -> propertyDeclarations.add(x);
+            case PhpMethodDeclaration x -> methodDeclarations.add(x);
         }
     }
 
@@ -56,7 +58,8 @@ public final class PhpSymbolCollection {
                 uses,
                 nsDefinitions,
                 classDeclarations,
-                propertyDeclarations
+                propertyDeclarations,
+                methodDeclarations
         );
     }
 
@@ -126,5 +129,9 @@ public final class PhpSymbolCollection {
 
     public List<PhpPropertyDeclaration> propertyDeclarations() {
         return propertyDeclarations;
+    }
+
+    public List<PhpMethodDeclaration> methodDeclarations() {
+        return methodDeclarations;
     }
 }
