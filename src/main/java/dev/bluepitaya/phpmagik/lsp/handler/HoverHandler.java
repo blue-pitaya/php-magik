@@ -8,7 +8,6 @@ import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.Hover;
 import dev.bluepitaya.phpmagik.lsp.dto.MarkupContent;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import dev.bluepitaya.phpmagik.resolver.PhpMethodDeclarationResolver;
 import org.jspecify.annotations.NullMarked;
@@ -47,10 +46,7 @@ public final class HoverHandler {
             return null;
         }
 
-        @Nullable String text = switch (sym) {
-            case PhpMethodDeclaration method -> method.hover();
-            default -> null;
-        };
+        @Nullable String text = sym.hover();
         if (text == null) return null;
 
         return new Hover(new MarkupContent("markdown", text));

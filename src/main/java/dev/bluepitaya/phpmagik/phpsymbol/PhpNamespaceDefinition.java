@@ -23,6 +23,11 @@ public final class PhpNamespaceDefinition implements PhpSymbol, PhpSymbolOwner {
         return depth;
     }
 
+    @Override
+    public @Nullable String hover() {
+        return name == null ? null : PhpSymbol.code("namespace " + name);
+    }
+
     public @Nullable String name() {
         return name;
     }

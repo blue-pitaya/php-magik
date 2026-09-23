@@ -24,6 +24,15 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
         return depth;
     }
 
+    @Override
+    public @Nullable String hover() {
+        if (name == null) return null;
+
+        String ownerName = owner == null ? null : owner.name();
+
+        return PhpSymbol.code(ownerName == null ? name : ownerName + "::" + name);
+    }
+
     public @Nullable PhpClassDeclaration owner() {
         return owner;
     }

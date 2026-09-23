@@ -24,13 +24,13 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
         return depth;
     }
 
+    @Override
     public @Nullable String hover() {
         if (name == null) return null;
 
         String ownerName = owner == null ? null : owner.name();
-        String qualified = ownerName == null ? name : ownerName + "::" + name;
 
-        return "```php\n" + qualified + "\n```";
+        return PhpSymbol.code("function " + (ownerName == null ? name : ownerName + "::" + name));
     }
 
     public @Nullable PhpClassDeclaration owner() {

@@ -25,6 +25,13 @@ public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
         return depth;
     }
 
+    @Override
+    public @Nullable String hover() {
+        if (name == null) return null;
+
+        return PhpSymbol.code($modifier.isEmpty() ? "class " + name : $modifier + " class " + name);
+    }
+
     public String $modifier() {
         return $modifier;
     }
