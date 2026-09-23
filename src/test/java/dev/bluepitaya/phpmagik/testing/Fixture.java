@@ -61,10 +61,10 @@ public final class Fixture implements AutoCloseable {
     }
 
     public PhpFile file(String fileName) {
-        for (PhpFile file : workspace.files()) {
-            if (file.path().endsWith(fileName)) return file;
-        }
-        throw new AssertionError("no indexed file named " + fileName);
+        return workspace.files().stream()
+                .filter(f -> f.path().endsWith(fileName))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no indexed file named " + fileName));
     }
 
     public Workspace workspace() {

@@ -7,12 +7,20 @@ import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
+/**
+ * The name field of a namespace_definition is a namespace_name, a subtree of
+ * one name per segment - never a leaf, and so never a {@code leaf} callback.
+ * Its own text is the qualified name, which is what gets recorded, taken when
+ * the subtree opens one level below the definition that owns it.
+ */
 @NullMarked
 public final class PhpNamespaceDefinitionListener implements CompleteIndexer.Listener {
 
+    private static final int NONE = -1;
+
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private int state = 0;
+    private int depth = NONE;
 
     public PhpNamespaceDefinitionListener(
             PhpSymbolCollection collection, PhpFile file
@@ -22,19 +30,21 @@ public final class PhpNamespaceDefinitionListener implements CompleteIndexer.Lis
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        String type = node.getType();
-        switch (state) {
-            case 0 -> {
-                if ("namespace_definition".equals(type)) {
-                    state = 1;
+        switch (node.getType()) {
+            case "namespace_definition" -> depth = ctx.depth();
+            case "namespace_name" -> {
+                if (ctx.depth() != depth + 1) {
+                    return;
                 }
-            }
-            case 1 -> {
-                if ("name".equals(type)) {
-                    state = 2;
-                } else {
-                    //TODO: can be also a body but its nor supported yet
-                    state = 0;
+                depth = NONE;
+
+                String name = Nodes.text(node);
+                if (name != null) {
+                    collection.add(new PhpNamespaceDefinition(
+                            name,
+                            Range.of(node),
+                            file
+                    ));
                 }
             }
         }
@@ -44,14 +54,6 @@ public final class PhpNamespaceDefinitionListener implements CompleteIndexer.Lis
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if (state == 2) {
-            collection.add(new PhpNamespaceDefinition(
-                    Nodes.text(node),
-                    Range.of(node),
-                    file
-            ));
-        }
-        state = 0;
     }
 
     public void token(CompleteIndexer.Ctx ctx, Node node, String field) {

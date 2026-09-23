@@ -79,6 +79,7 @@ public final class HoverHandler {
             case PhpUseStatement use -> typedHover(use.alias(), use.fqn());
             case PhpClassDefinition cls -> null;
             case PhpClassUsage usage -> null;
+            default -> null;
         };
         if (text == null) return null;
 

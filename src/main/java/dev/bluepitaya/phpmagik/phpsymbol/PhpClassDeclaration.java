@@ -5,9 +5,11 @@ import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-public record PhpNamespaceDefinition(
+public record PhpClassDeclaration(
+        String $modifier,
         String name,
         Range range,
+        Range scope,
         PhpFile file
-) implements PhpSymbol, PhpSymbolOwner {
+) implements PhpSymbol {
 }

@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -12,6 +13,7 @@ import java.util.List;
 
 /**
  * A walk of the whole PHP grammar, transcribed from {@code tree-sitter-php/php_only/src/node-types.json}.
+ * Always performed per single PhpFile.
  * Doc:
  * - https://tree-sitter.github.io/tree-sitter/using-parsers
  * - https://tree-sitter.github.io/tree-sitter/creating-parsers
@@ -47,6 +49,7 @@ public final class CompleteIndexer {
 
         private final Listener listener;
         private final Deque<Node> path = new ArrayDeque<>();
+        private final Deque<PhpSymbolOwner> owners = new ArrayDeque<>();
 
         public Ctx(Listener listener) {
             this.listener = listener;
