@@ -27,36 +27,17 @@ public final class PhpPropertyDeclarationListener implements CompleteIndexer.Lis
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "property_declaration", "property_element", "property_promotion_parameter" ->
+            case "property_element", "property_promotion_parameter" ->
                     declarations.push(new PhpPropertyDeclaration(file, ctx.depth()));
-            /* a type or a visibility modifier is a subtree, not a leaf */
-            default -> fill(ctx, node);
+            case "variable_name" -> fill(ctx, node);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "property_element" -> {
-                PhpPropertyDeclaration declared = declarations.poll();
-                PhpPropertyDeclaration shared = declarations.peek();
-                if (declared == null || shared == null) {
-                    return;
-                }
-
-                declared.$modifier(shared.$modifier());
-                String type = shared.type();
-                if (type != null) {
-                    declared.type(type);
-                }
-                commit(declared);
-            }
-            case "property_promotion_parameter" -> commit(declarations.poll());
-            case "property_declaration" -> declarations.poll();
+            case "property_element", "property_promotion_parameter" ->
+                    commit(declarations.poll());
         }
-    }
-
-    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        fill(ctx, node);
     }
 
     private void fill(CompleteIndexer.Ctx ctx, Node node) {
@@ -65,31 +46,11 @@ public final class PhpPropertyDeclarationListener implements CompleteIndexer.Lis
             return;
         }
 
-        switch (node.getType()) {
-            case "abstract_modifier", "final_modifier", "readonly_modifier",
-                 "static_modifier", "var_modifier", "visibility_modifier" -> {
-                String text = Nodes.text(node);
-                if (text != null) {
-                    String modifier = declaration.$modifier();
-                    declaration.$modifier(
-                            modifier.isEmpty() ? text : modifier + " " + text);
-                }
-            }
-            case "disjunctive_normal_form_type", "intersection_type", "named_type",
-                 "optional_type", "primitive_type", "union_type" -> {
-                String text = Nodes.text(node);
-                if (text != null) {
-                    declaration.type(text);
-                }
-            }
-            case "variable_name" -> {
-                /* the first one names it; a later one is the default value */
-                String text = Nodes.text(node);
-                if (declaration.name() == null && text != null) {
-                    declaration.name(text);
-                    declaration.range(Range.of(node));
-                }
-            }
+        /* the first one names it; a later one is the default value */
+        String text = Nodes.text(node);
+        if (declaration.name() == null && text != null) {
+            declaration.name(text);
+            declaration.range(Range.of(node));
         }
     }
 
@@ -100,6 +61,9 @@ public final class PhpPropertyDeclarationListener implements CompleteIndexer.Lis
         }
 
         collection.add(declaration);
+    }
+
+    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
     }
 
     public void token(CompleteIndexer.Ctx ctx, Node node, String field) {
