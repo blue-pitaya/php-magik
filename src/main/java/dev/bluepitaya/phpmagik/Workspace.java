@@ -113,9 +113,11 @@ public final class Workspace implements AutoCloseable {
                 return; //TODO: maybe throw?
             }
 
-            indexer.walk(root, nsDefListener);
-            indexer.walk(root, clsDeclListener);
-            indexer.walk(root, propDeclListener);
+            indexer.walk(root, new CompleteIndexer.Listeners(
+                    nsDefListener,
+                    clsDeclListener,
+                    propDeclListener
+            ));
         }
 
         symbols.addAll(collection);

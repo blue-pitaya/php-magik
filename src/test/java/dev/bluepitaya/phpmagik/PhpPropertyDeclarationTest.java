@@ -23,6 +23,12 @@ class PhpPropertyDeclarationTest {
                             .map(PhpPropertyDeclaration::name)
                             .toList()
             );
+            assertEquals(
+                    List.of("Service1", "Service1", "Service1", "Service1"),
+                    propertyDeclarations.stream()
+                            .map(property -> property.owner().name())
+                            .toList()
+            );
         }
     }
 }

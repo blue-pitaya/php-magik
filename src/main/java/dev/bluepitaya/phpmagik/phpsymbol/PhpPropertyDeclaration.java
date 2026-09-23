@@ -11,6 +11,7 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
     private final PhpFile file;
     private final int depth;
 
+    private @Nullable PhpClassDeclaration owner;
     private @Nullable String name;
     private @Nullable Range range;
 
@@ -21,6 +22,14 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
 
     public int depth() {
         return depth;
+    }
+
+    public @Nullable PhpClassDeclaration owner() {
+        return owner;
+    }
+
+    public void owner(PhpClassDeclaration owner) {
+        this.owner = owner;
     }
 
     public @Nullable String name() {
