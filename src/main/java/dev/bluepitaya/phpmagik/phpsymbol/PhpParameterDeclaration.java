@@ -11,7 +11,7 @@ public final class PhpParameterDeclaration implements PhpSymbol {
     private final PhpFile file;
     private final int depth;
 
-    private @Nullable PhpMethodDeclaration owner;
+    private @Nullable PhpSymbolOwner owner;
     private @Nullable PhpType phpType;
     private @Nullable String name;
     private @Nullable Range range;
@@ -30,16 +30,24 @@ public final class PhpParameterDeclaration implements PhpSymbol {
         if (name == null) return null;
 
         String declared = phpType == null ? name : phpType.php() + " " + name;
-        String ownerName = owner == null ? null : owner.name();
+        String ownerName = ownerName();
 
         return PhpSymbol.code(ownerName == null ? declared : ownerName + "(" + declared + ")");
     }
 
-    public @Nullable PhpMethodDeclaration owner() {
+    private @Nullable String ownerName() {
+        return switch (owner) {
+            case PhpMethodDeclaration m -> m.name();
+            case PhpFunctionDefinition f -> f.name();
+            case null, default -> null;
+        };
+    }
+
+    public @Nullable PhpSymbolOwner owner() {
         return owner;
     }
 
-    public void owner(PhpMethodDeclaration owner) {
+    public void owner(PhpSymbolOwner owner) {
         this.owner = owner;
     }
 

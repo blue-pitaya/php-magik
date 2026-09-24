@@ -2,9 +2,9 @@ package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
@@ -44,7 +44,7 @@ public final class PhpParameterDeclarationListener implements Listener {
 
     private void open(CompleteIndexer.Ctx ctx) {
         PhpParameterDeclaration declaration = new PhpParameterDeclaration(file, ctx.depth());
-        if (ctx.peek() instanceof PhpMethodDeclaration owner) {
+        if (ctx.peek() instanceof PhpSymbolOwner owner) {
             declaration.owner(owner);
         }
 

@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.testing.Fixture;
@@ -27,7 +28,7 @@ class PhpParameterDeclarationTest {
             assertEquals(
                     List.of("two", "two"),
                     parameterDeclarations.stream()
-                            .map(parameter -> parameter.owner().name())
+                            .map(parameter -> ((PhpMethodDeclaration) parameter.owner()).name())
                             .toList()
             );
             assertEquals(
