@@ -1,10 +1,13 @@
 package dev.bluepitaya.phpmagik;
 
+import org.jspecify.annotations.NullMarked;
+
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 
-final class ProgramParams {
-
-    public final String rootPath;
+@NullMarked
+record ProgramParams(Path rootPath) {
 
     public static final class ArgException extends RuntimeException {
         ArgException(String message) {
@@ -12,7 +15,7 @@ final class ProgramParams {
         }
     }
 
-    ProgramParams(String[] args) {
+    static ProgramParams parse(String[] args) {
         var params = new LinkedHashMap<String, String>();
 
         for (var i = 0; i < args.length; i++) {
@@ -42,6 +45,11 @@ final class ProgramParams {
         if (rootPath == null) {
             throw new ArgException("--path is required");
         }
-        this.rootPath = rootPath;
+
+        try {
+            return new ProgramParams(Path.of(rootPath));
+        } catch (InvalidPathException e) {
+            throw new ArgException("--path is invalid: " + e.getReason());
+        }
     }
 }
