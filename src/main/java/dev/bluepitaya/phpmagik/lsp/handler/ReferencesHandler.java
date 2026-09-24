@@ -10,9 +10,13 @@ import dev.bluepitaya.phpmagik.lsp.dto.Position;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceContext;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentIdentifier;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
@@ -64,9 +68,18 @@ public final class ReferencesHandler {
             add(locations, definition);
         }
 
-        for (PhpMethodVarUsage usage : workspace.symbols().varUsages()) {
-            if (usage.definition() == definition) {
-                add(locations, usage);
+        if (definition instanceof PhpMethodLocalVarDeclaration
+                || definition instanceof PhpParameterDeclaration) {
+            for (PhpMethodVarUsage usage : workspace.symbols().varUsages()) {
+                if (usage.definition() == definition) {
+                    add(locations, usage);
+                }
+            }
+        } else {
+            for (PhpReference reference : workspace.symbols().references()) {
+                if (reference.definition() == definition) {
+                    add(locations, reference);
+                }
             }
         }
 
@@ -80,6 +93,10 @@ public final class ReferencesHandler {
             case PhpMethodVarUsage usage -> usage.definition();
             case PhpMethodLocalVarDeclaration declaration -> declaration;
             case PhpParameterDeclaration declaration -> declaration;
+            case PhpFunctionDefinition definition -> definition;
+            case PhpMethodDeclaration definition -> definition;
+            case PhpPropertyDeclaration definition -> definition;
+            case PhpReference reference -> reference.definition();
             case null, default -> null;
         };
     }

@@ -54,6 +54,7 @@ public final class Workspace implements AutoCloseable {
                 }
             }
         }
+        new ReferenceResolver().resolve(symbols);
         log.log("indexed " + files.size() + " file(s)");
     }
 
@@ -91,6 +92,7 @@ public final class Workspace implements AutoCloseable {
 
         symbols.removeFile(file);
         indexSymbols(file);
+        new ReferenceResolver().resolve(symbols);
     }
 
     private void indexSymbols(PhpFile file) {
@@ -107,7 +109,6 @@ public final class Workspace implements AutoCloseable {
 
         new DefinitionFiller().fill(collection);
         new MethodVarsTypeInferer().infer(collection);
-        new ReferenceResolver().resolve(collection);
 
         symbols.addAll(collection);
     }

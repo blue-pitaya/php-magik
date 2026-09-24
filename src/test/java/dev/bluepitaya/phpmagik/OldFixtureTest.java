@@ -358,4 +358,131 @@ class OldFixtureTest {
             assertEquals(loc(uri, 4, 20, 4, 29), definition(f, "main.php", 13, 15));
         }
     }
+
+    @Test
+    void test_23_functionReferences() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_23")) {
+            String uri = f.file("main.php").uri();
+            ArrayNode withDecl = references(f, "main.php", 2, 9, true);
+            ArrayNode expectedWith = Json.array();
+            expectedWith.add(loc(uri, 2, 9, 2, 15));
+            expectedWith.add(loc(uri, 7, 5, 7, 11));
+            expectedWith.add(loc(uri, 8, 5, 8, 11));
+            assertEquals(expectedWith, withDecl);
+
+            ArrayNode withoutDecl = references(f, "main.php", 2, 9, false);
+            ArrayNode expectedWithout = Json.array();
+            expectedWithout.add(loc(uri, 7, 5, 7, 11));
+            expectedWithout.add(loc(uri, 8, 5, 8, 11));
+            assertEquals(expectedWithout, withoutDecl);
+        }
+    }
+
+    @Test
+    void test_24_propertyReferences() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_24")) {
+            String uri = f.file("main.php").uri();
+            ArrayNode refs = references(f, "main.php", 4, 15, true);
+            ArrayNode expected = Json.array();
+            expected.add(loc(uri, 4, 15, 4, 17));
+            expected.add(loc(uri, 8, 15, 8, 16));
+            expected.add(loc(uri, 14, 15, 14, 16));
+            assertEquals(expected, refs);
+        }
+    }
+
+    @Test
+    void test_26_methodReferencesAcrossFiles() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_26")) {
+            String loggerUri = f.file("Logger.php").uri();
+            String aUri = f.file("A.php").uri();
+            String bUri = f.file("B.php").uri();
+            ArrayNode refs = references(f, "Logger.php", 4, 20, true);
+            ArrayNode expected = Json.array();
+            expected.add(loc(loggerUri, 4, 20, 4, 23));
+            expected.add(loc(aUri, 4, 8, 4, 11));
+            expected.add(loc(bUri, 4, 8, 4, 11));
+            assertEquals(expected, refs);
+        }
+    }
+
+    @Test
+    void test_27_methodWithNoUsages() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_27")) {
+            String uri = f.file("main.php").uri();
+            assertEquals(Json.array(), references(f, "main.php", 4, 20, false));
+
+            ArrayNode withDecl = references(f, "main.php", 4, 20, true);
+            ArrayNode expected = Json.array();
+            expected.add(loc(uri, 4, 20, 4, 26));
+            assertEquals(expected, withDecl);
+        }
+    }
+
+    @Test
+    void test_28_functionReferencesFromCallSite() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_28")) {
+            String uri = f.file("main.php").uri();
+            ArrayNode refs = references(f, "main.php", 7, 5, true);
+            ArrayNode expected = Json.array();
+            expected.add(loc(uri, 2, 9, 2, 15));
+            expected.add(loc(uri, 7, 5, 7, 11));
+            expected.add(loc(uri, 8, 5, 8, 11));
+            assertEquals(expected, refs);
+        }
+    }
+
+    @Test
+    void test_29_methodReferencesIsolatedByClass() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_29")) {
+            String uri = f.file("main.php").uri();
+            ArrayNode refs = references(f, "main.php", 4, 20, true);
+            ArrayNode expected = Json.array();
+            expected.add(loc(uri, 4, 20, 4, 25));
+            expected.add(loc(uri, 22, 10, 22, 15));
+            assertEquals(expected, refs);
+        }
+    }
+
+    @Test
+    void test_33_propertyUsedOnceViaThis() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_33")) {
+            String uri = f.file("main.php").uri();
+            ArrayNode withoutDecl = references(f, "main.php", 4, 15, false);
+            ArrayNode expectedWithout = Json.array();
+            expectedWithout.add(loc(uri, 8, 22, 8, 27));
+            assertEquals(expectedWithout, withoutDecl);
+
+            ArrayNode withDecl = references(f, "main.php", 4, 15, true);
+            ArrayNode expectedWith = Json.array();
+            expectedWith.add(loc(uri, 4, 15, 4, 21));
+            expectedWith.add(loc(uri, 8, 22, 8, 27));
+            assertEquals(expectedWith, withDecl);
+        }
+    }
+
+    @Test
+    void test_34_twoCallsSameLine() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_34")) {
+            String uri = f.file("main.php").uri();
+            ArrayNode refs = references(f, "main.php", 2, 9, true);
+            ArrayNode expected = Json.array();
+            expected.add(loc(uri, 2, 9, 2, 12));
+            expected.add(loc(uri, 7, 5, 7, 8));
+            expected.add(loc(uri, 7, 14, 7, 17));
+            assertEquals(expected, refs);
+        }
+    }
+
+    @Test
+    void test_35_globalFunctionNotMethod() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_35")) {
+            String uri = f.file("main.php").uri();
+            ArrayNode refs = references(f, "main.php", 2, 9, true);
+            ArrayNode expected = Json.array();
+            expected.add(loc(uri, 2, 9, 2, 15));
+            expected.add(loc(uri, 17, 4, 17, 10));
+            assertEquals(expected, refs);
+        }
+    }
 }
