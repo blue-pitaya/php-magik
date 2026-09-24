@@ -32,9 +32,9 @@ class PhpParameterDeclarationTest {
                             .toList()
             );
             assertEquals(
-                    List.of(PhpType.String, PhpType.Integer),
+                    List.of(PhpType.Builtin.String, PhpType.Builtin.Integer),
                     parameterDeclarations.stream()
-                            .map(PhpParameterDeclaration::phpType)
+                            .map(PhpParameterDeclaration::type)
                             .toList()
             );
         }

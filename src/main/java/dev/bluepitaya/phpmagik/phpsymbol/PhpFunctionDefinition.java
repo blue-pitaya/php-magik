@@ -13,6 +13,7 @@ public final class PhpFunctionDefinition implements PhpSymbol, PhpSymbolOwner {
 
     private @Nullable String name;
     private @Nullable Range range;
+    private @Nullable Range scope;
 
     public PhpFunctionDefinition(PhpFile file, int depth) {
         this.file = file;
@@ -45,6 +46,14 @@ public final class PhpFunctionDefinition implements PhpSymbol, PhpSymbolOwner {
 
     public void range(Range range) {
         this.range = range;
+    }
+
+    public @Nullable Range scope() {
+        return scope;
+    }
+
+    public void scope(Range scope) {
+        this.scope = scope;
     }
 
     @Override

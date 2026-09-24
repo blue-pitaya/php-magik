@@ -105,10 +105,11 @@ public final class Workspace implements AutoCloseable {
             }
 
             indexer.walk(root, AggregatedListener.create(collection, file));
-        }
 
-        new DefinitionFiller().fill(collection);
-        new MethodVarsTypeInferer().infer(collection);
+            new DefinitionFiller().fill(collection);
+            new PhpTypeInferer().infer(collection, root);
+            new VarUsageTypePropagator().propagate(collection);
+        }
 
         symbols.addAll(collection);
     }

@@ -12,8 +12,7 @@ public final class PhpParameterDeclaration implements PhpSymbol {
     private final int depth;
 
     private @Nullable PhpSymbolOwner owner;
-    private @Nullable PhpType phpType;
-    private @Nullable String namedTypeName;
+    private @Nullable PhpType type;
     private @Nullable String name;
     private @Nullable Range range;
 
@@ -30,7 +29,7 @@ public final class PhpParameterDeclaration implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String typeStr = phpType != null ? phpType.php() : namedTypeName;
+        String typeStr = type != null ? type.php() : null;
         String declared = typeStr == null ? name : typeStr + " " + name;
         String ownerName = ownerName();
 
@@ -53,20 +52,12 @@ public final class PhpParameterDeclaration implements PhpSymbol {
         this.owner = owner;
     }
 
-    public @Nullable PhpType phpType() {
-        return phpType;
+    public @Nullable PhpType type() {
+        return type;
     }
 
-    public void phpType(PhpType phpType) {
-        this.phpType = phpType;
-    }
-
-    public @Nullable String namedTypeName() {
-        return namedTypeName;
-    }
-
-    public void namedTypeName(String namedTypeName) {
-        this.namedTypeName = namedTypeName;
+    public void type(PhpType type) {
+        this.type = type;
     }
 
     public @Nullable String name() {

@@ -13,7 +13,9 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
 
     private @Nullable PhpClassDeclaration owner;
     private @Nullable String name;
+    private @Nullable PhpType returnType;
     private @Nullable Range range;
+    private @Nullable Range scope;
 
     public PhpMethodDeclaration(PhpFile file, int depth) {
         this.file = file;
@@ -49,6 +51,14 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
         this.name = name;
     }
 
+    public @Nullable PhpType returnType() {
+        return returnType;
+    }
+
+    public void returnType(PhpType returnType) {
+        this.returnType = returnType;
+    }
+
     @Override
     public @Nullable Range range() {
         return range;
@@ -56,6 +66,14 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
 
     public void range(Range range) {
         this.range = range;
+    }
+
+    public @Nullable Range scope() {
+        return scope;
+    }
+
+    public void scope(Range scope) {
+        this.scope = scope;
     }
 
     @Override

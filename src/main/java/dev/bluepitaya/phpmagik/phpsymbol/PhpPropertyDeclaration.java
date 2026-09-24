@@ -13,6 +13,7 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
 
     private @Nullable PhpClassDeclaration owner;
     private @Nullable String name;
+    private @Nullable PhpType type;
     private @Nullable Range range;
 
     public PhpPropertyDeclaration(PhpFile file, int depth) {
@@ -47,6 +48,14 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
 
     public void name(String name) {
         this.name = name;
+    }
+
+    public @Nullable PhpType type() {
+        return type;
+    }
+
+    public void type(PhpType type) {
+        this.type = type;
     }
 
     @Override

@@ -7,6 +7,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.DidOpenParams;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
+import dev.bluepitaya.phpmagik.lsp.handler.CompletionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidChangeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DidCloseHandler;
@@ -44,6 +45,7 @@ public final class LspServer {
     private final HoverHandler hover;
     private final DefinitionHandler definition;
     private final ReferencesHandler references;
+    private final CompletionHandler completion;
 
     public LspServer(Workspace app, Logger log) {
         this.in = new BufferedInputStream(System.in);
@@ -58,6 +60,7 @@ public final class LspServer {
         this.hover = new HoverHandler(app, symbols, new PhpMethodDeclarationResolver(app), log);
         this.definition = new DefinitionHandler(app, symbols, log);
         this.references = new ReferencesHandler(app, symbols, log);
+        this.completion = new CompletionHandler(app, log);
     }
 
     public void run() throws IOException {
@@ -108,6 +111,8 @@ public final class LspServer {
                         definition.handle(bind(params, TextDocumentPosition.class)));
                 case "textDocument/references" -> respond(getRequestIdOrThrow(request),
                         references.handle(bind(params, ReferenceParams.class)));
+                case "textDocument/completion" -> respond(getRequestIdOrThrow(request),
+                        completion.handle(bind(params, TextDocumentPosition.class)));
                 default -> {
                     JsonNode id = request.get("id");
                     /* an unknown notification is still a notification: no reply */

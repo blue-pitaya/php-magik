@@ -12,7 +12,7 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
 
     private @Nullable PhpSymbolOwner owner;
     private @Nullable String name;
-    private @Nullable String namedTypeName;
+    private @Nullable PhpType type;
     private @Nullable Range range;
 
     public PhpMethodLocalVarDeclaration(PhpFile file) {
@@ -52,12 +52,12 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
         this.name = name;
     }
 
-    public @Nullable String namedTypeName() {
-        return namedTypeName;
+    public @Nullable PhpType type() {
+        return type;
     }
 
-    public void namedTypeName(String namedTypeName) {
-        this.namedTypeName = namedTypeName;
+    public void type(PhpType type) {
+        this.type = type;
     }
 
     @Override

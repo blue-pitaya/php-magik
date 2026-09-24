@@ -8,6 +8,7 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -57,7 +58,7 @@ public final class PhpMethodVarListener implements Listener {
             declaration.range(Range.of(node));
             String createdType = createdTypeOf(parent);
             if (createdType != null) {
-                declaration.namedTypeName(createdType);
+                declaration.type(PhpType.named(createdType));
             }
             collection.add(declaration);
             return;

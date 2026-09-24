@@ -10,6 +10,7 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -101,15 +102,19 @@ public final class ReferenceResolver {
     ) {
         for (PhpParameterDeclaration declared : symbols.parameterDeclarations()) {
             if (declared.owner() == owner && receiver.equals(declared.name())) {
-                return declared.namedTypeName();
+                return classTypeName(declared.type());
             }
         }
         for (PhpMethodLocalVarDeclaration declared : symbols.localVarDeclarations()) {
             if (declared.owner() == owner && receiver.equals(declared.name())) {
-                return declared.namedTypeName();
+                return classTypeName(declared.type());
             }
         }
         return null;
+    }
+
+    private static @Nullable String classTypeName(@Nullable PhpType type) {
+        return type instanceof PhpType.ClassType classType ? classType.name() : null;
     }
 
     private static @Nullable PhpClassDeclaration classNamed(

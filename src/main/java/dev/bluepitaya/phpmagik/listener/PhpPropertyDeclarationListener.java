@@ -7,6 +7,7 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -32,7 +33,7 @@ public final class PhpPropertyDeclarationListener implements Listener {
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "property_element", "property_promotion_parameter" -> open(ctx);
+            case "property_element", "property_promotion_parameter" -> open(ctx, node);
             case "variable_name" -> fill(ctx, node);
         }
     }
@@ -43,7 +44,7 @@ public final class PhpPropertyDeclarationListener implements Listener {
         }
     }
 
-    private void open(CompleteIndexer.Ctx ctx) {
+    private void open(CompleteIndexer.Ctx ctx, Node node) {
         PhpPropertyDeclaration declaration = new PhpPropertyDeclaration(file, ctx.depth());
         PhpSymbolOwner enclosing = ctx.peek();
         /* a promoted parameter sits in the constructor, which sits in the class */
@@ -52,6 +53,14 @@ public final class PhpPropertyDeclarationListener implements Listener {
         }
         if (enclosing instanceof PhpClassDeclaration owner) {
             declaration.owner(owner);
+        }
+
+        Node parent = node.getParent();
+        if (parent != null) {
+            PhpType type = PhpType.parse(Nodes.text(parent.getChildByFieldName("type")));
+            if (type != null) {
+                declaration.type(type);
+            }
         }
 
         declarations.push(declaration);

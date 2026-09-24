@@ -7,6 +7,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.ReferenceContext;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentIdentifier;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
+import dev.bluepitaya.phpmagik.lsp.handler.CompletionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
@@ -67,6 +68,20 @@ class OldFixtureTest {
         return Json.location(uri, new Range(new Point(startLine, startChar), new Point(endLine, endChar)));
     }
 
+    private static ArrayNode completion(Fixture fixture, String fileName, int line, int character) {
+        var handler = new CompletionHandler(fixture.workspace(), fixture.log());
+        String uri = fixture.file(fileName).uri();
+        return handler.handle(at(uri, line, character));
+    }
+
+    private static ObjectNode item(String label, int kind, String detail) {
+        ObjectNode item = Json.object();
+        item.put("label", label);
+        item.put("kind", kind);
+        item.put("detail", detail);
+        return item;
+    }
+
     @Test
     void test_1_standaloneFunctionHover() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_1")) {
@@ -119,7 +134,7 @@ class OldFixtureTest {
             assertEquals(php("print(int $a)"), hover(f, "main.php", 6, 30));
             assertEquals(php("print(): $b"), hover(f, "main.php", 8, 8));
             assertEquals(php("print(): int $a"), hover(f, "main.php", 8, 13));
-            assertEquals(php("print(): $b"), hover(f, "main.php", 10, 15));
+            assertEquals(php("print(): int $b"), hover(f, "main.php", 10, 15));
         }
     }
 
@@ -133,7 +148,7 @@ class OldFixtureTest {
             assertEquals(php("print(): $b"), hover(f, "main.php", 15, 8));
             assertEquals(php("print(): $c"), hover(f, "main.php", 16, 8));
             assertEquals(php("print(): int $a"), hover(f, "main.php", 16, 13));
-            assertEquals(php("print(): $b"), hover(f, "main.php", 16, 18));
+            assertEquals(php("print(): int $b"), hover(f, "main.php", 16, 18));
         }
     }
 
@@ -145,8 +160,8 @@ class OldFixtureTest {
             assertEquals(php("function Foo::call"), hover(f, "Foo.php", 9, 20));
             assertEquals(php("call(): $a"), hover(f, "Foo.php", 11, 8));
             assertEquals(php("call(): $b"), hover(f, "Foo.php", 12, 8));
-            assertEquals(php("call(): $a"), hover(f, "Foo.php", 14, 13));
-            assertEquals(php("call(): $b"), hover(f, "Foo.php", 15, 13));
+            assertEquals(php("call(): A $a"), hover(f, "Foo.php", 14, 13));
+            assertEquals(php("call(): B $b"), hover(f, "Foo.php", 15, 13));
 
             assertEquals(php("namespace App\\NSA"), hover(f, "A.php", 2, 10));
             assertEquals(php("class A"), hover(f, "A.php", 4, 6));
@@ -274,7 +289,7 @@ class OldFixtureTest {
             assertEquals(php("__construct(Engine $engine)"), hover(f, "main.php", 13, 39));
             assertEquals(php("__construct(): Engine $engine"), hover(f, "main.php", 15, 24));
             assertEquals(php("describe(): $total"), hover(f, "main.php", 20, 8));
-            assertEquals(php("describe(): $total"), hover(f, "main.php", 22, 39));
+            assertEquals(php("describe(): int $total"), hover(f, "main.php", 22, 39));
         }
     }
 
@@ -483,6 +498,53 @@ class OldFixtureTest {
             expected.add(loc(uri, 2, 9, 2, 15));
             expected.add(loc(uri, 17, 4, 17, 10));
             assertEquals(expected, refs);
+        }
+    }
+
+    @Test
+    void test_18_memberCompletionLocalObject() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_18")) {
+            ArrayNode expected = Json.array();
+            expected.add(item("x", 5, "int"));
+            expected.add(item("len", 2, "int"));
+            assertEquals(expected, completion(f, "main.php", 15, 8));
+        }
+    }
+
+    @Test
+    void test_19_memberCompletionTypedParam() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_19")) {
+            ArrayNode expected = Json.array();
+            expected.add(item("power", 5, "int"));
+            assertEquals(expected, completion(f, "main.php", 11, 19));
+        }
+    }
+
+    @Test
+    void test_20_localVariableCompletionInMethod() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_20")) {
+            ArrayNode expected = Json.array();
+            expected.add(item("$this", 6, "Calc"));
+            expected.add(item("$n", 6, "int"));
+            expected.add(item("$tmp", 6, "int"));
+            assertEquals(expected, completion(f, "main.php", 9, 0));
+        }
+    }
+
+    @Test
+    void test_21_memberCompletionClassInOtherFile() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_21")) {
+            ArrayNode expected = Json.array();
+            expected.add(item("label", 5, "string"));
+            expected.add(item("render", 2, "string"));
+            assertEquals(expected, completion(f, "main.php", 4, 15));
+        }
+    }
+
+    @Test
+    void test_22_staticCompletionUnsupported() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_22")) {
+            assertEquals(Json.array(), completion(f, "main.php", 12, 9));
         }
     }
 }

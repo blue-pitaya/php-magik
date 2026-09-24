@@ -5,6 +5,7 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -30,7 +31,7 @@ public final class PhpMethodDeclarationListener implements Listener {
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         if ("method_declaration".equals(node.getType())) {
-            open(ctx);
+            open(ctx, node);
         }
     }
 
@@ -48,10 +49,17 @@ public final class PhpMethodDeclarationListener implements Listener {
         }
     }
 
-    private void open(CompleteIndexer.Ctx ctx) {
+    private void open(CompleteIndexer.Ctx ctx, Node node) {
         PhpMethodDeclaration declaration = new PhpMethodDeclaration(file, ctx.depth());
         if (ctx.peek() instanceof PhpClassDeclaration owner) {
             declaration.owner(owner);
+        }
+        declaration.scope(Range.of(node));
+
+        Node returnTypeNode = node.getChildByFieldName("return_type");
+        PhpType returnType = PhpType.parse(Nodes.text(returnTypeNode));
+        if (returnType != null) {
+            declaration.returnType(returnType);
         }
 
         declarations.push(declaration);

@@ -74,7 +74,7 @@ public final class PhpParameterDeclarationListener implements Listener {
 
         String text = Nodes.text(node);
         if (text != null) {
-            declaration.namedTypeName(text);
+            declaration.type(PhpType.named(text));
         }
     }
 
@@ -101,7 +101,7 @@ public final class PhpParameterDeclarationListener implements Listener {
 
         PhpType phpType = PhpType.of(Nodes.text(node));
         if (phpType != null) {
-            declaration.phpType(phpType);
+            declaration.type(phpType);
         }
     }
 
