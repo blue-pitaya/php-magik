@@ -40,63 +40,6 @@ public final class CompleteIndexer {
         void unknown(Ctx ctx, Node node);
     }
 
-    public static final class Listeners implements Listener {
-
-        private final List<Listener> listeners;
-
-        public Listeners(Listener... listeners) {
-            this.listeners = List.of(listeners);
-        }
-
-        public void enter(Ctx ctx, Node node) {
-            for (Listener listener : listeners) {
-                listener.enter(ctx, node);
-            }
-        }
-
-        public void exit(Ctx ctx, Node node) {
-            for (Listener listener : listeners) {
-                listener.exit(ctx, node);
-            }
-        }
-
-        public void leaf(Ctx ctx, Node node) {
-            for (Listener listener : listeners) {
-                listener.leaf(ctx, node);
-            }
-        }
-
-        public void token(Ctx ctx, Node node, String field) {
-            for (Listener listener : listeners) {
-                listener.token(ctx, node, field);
-            }
-        }
-
-        public void extra(Ctx ctx, Node node) {
-            for (Listener listener : listeners) {
-                listener.extra(ctx, node);
-            }
-        }
-
-        public void error(Ctx ctx, Node node) {
-            for (Listener listener : listeners) {
-                listener.error(ctx, node);
-            }
-        }
-
-        public void unexpected(Ctx ctx, Node parent, Node child, String field) {
-            for (Listener listener : listeners) {
-                listener.unexpected(ctx, parent, child, field);
-            }
-        }
-
-        public void unknown(Ctx ctx, Node node) {
-            for (Listener listener : listeners) {
-                listener.unknown(ctx, node);
-            }
-        }
-    }
-
     public static final String NONE = "";
 
     public record Slot(Node node, String field) {

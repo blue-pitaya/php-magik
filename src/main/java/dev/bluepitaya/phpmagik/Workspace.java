@@ -96,44 +96,13 @@ public final class Workspace implements AutoCloseable {
     private void indexSymbols(PhpFile file) {
         var collection = new PhpSymbolCollection();
         var indexer = new CompleteIndexer();
-        var nsDefListener = new PhpNamespaceDefinitionListener(
-                collection,
-                file
-        );
-        var clsDeclListener = new PhpClassDeclarationListener(
-                collection,
-                file
-        );
-        var propDeclListener = new PhpPropertyDeclarationListener(
-                collection,
-                file
-        );
-        var methodDeclListener = new PhpMethodDeclarationListener(
-                collection,
-                file
-        );
-        var paramDeclListener = new PhpParameterDeclarationListener(
-                collection,
-                file
-        );
-        var methodVarListener = new PhpMethodVarListener(
-                collection,
-                file
-        );
         try (Tree tree = file.tree()) {
             Node root = tree.getRootNode();
             if (root == null) {
                 return; //TODO: maybe throw?
             }
 
-            indexer.walk(root, new CompleteIndexer.Listeners(
-                    nsDefListener,
-                    clsDeclListener,
-                    propDeclListener,
-                    methodDeclListener,
-                    paramDeclListener,
-                    methodVarListener
-            ));
+            indexer.walk(root, AggregatedListener.create(collection, file));
         }
 
         new DefinitionFiller().fill(collection);
