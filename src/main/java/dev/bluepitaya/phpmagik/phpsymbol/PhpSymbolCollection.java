@@ -11,6 +11,7 @@ public final class PhpSymbolCollection {
     private final List<PhpClassDeclaration> classDeclarations = new ArrayList<>();
     private final List<PhpPropertyDeclaration> propertyDeclarations = new ArrayList<>();
     private final List<PhpMethodDeclaration> methodDeclarations = new ArrayList<>();
+    private final List<PhpFunctionDefinition> functionDefinitions = new ArrayList<>();
     private final List<PhpParameterDeclaration> parameterDeclarations = new ArrayList<>();
     private final List<PhpMethodLocalVarDeclaration> localVarDeclarations = new ArrayList<>();
     private final List<PhpMethodVarUsage> varUsages = new ArrayList<>();
@@ -21,6 +22,7 @@ public final class PhpSymbolCollection {
             case PhpClassDeclaration x -> classDeclarations.add(x);
             case PhpPropertyDeclaration x -> propertyDeclarations.add(x);
             case PhpMethodDeclaration x -> methodDeclarations.add(x);
+            case PhpFunctionDefinition x -> functionDefinitions.add(x);
             case PhpParameterDeclaration x -> parameterDeclarations.add(x);
             case PhpMethodLocalVarDeclaration x -> localVarDeclarations.add(x);
             case PhpMethodVarUsage x -> varUsages.add(x);
@@ -33,6 +35,7 @@ public final class PhpSymbolCollection {
                 classDeclarations,
                 propertyDeclarations,
                 methodDeclarations,
+                functionDefinitions,
                 parameterDeclarations,
                 localVarDeclarations,
                 varUsages
@@ -65,6 +68,10 @@ public final class PhpSymbolCollection {
 
     public List<PhpMethodDeclaration> methodDeclarations() {
         return methodDeclarations;
+    }
+
+    public List<PhpFunctionDefinition> functionDefinitions() {
+        return functionDefinitions;
     }
 
     public List<PhpParameterDeclaration> parameterDeclarations() {

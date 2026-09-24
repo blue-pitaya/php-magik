@@ -9,6 +9,7 @@ public sealed interface PhpSymbol permits
         PhpClassDeclaration,
         PhpPropertyDeclaration,
         PhpMethodDeclaration,
+        PhpFunctionDefinition,
         PhpParameterDeclaration,
         PhpMethodLocalVarDeclaration,
         PhpMethodVarUsage {

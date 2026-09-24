@@ -1,6 +1,7 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
@@ -39,6 +40,7 @@ final class SymbolPrinter {
             case PhpClassDeclaration x -> x.name();
             case PhpPropertyDeclaration x -> x.name();
             case PhpMethodDeclaration x -> x.name();
+            case PhpFunctionDefinition x -> x.name();
             case PhpParameterDeclaration x -> x.name();
             case PhpMethodLocalVarDeclaration x -> x.name();
             case PhpMethodVarUsage x -> x.name();
