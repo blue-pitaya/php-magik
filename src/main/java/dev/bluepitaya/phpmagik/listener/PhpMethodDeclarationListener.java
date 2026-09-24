@@ -1,9 +1,10 @@
-package dev.bluepitaya.phpmagik;
+package dev.bluepitaya.phpmagik.listener;
 
+import dev.bluepitaya.phpmagik.CompleteIndexer;
+import dev.bluepitaya.phpmagik.PhpFile;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -14,13 +15,13 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 @NullMarked
-public final class PhpParameterDeclarationListener implements CompleteIndexer.Listener {
+public final class PhpMethodDeclarationListener implements CompleteIndexer.Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private final Deque<PhpParameterDeclaration> declarations = new ArrayDeque<>();
+    private final Deque<PhpMethodDeclaration> declarations = new ArrayDeque<>();
 
-    public PhpParameterDeclarationListener(
+    public PhpMethodDeclarationListener(
             PhpSymbolCollection collection, PhpFile file
     ) {
         this.collection = collection;
@@ -28,66 +29,55 @@ public final class PhpParameterDeclarationListener implements CompleteIndexer.Li
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        switch (node.getType()) {
-            case "simple_parameter" -> open(ctx);
-            case "variable_name" -> fill(ctx, node);
+        if ("method_declaration".equals(node.getType())) {
+            open(ctx);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("simple_parameter".equals(node.getType())) {
-            commit(declarations.poll());
+        if ("method_declaration".equals(node.getType())) {
+            PhpMethodDeclaration declaration = declarations.poll();
+            ctx.pop();
+            commit(declaration);
+        }
+    }
+
+    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
+        if ("name".equals(node.getType())) {
+            fill(ctx, node);
         }
     }
 
     private void open(CompleteIndexer.Ctx ctx) {
-        PhpParameterDeclaration declaration = new PhpParameterDeclaration(file, ctx.depth());
-        if (ctx.peek() instanceof PhpMethodDeclaration owner) {
+        PhpMethodDeclaration declaration = new PhpMethodDeclaration(file, ctx.depth());
+        if (ctx.peek() instanceof PhpClassDeclaration owner) {
             declaration.owner(owner);
         }
 
         declarations.push(declaration);
+        ctx.push(declaration);
     }
 
     private void fill(CompleteIndexer.Ctx ctx, Node node) {
-        PhpParameterDeclaration declaration = declarations.peek();
+        PhpMethodDeclaration declaration = declarations.peek();
         if (declaration == null || ctx.depth() != declaration.depth() + 1) {
             return;
         }
 
-        /* the first one names it; a later one is the default value */
         String text = Nodes.text(node);
-        if (declaration.name() == null && text != null) {
+        if (text != null) {
             declaration.name(text);
             declaration.range(Range.of(node));
         }
     }
 
-    private void commit(@Nullable PhpParameterDeclaration declaration) {
+    private void commit(@Nullable PhpMethodDeclaration declaration) {
         if (declaration == null || declaration.name() == null
                 || declaration.range() == null) {
             return;
         }
 
         collection.add(declaration);
-    }
-
-    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if ("primitive_type".equals(node.getType())) {
-            fillType(ctx, node);
-        }
-    }
-
-    private void fillType(CompleteIndexer.Ctx ctx, Node node) {
-        PhpParameterDeclaration declaration = declarations.peek();
-        if (declaration == null || ctx.depth() != declaration.depth() + 1) {
-            return;
-        }
-
-        PhpType phpType = PhpType.of(Nodes.text(node));
-        if (phpType != null) {
-            declaration.phpType(phpType);
-        }
     }
 
     public void token(CompleteIndexer.Ctx ctx, Node node, String field) {

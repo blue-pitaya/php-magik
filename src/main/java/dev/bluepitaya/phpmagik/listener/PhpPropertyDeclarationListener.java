@@ -1,5 +1,7 @@
-package dev.bluepitaya.phpmagik;
+package dev.bluepitaya.phpmagik.listener;
 
+import dev.bluepitaya.phpmagik.CompleteIndexer;
+import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
@@ -37,8 +39,7 @@ public final class PhpPropertyDeclarationListener implements CompleteIndexer.Lis
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "property_element", "property_promotion_parameter" ->
-                    commit(declarations.poll());
+            case "property_element", "property_promotion_parameter" -> commit(declarations.poll());
         }
     }
 

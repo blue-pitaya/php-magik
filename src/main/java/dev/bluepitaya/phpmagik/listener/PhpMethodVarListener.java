@@ -1,5 +1,7 @@
-package dev.bluepitaya.phpmagik;
+package dev.bluepitaya.phpmagik.listener;
 
+import dev.bluepitaya.phpmagik.CompleteIndexer;
+import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
