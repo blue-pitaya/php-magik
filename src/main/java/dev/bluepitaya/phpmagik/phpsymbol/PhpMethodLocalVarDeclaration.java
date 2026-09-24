@@ -10,7 +10,7 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
 
     private final PhpFile file;
 
-    private @Nullable PhpMethodDeclaration owner;
+    private @Nullable PhpSymbolOwner owner;
     private @Nullable String name;
     private @Nullable Range range;
 
@@ -22,16 +22,24 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String ownerName = owner == null ? null : owner.name();
+        String ownerName = ownerName();
 
         return PhpSymbol.code(ownerName == null ? name : ownerName + "(): " + name);
     }
 
-    public @Nullable PhpMethodDeclaration owner() {
+    private @Nullable String ownerName() {
+        return switch (owner) {
+            case PhpMethodDeclaration m -> m.name();
+            case PhpFunctionDefinition f -> f.name();
+            case null, default -> null;
+        };
+    }
+
+    public @Nullable PhpSymbolOwner owner() {
         return owner;
     }
 
-    public void owner(PhpMethodDeclaration owner) {
+    public void owner(PhpSymbolOwner owner) {
         this.owner = owner;
     }
 

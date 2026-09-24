@@ -2,10 +2,12 @@ package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -32,12 +34,13 @@ public final class PhpMethodVarListener implements Listener {
     }
 
     private void collect(CompleteIndexer.Ctx ctx, Node node) {
-        if (!(ctx.peek() instanceof PhpMethodDeclaration owner)) {
+        if (!(ctx.peek() instanceof PhpMethodDeclaration)
+                && !(ctx.peek() instanceof PhpFunctionDefinition)) {
             return;
         }
+        PhpSymbolOwner owner = (PhpSymbolOwner) ctx.peek();
 
         Node parent = ctx.parent();
-        /* a parameter declares itself, at this very range */
         if (isParameter(parent)) {
             return;
         }

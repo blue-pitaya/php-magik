@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
 import dev.bluepitaya.phpmagik.testing.Fixture;
@@ -31,7 +32,7 @@ class PhpMethodVarTest {
             assertEquals(
                     List.of("foo"),
                     symbols.localVarDeclarations().stream()
-                            .map(declaration -> declaration.owner().name())
+                            .map(declaration -> ((PhpMethodDeclaration) declaration.owner()).name())
                             .distinct()
                             .toList()
             );
