@@ -16,7 +16,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 @NullMarked
-public final class PhpParameterDeclarationListener implements CompleteIndexer.Listener {
+public final class PhpParameterDeclarationListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;

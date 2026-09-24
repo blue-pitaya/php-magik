@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.listener.Listener;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
@@ -20,25 +21,6 @@ import java.util.List;
  */
 @NullMarked
 public final class CompleteIndexer {
-
-    public interface Listener {
-
-        void enter(Ctx ctx, Node node);
-
-        void exit(Ctx ctx, Node node);
-
-        void leaf(Ctx ctx, Node node);
-
-        void token(Ctx ctx, Node node, String field);
-
-        void extra(Ctx ctx, Node node);
-
-        void error(Ctx ctx, Node node);
-
-        void unexpected(Ctx ctx, Node parent, Node child, String field);
-
-        void unknown(Ctx ctx, Node node);
-    }
 
     public static final String NONE = "";
 

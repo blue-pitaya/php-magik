@@ -13,7 +13,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 @NullMarked
-public final class PhpClassDeclarationListener implements CompleteIndexer.Listener {
+public final class PhpClassDeclarationListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;

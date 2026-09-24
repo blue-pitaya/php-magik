@@ -9,11 +9,11 @@ import org.jspecify.annotations.NullMarked;
 import java.util.List;
 
 @NullMarked
-public final class AggregatedListener implements CompleteIndexer.Listener {
+public final class AggregatedListener implements Listener {
 
-    private final List<CompleteIndexer.Listener> listeners;
+    private final List<Listener> listeners;
 
-    public AggregatedListener(CompleteIndexer.Listener... listeners) {
+    public AggregatedListener(Listener... listeners) {
         this.listeners = List.of(listeners);
     }
 
@@ -29,49 +29,49 @@ public final class AggregatedListener implements CompleteIndexer.Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.enter(ctx, node);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.exit(ctx, node);
         }
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.leaf(ctx, node);
         }
     }
 
     public void token(CompleteIndexer.Ctx ctx, Node node, String field) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.token(ctx, node, field);
         }
     }
 
     public void extra(CompleteIndexer.Ctx ctx, Node node) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.extra(ctx, node);
         }
     }
 
     public void error(CompleteIndexer.Ctx ctx, Node node) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.error(ctx, node);
         }
     }
 
     public void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.unexpected(ctx, parent, child, field);
         }
     }
 
     public void unknown(CompleteIndexer.Ctx ctx, Node node) {
-        for (CompleteIndexer.Listener listener : listeners) {
+        for (Listener listener : listeners) {
             listener.unknown(ctx, node);
         }
     }

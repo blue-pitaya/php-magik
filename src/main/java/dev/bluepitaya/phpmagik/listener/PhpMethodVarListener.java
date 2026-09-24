@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public final class PhpMethodVarListener implements CompleteIndexer.Listener {
+public final class PhpMethodVarListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
