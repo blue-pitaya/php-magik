@@ -47,6 +47,8 @@ public class Node implements Iterable<Node> {
 
     private final @Nullable Tree tree;
 
+    private @Nullable String cachedType;
+
     //TODO: many @Nullable here is not true
     Node(int context0, int context1, int context2, int context3, long id, @Nullable Tree tree) {
         this.context0 = context0;
@@ -201,7 +203,12 @@ public class Node implements Iterable<Node> {
     }
 
     public @Nullable String getType() {
-        return getType(false);
+        String cached = cachedType;
+        if (cached == null) {
+            cached = getType(false);
+            cachedType = cached;
+        }
+        return cached;
     }
 
     /** The type as it appears in the grammar, ignoring aliases. */

@@ -19,7 +19,7 @@ public final class Logger implements Closeable {
                 StandardOpenOption.WRITE, StandardOpenOption.APPEND);
     }
 
-    public void log(String message) {
+    public synchronized void log(String message) {
         try {
             out.write(message);
             out.write('\n');

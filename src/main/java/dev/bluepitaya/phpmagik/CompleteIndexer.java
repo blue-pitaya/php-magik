@@ -8,7 +8,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 
@@ -30,7 +29,7 @@ public final class CompleteIndexer {
     public static final class Ctx {
 
         private final Listener listener;
-        private final Deque<Node> path = new ArrayDeque<>();
+        private final List<Node> path = new ArrayList<>();
         private final Deque<PhpSymbolOwner> owners = new ArrayDeque<>();
 
         public Ctx(Listener listener) {
@@ -38,9 +37,7 @@ public final class CompleteIndexer {
         }
 
         public List<Node> path() {
-            List<Node> nodes = new ArrayList<>(path);
-            Collections.reverse(nodes);
-            return List.copyOf(nodes);
+            return List.copyOf(path);
         }
 
         public int depth() {
@@ -48,7 +45,7 @@ public final class CompleteIndexer {
         }
 
         public @Nullable Node parent() {
-            return path.size() < 2 ? null : path.stream().skip(1).findFirst().orElse(null);
+            return path.size() < 2 ? null : path.get(path.size() - 2);
         }
 
         public void push(PhpSymbolOwner owner) {
@@ -64,10 +61,10 @@ public final class CompleteIndexer {
         }
 
         public List<Slot> slots(Node node) {
-            List<Slot> slots = new ArrayList<>();
-            int count = node.getChildCount();
-            for (int i = 0; i < count; i++) {
-                Node child = node.getChild(i);
+            List<Node> children = node.getChildren();
+            List<Slot> slots = new ArrayList<>(children.size());
+            for (int i = 0; i < children.size(); i++) {
+                Node child = children.get(i);
                 String field = node.getFieldNameForChild(i);
 
                 if (child.isError() || child.isMissing()) {
@@ -88,19 +85,19 @@ public final class CompleteIndexer {
         }
 
         void enter(Node node) {
-            path.push(node);
+            path.add(node);
             listener.enter(this, node);
         }
 
         void exit(Node node) {
             listener.exit(this, node);
-            path.pop();
+            path.removeLast();
         }
 
         void leaf(Node node) {
-            path.push(node);
+            path.add(node);
             listener.leaf(this, node);
-            path.pop();
+            path.removeLast();
         }
 
         void token(Slot slot) {
