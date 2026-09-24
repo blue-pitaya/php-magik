@@ -301,4 +301,36 @@ class OldFixtureTest {
             assertEquals(expected, refs);
         }
     }
+
+    @Test
+    void test_40_functionsWithDocblocks() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_40")) {
+            assertEquals(php("function add"), hover(f, "main.php", 8, 9));
+            assertEquals(php("function plain"), hover(f, "main.php", 14, 9));
+            assertEquals(php("function undocumented"), hover(f, "main.php", 19, 9));
+            assertEquals(php("class Calc"), hover(f, "main.php", 24, 6));
+            assertEquals(php("function Calc::double"), hover(f, "main.php", 29, 20));
+        }
+    }
+
+    @Test
+    void test_41_bracedNamespaces() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_41")) {
+            assertEquals(php("class A"), hover(f, "main.php", 3, 10));
+            assertEquals(php("function A::get"), hover(f, "main.php", 5, 24));
+            assertEquals(php("class Foo"), hover(f, "main.php", 16, 10));
+            assertEquals(php("function Foo::call"), hover(f, "main.php", 18, 24));
+            assertEquals(php("call(A $a)"), hover(f, "main.php", 18, 31));
+            assertEquals(php("call(int $n)"), hover(f, "main.php", 18, 51));
+            assertEquals(php("call(Foo $self)"), hover(f, "main.php", 18, 59));
+        }
+    }
+
+    @Test
+    void test_43_classImplementsInterface() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_43")) {
+            assertEquals(php("class Square"), hover(f, "main.php", 2, 6));
+            assertEquals(php("function make"), hover(f, "main.php", 6, 9));
+        }
+    }
 }
