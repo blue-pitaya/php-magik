@@ -33,6 +33,7 @@ public final class PhpParameterDeclarationListener implements Listener {
         switch (node.getType()) {
             case "simple_parameter" -> open(ctx);
             case "variable_name" -> fill(ctx, node);
+            case "named_type" -> fillNamedType(ctx, node);
         }
     }
 
@@ -62,6 +63,18 @@ public final class PhpParameterDeclarationListener implements Listener {
         if (declaration.name() == null && text != null) {
             declaration.name(text);
             declaration.range(Range.of(node));
+        }
+    }
+
+    private void fillNamedType(CompleteIndexer.Ctx ctx, Node node) {
+        PhpParameterDeclaration declaration = declarations.peek();
+        if (declaration == null || ctx.depth() != declaration.depth() + 1) {
+            return;
+        }
+
+        String text = Nodes.text(node);
+        if (text != null) {
+            declaration.namedTypeName(text);
         }
     }
 

@@ -138,9 +138,73 @@ class OldFixtureTest {
     }
 
     @Test
+    void test_8_multiFileNamespaces() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_8")) {
+            assertEquals(php("namespace App"), hover(f, "Foo.php", 2, 10));
+            assertEquals(php("class Foo"), hover(f, "Foo.php", 7, 6));
+            assertEquals(php("function Foo::call"), hover(f, "Foo.php", 9, 20));
+            assertEquals(php("call(): $a"), hover(f, "Foo.php", 11, 8));
+            assertEquals(php("call(): $b"), hover(f, "Foo.php", 12, 8));
+            assertEquals(php("call(): $a"), hover(f, "Foo.php", 14, 13));
+            assertEquals(php("call(): $b"), hover(f, "Foo.php", 15, 13));
+
+            assertEquals(php("namespace App\\NSA"), hover(f, "A.php", 2, 10));
+            assertEquals(php("class A"), hover(f, "A.php", 4, 6));
+            assertEquals(php("function A::get"), hover(f, "A.php", 6, 20));
+
+            assertEquals(php("namespace App\\NSB"), hover(f, "B.php", 2, 10));
+            assertEquals(php("class B"), hover(f, "B.php", 4, 6));
+            assertEquals(php("function B::get"), hover(f, "B.php", 6, 20));
+        }
+    }
+
+    @Test
     void test_9_globalVarNotSupported() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_9")) {
             assertNull(definition(f, "main.php", 3, 5));
+        }
+    }
+
+    @Test
+    void test_10_multiFileClassAndGlobalScope() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_10")) {
+            assertEquals(php("class Greeter"), hover(f, "Greeter.php", 2, 6));
+            assertEquals(php("Greeter::$name"), hover(f, "Greeter.php", 4, 18));
+            assertEquals(php("function Greeter::__construct"), hover(f, "Greeter.php", 6, 20));
+            assertEquals(php("__construct(string $name)"), hover(f, "Greeter.php", 6, 39));
+            assertEquals(php("__construct(): string $name"), hover(f, "Greeter.php", 8, 22));
+            assertEquals(php("function Greeter::greet"), hover(f, "Greeter.php", 11, 20));
+            assertEquals(php("function Greeter::shout"), hover(f, "Greeter.php", 16, 20));
+
+            assertNull(hover(f, "main.php", 2, 0));
+        }
+    }
+
+    @Test
+    void test_11_globalScopeVarsNotSupported() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_11")) {
+            assertNull(hover(f, "main.php", 2, 0));
+            assertNull(hover(f, "main.php", 3, 5));
+        }
+    }
+
+    @Test
+    void test_12_classAndStandaloneFunction() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_12")) {
+            assertEquals(php("class Box"), hover(f, "main.php", 2, 6));
+            assertEquals(php("Box::$value"), hover(f, "main.php", 4, 15));
+            assertEquals(php("function Box::get"), hover(f, "main.php", 6, 20));
+            assertEquals(php("function main"), hover(f, "main.php", 12, 9));
+            assertEquals(php("main(): $b"), hover(f, "main.php", 14, 4));
+            assertEquals(php("main(): $x"), hover(f, "main.php", 15, 4));
+        }
+    }
+
+    @Test
+    void test_13_functionCallNotResolved() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_13")) {
+            assertEquals(php("function greet"), hover(f, "main.php", 2, 9));
+            assertNull(hover(f, "main.php", 7, 5));
         }
     }
 
@@ -194,6 +258,34 @@ class OldFixtureTest {
             expected.add(loc(uri, 5, 9, 5, 11));
             expected.add(loc(uri, 6, 11, 6, 13));
             assertEquals(expected, refs);
+        }
+    }
+
+    @Test
+    void test_7_propertyChainAndNamedParamType() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_7")) {
+            assertEquals(php("class Engine"), hover(f, "main.php", 2, 6));
+            assertEquals(php("class Car"), hover(f, "main.php", 9, 6));
+            assertEquals(php("Engine::$power"), hover(f, "main.php", 4, 15));
+            assertEquals(php("Engine::$fuel"), hover(f, "main.php", 6, 18));
+            assertEquals(php("Car::$engine"), hover(f, "main.php", 11, 19));
+            assertEquals(php("function Car::__construct"), hover(f, "main.php", 13, 20));
+            assertEquals(php("function Car::describe"), hover(f, "main.php", 18, 20));
+            assertEquals(php("__construct(Engine $engine)"), hover(f, "main.php", 13, 39));
+            assertEquals(php("__construct(): Engine $engine"), hover(f, "main.php", 15, 24));
+            assertEquals(php("describe(): $total"), hover(f, "main.php", 20, 8));
+            assertEquals(php("describe(): $total"), hover(f, "main.php", 22, 39));
+        }
+    }
+
+    @Test
+    void test_42_namedParamTypeInStandaloneFunction() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_42")) {
+            assertEquals(php("function run"), hover(f, "main.php", 2, 9));
+            assertEquals(php("run(Container $c)"), hover(f, "main.php", 2, 23));
+            assertEquals(php("run(): $e"), hover(f, "main.php", 4, 4));
+            assertEquals(php("run(): Container $c"), hover(f, "main.php", 4, 9));
+            assertEquals(php("run(): $e"), hover(f, "main.php", 6, 11));
         }
     }
 

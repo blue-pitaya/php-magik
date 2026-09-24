@@ -19,6 +19,11 @@ public final class MethodVarsTypeInferer {
             if (phpType != null) {
                 usage.phpType(phpType);
             }
+
+            String namedTypeName = parameter.namedTypeName();
+            if (namedTypeName != null) {
+                usage.namedTypeName(namedTypeName);
+            }
         }
     }
 }
