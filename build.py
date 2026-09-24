@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 JNI_FLAGS = ["-O2", "-fPIC", "-Wall", "-Wextra"]
@@ -198,9 +199,31 @@ class Runner:
             path,
         )
 
+    def run_app(self, args: list[str]):
+        self.build_all()
+        self.run(
+            "java",
+            f"-Djava.library.path={self.paths.native}",
+            "-cp",
+            self.paths.classpath(),
+            "dev.bluepitaya.phpmagik.Main",
+            *args,
+        )
+
 
 def main():
+    argv = sys.argv[1:]
     runner = Runner(Paths(Path(__file__).resolve().parent))
+    if argv and argv[0] == "run":
+        rest = argv[1:]
+        if rest and rest[0] == "--":
+            rest = rest[1:]
+        try:
+            runner.run_app(rest)
+        except subprocess.CalledProcessError as error:
+            sys.exit(error.returncode)
+        return
+
     cmds = {
         "clean": runner.clean,
         "build_java": runner.build_java,
@@ -210,6 +233,7 @@ def main():
         "debug_test": runner.debug_test,
         "compile_commands": runner.compile_commands,
         "serve": runner.serve,
+        "run": runner.run_app,
     }
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=list(cmds))
@@ -218,7 +242,8 @@ def main():
         nargs="?",
         help="project root to index, required by serve; "
         "for test and debug_test a surefire filter like Class#method, "
-        "defaulting to the whole suite",
+        "defaulting to the whole suite. run takes no target: everything "
+        "after it goes to the server, e.g. run --path /project --print",
     )
     parser.add_argument(
         "--port",

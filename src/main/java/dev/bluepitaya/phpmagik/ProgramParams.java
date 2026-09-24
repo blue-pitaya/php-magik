@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 
 @NullMarked
-record ProgramParams(Path rootPath) {
+record ProgramParams(Path rootPath, boolean print) {
 
     public static final class ArgException extends RuntimeException {
         ArgException(String message) {
@@ -17,11 +17,17 @@ record ProgramParams(Path rootPath) {
 
     static ProgramParams parse(String[] args) {
         var params = new LinkedHashMap<String, String>();
+        var print = false;
 
         for (var i = 0; i < args.length; i++) {
             var arg = args[i];
             if (!arg.startsWith("--")) {
                 throw new ArgException("unexpected argument: " + arg);
+            }
+
+            if (arg.equals("--print")) {
+                print = true;
+                continue;
             }
 
             String name;
@@ -47,7 +53,7 @@ record ProgramParams(Path rootPath) {
         }
 
         try {
-            return new ProgramParams(Path.of(rootPath));
+            return new ProgramParams(Path.of(rootPath), print);
         } catch (InvalidPathException e) {
             throw new ArgException("--path is invalid: " + e.getReason());
         }

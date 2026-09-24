@@ -17,11 +17,10 @@ public final class Main {
             programParams = ProgramParams.parse(args);
         } catch (ProgramParams.ArgException cause) {
             System.err.println(cause.getMessage());
-            System.err.println("usage: php-magik --path <dir|file>");
+            System.err.println("usage: php-magik --path <dir|file> [--print]");
             System.exit(2);
             return;
         }
-        var rootPath = programParams.rootPath();
 
         try (var parser = new Parser(); var log = new Logger(LOG_PATH)) {
             log.log("=== php-magik started, pid " + ProcessHandle.current().pid());
@@ -33,6 +32,11 @@ public final class Main {
                 log.log("scan error: " + cause.getMessage());
                 System.err.println("scan error: " + cause.getMessage());
                 System.exit(1);
+            }
+
+            if (programParams.print()) {
+                new SymbolPrinter().print(workspace);
+                return;
             }
 
             new LspServer(workspace, log).run();
