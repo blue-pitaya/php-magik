@@ -333,4 +333,29 @@ class OldFixtureTest {
             assertEquals(php("function make"), hover(f, "main.php", 6, 9));
         }
     }
+
+    @Test
+    void test_15_propertyDefinition() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_15")) {
+            String uri = f.file("main.php").uri();
+            assertEquals(loc(uri, 4, 15, 4, 17), definition(f, "main.php", 9, 15));
+            assertEquals(loc(uri, 4, 15, 4, 17), definition(f, "main.php", 4, 15));
+        }
+    }
+
+    @Test
+    void test_16_forwardFunctionReference() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_16")) {
+            String uri = f.file("main.php").uri();
+            assertEquals(loc(uri, 4, 9, 4, 15), definition(f, "main.php", 2, 5));
+        }
+    }
+
+    @Test
+    void test_17_objectMethodCall() throws IOException {
+        try (Fixture f = Fixture.index("old_tests/test_17")) {
+            String uri = f.file("main.php").uri();
+            assertEquals(loc(uri, 4, 20, 4, 29), definition(f, "main.php", 13, 15));
+        }
+    }
 }

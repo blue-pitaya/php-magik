@@ -12,7 +12,8 @@ public sealed interface PhpSymbol permits
         PhpFunctionDefinition,
         PhpParameterDeclaration,
         PhpMethodLocalVarDeclaration,
-        PhpMethodVarUsage {
+        PhpMethodVarUsage,
+        PhpReference {
 
     static String code(String php) {
         return "```php\n" + php + "\n```";

@@ -55,6 +55,10 @@ public final class PhpMethodVarListener implements Listener {
             declaration.owner(owner);
             declaration.name(text);
             declaration.range(Range.of(node));
+            String createdType = createdTypeOf(parent);
+            if (createdType != null) {
+                declaration.namedTypeName(createdType);
+            }
             collection.add(declaration);
             return;
         }
@@ -64,6 +68,29 @@ public final class PhpMethodVarListener implements Listener {
         usage.name(text);
         usage.range(Range.of(node));
         collection.add(usage);
+    }
+
+    private static @Nullable String createdTypeOf(@Nullable Node parent) {
+        if (parent == null) {
+            return null;
+        }
+        Node right = parent.getChildByFieldName("right");
+        if (right == null || !"object_creation_expression".equals(right.getType())) {
+            return null;
+        }
+
+        int count = right.getNamedChildCount();
+        for (int i = 0; i < count; i++) {
+            Node child = right.getNamedChild(i);
+            switch (Nodes.type(child)) {
+                case "name", "qualified_name" -> {
+                    return Nodes.text(child);
+                }
+                default -> {
+                }
+            }
+        }
+        return null;
     }
 
     private static boolean isAssigned(Node node, @Nullable Node parent) {

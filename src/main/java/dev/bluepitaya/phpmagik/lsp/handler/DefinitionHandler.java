@@ -8,6 +8,8 @@ import dev.bluepitaya.phpmagik.lsp.Json;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
@@ -42,11 +44,13 @@ public final class DefinitionHandler {
         }
 
         PhpSymbol sym = symbols.resolveAt(file, line, col);
-        if (!(sym instanceof PhpMethodVarUsage usage)) {
-            return null;
-        }
 
-        PhpSymbol definition = usage.definition();
+        PhpSymbol definition = switch (sym) {
+            case PhpMethodVarUsage usage -> usage.definition();
+            case PhpReference reference -> reference.definition();
+            case PhpPropertyDeclaration property -> property;
+            case null, default -> null;
+        };
         if (definition == null) {
             return null;
         }

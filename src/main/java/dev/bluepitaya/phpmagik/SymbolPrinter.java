@@ -8,6 +8,7 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpNamespaceDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,6 +45,7 @@ final class SymbolPrinter {
             case PhpParameterDeclaration x -> x.name();
             case PhpMethodLocalVarDeclaration x -> x.name();
             case PhpMethodVarUsage x -> x.name();
+            case PhpReference x -> x.name();
         };
         return name == null ? "<unnamed>" : name;
     }

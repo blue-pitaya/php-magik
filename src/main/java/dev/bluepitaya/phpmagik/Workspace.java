@@ -107,6 +107,7 @@ public final class Workspace implements AutoCloseable {
 
         new DefinitionFiller().fill(collection);
         new MethodVarsTypeInferer().infer(collection);
+        new ReferenceResolver().resolve(collection);
 
         symbols.addAll(collection);
     }

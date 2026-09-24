@@ -6,34 +6,35 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
+public final class PhpReference implements PhpSymbol {
+
+    public enum Kind {
+        FUNCTION,
+        PROPERTY,
+        METHOD
+    }
 
     private final PhpFile file;
+    private final Kind kind;
 
     private @Nullable PhpSymbolOwner owner;
     private @Nullable String name;
-    private @Nullable String namedTypeName;
+    private @Nullable String receiverVar;
+    private @Nullable PhpSymbol definition;
     private @Nullable Range range;
 
-    public PhpMethodLocalVarDeclaration(PhpFile file) {
+    public PhpReference(PhpFile file, Kind kind) {
         this.file = file;
+        this.kind = kind;
+    }
+
+    public Kind kind() {
+        return kind;
     }
 
     @Override
     public @Nullable String hover() {
-        if (name == null) return null;
-
-        String ownerName = ownerName();
-
-        return PhpSymbol.code(ownerName == null ? name : ownerName + "(): " + name);
-    }
-
-    private @Nullable String ownerName() {
-        return switch (owner) {
-            case PhpMethodDeclaration m -> m.name();
-            case PhpFunctionDefinition f -> f.name();
-            case null, default -> null;
-        };
+        return null;
     }
 
     public @Nullable PhpSymbolOwner owner() {
@@ -52,12 +53,20 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
         this.name = name;
     }
 
-    public @Nullable String namedTypeName() {
-        return namedTypeName;
+    public @Nullable String receiverVar() {
+        return receiverVar;
     }
 
-    public void namedTypeName(String namedTypeName) {
-        this.namedTypeName = namedTypeName;
+    public void receiverVar(String receiverVar) {
+        this.receiverVar = receiverVar;
+    }
+
+    public @Nullable PhpSymbol definition() {
+        return definition;
+    }
+
+    public void definition(PhpSymbol definition) {
+        this.definition = definition;
     }
 
     @Override
