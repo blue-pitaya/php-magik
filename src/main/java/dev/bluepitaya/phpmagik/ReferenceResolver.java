@@ -100,7 +100,7 @@ public final class ReferenceResolver {
     }
 
     private @Nullable String classTypeName(@Nullable PhpType type) {
-        return type instanceof PhpType.ClassType(String name) ? name : null;
+        return type instanceof PhpType.ClassType(String fqn) ? fqn : null;
     }
 
     private static @Nullable String withoutDollar(@Nullable String name) {
@@ -130,9 +130,9 @@ public final class ReferenceResolver {
                 }
             }
             for (PhpClassDeclaration declared : symbols.classDeclarations()) {
-                String name = declared.name();
-                if (name != null) {
-                    classes.putIfAbsent(name, declared);
+                String fqn = declared.fqn();
+                if (fqn != null) {
+                    classes.putIfAbsent(fqn, declared);
                 }
             }
             for (PhpMethodDeclaration declared : symbols.methodDeclarations()) {

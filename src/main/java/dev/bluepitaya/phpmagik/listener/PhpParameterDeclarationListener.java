@@ -21,12 +21,14 @@ public final class PhpParameterDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpParameterDeclaration> declarations = new ArrayDeque<>();
+    private final PhpNameResolver names;
 
     public PhpParameterDeclarationListener(
-            PhpSymbolCollection collection, PhpFile file
+            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
     ) {
         this.collection = collection;
         this.file = file;
+        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
@@ -74,7 +76,7 @@ public final class PhpParameterDeclarationListener implements Listener {
 
         String text = Nodes.text(node);
         if (text != null) {
-            declaration.type(PhpType.named(text));
+            declaration.type(PhpType.named(names.resolve(text)));
         }
     }
 

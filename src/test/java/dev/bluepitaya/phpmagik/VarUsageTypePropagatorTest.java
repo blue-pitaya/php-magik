@@ -18,12 +18,12 @@ class VarUsageTypePropagatorTest {
             var usages = fixture.symbols().varUsages();
             assertEquals(
                     Arrays.asList(
-                            PhpType.named("Engine"),
+                            PhpType.named("App\\Engine"),
                             PhpType.Builtin.Integer,
                             PhpType.Builtin.Integer,
                             null,
                             PhpType.Builtin.Integer,
-                            PhpType.named("Engine")
+                            PhpType.named("App\\Engine")
                     ),
                     usages.stream().map(PhpMethodVarUsage::type).toList()
             );

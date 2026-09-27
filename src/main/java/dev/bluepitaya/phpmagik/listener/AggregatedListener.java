@@ -18,16 +18,18 @@ public final class AggregatedListener implements Listener {
     }
 
     public static AggregatedListener create(PhpSymbolCollection collection, PhpFile file) {
+        var names = new PhpNameResolver();
         return new AggregatedListener(
+                names,
                 new PhpNamespaceDefinitionListener(collection, file),
-                new PhpClassDeclarationListener(collection, file),
-                new PhpPropertyDeclarationListener(collection, file),
-                new PhpMethodDeclarationListener(collection, file),
+                new PhpClassDeclarationListener(collection, file, names),
+                new PhpPropertyDeclarationListener(collection, file, names),
+                new PhpMethodDeclarationListener(collection, file, names),
                 new PhpFunctionDefinitionListener(collection, file),
-                new PhpParameterDeclarationListener(collection, file),
-                new PhpMethodVarListener(collection, file),
+                new PhpParameterDeclarationListener(collection, file, names),
+                new PhpMethodVarListener(collection, file, names),
                 new PhpReferenceListener(collection, file),
-                new PhpClassReferenceListener(collection, file)
+                new PhpClassReferenceListener(collection, file, names)
         );
     }
 

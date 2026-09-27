@@ -21,12 +21,14 @@ public final class PhpMethodDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpMethodDeclaration> declarations = new ArrayDeque<>();
+    private final PhpNameResolver names;
 
     public PhpMethodDeclarationListener(
-            PhpSymbolCollection collection, PhpFile file
+            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
     ) {
         this.collection = collection;
         this.file = file;
+        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
@@ -57,7 +59,7 @@ public final class PhpMethodDeclarationListener implements Listener {
         declaration.scope(Range.of(node));
 
         Node returnTypeNode = node.getChildByFieldName("return_type");
-        PhpType returnType = PhpType.parse(Nodes.text(returnTypeNode));
+        PhpType returnType = names.type(Nodes.text(returnTypeNode));
         if (returnType != null) {
             declaration.returnType(returnType);
         }

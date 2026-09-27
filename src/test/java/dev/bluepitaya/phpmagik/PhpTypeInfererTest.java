@@ -17,7 +17,7 @@ class PhpTypeInfererTest {
         try (Fixture fixture = Fixture.index("php_vars")) {
             var locals = fixture.symbols().localVarDeclarations();
             assertEquals(
-                    Arrays.asList(PhpType.named("Engine"), null, PhpType.Builtin.Integer),
+                    Arrays.asList(PhpType.named("App\\Engine"), null, PhpType.Builtin.Integer),
                     locals.stream().map(PhpMethodLocalVarDeclaration::type).toList()
             );
         }

@@ -1,0 +1,144 @@
+package dev.bluepitaya.phpmagik.listener;
+
+import dev.bluepitaya.phpmagik.CompleteIndexer;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
+import dev.bluepitaya.phpmagik.ts.Node;
+import dev.bluepitaya.phpmagik.ts.Nodes;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@NullMarked
+public final class PhpNameResolver implements Listener {
+
+    private final Map<String, String> imports = new HashMap<>();
+    private @Nullable String namespace;
+
+    public @Nullable String namespace() {
+        return namespace;
+    }
+
+    public @Nullable PhpType type(@Nullable String text) {
+        if (text == null) {
+            return null;
+        }
+        PhpType builtin = PhpType.of(text);
+        return builtin != null ? builtin : PhpType.named(resolve(text));
+    }
+
+    public String resolve(String name) {
+        if (name.startsWith("\\")) {
+            return name.substring(1);
+        }
+        if (name.regionMatches(true, 0, "namespace\\", 0, 10)) {
+            return qualify(name.substring(10));
+        }
+        if ("self".equalsIgnoreCase(name) || "static".equalsIgnoreCase(name) || "parent".equalsIgnoreCase(name)) {
+            return name;
+        }
+
+        int slash = name.indexOf('\\');
+        String imported = imports.get(slash < 0 ? name : name.substring(0, slash));
+        if (imported != null) {
+            return slash < 0 ? imported : imported + name.substring(slash);
+        }
+        return qualify(name);
+    }
+
+    private String qualify(String name) {
+        return namespace == null ? name : namespace + "\\" + name;
+    }
+
+    public @Nullable String importedName(Node clause) {
+        @Nullable Node imported = null;
+        for (int i = 0; i < clause.getNamedChildCount() && imported == null; i++) {
+            Node child = clause.getNamedChild(i);
+            if ("name".equals(child.getType()) || "qualified_name".equals(child.getType())) {
+                imported = child;
+            }
+        }
+        String text = Nodes.text(imported);
+        if (text == null) {
+            return null;
+        }
+        if (text.startsWith("\\")) {
+            text = text.substring(1);
+        }
+
+        @Nullable Node group = clause.getParent();
+        @Nullable Node declaration = group == null ? null : group.getParent();
+        if (declaration == null || !"namespace_use_group".equals(Nodes.type(group))) {
+            return text;
+        }
+        for (int i = 0; i < declaration.getNamedChildCount(); i++) {
+            Node child = declaration.getNamedChild(i);
+            if ("namespace_name".equals(child.getType())) {
+                return Nodes.text(child) + "\\" + text;
+            }
+        }
+        return text;
+    }
+
+    public boolean importsClass(Node clause) {
+        if (clause.getChildByFieldName("type") != null) {
+            return false;
+        }
+
+        Node declaration = clause.getParent();
+        if (declaration != null && "namespace_use_group".equals(declaration.getType())) {
+            declaration = declaration.getParent();
+        }
+        return declaration == null || declaration.getChildByFieldName("type") == null;
+    }
+
+    public void enter(CompleteIndexer.Ctx ctx, Node node) {
+        switch (node.getType()) {
+            case "namespace_definition" -> {
+                namespace = null;
+                imports.clear();
+            }
+            case "namespace_name" -> {
+                if ("namespace_definition".equals(Nodes.type(ctx.parent()))) {
+                    namespace = Nodes.text(node);
+                }
+            }
+            case "namespace_use_clause" -> {
+                String imported = importedName(node);
+                if (imported != null && importsClass(node)) {
+                    Node alias = node.getChildByFieldName("alias");
+                    String key = alias != null ? Nodes.text(alias) : imported.substring(imported.lastIndexOf('\\') + 1);
+                    imports.put(key, imported);
+                }
+            }
+            case null, default -> {
+            }
+        }
+    }
+
+    public void exit(CompleteIndexer.Ctx ctx, Node node) {
+        if ("namespace_definition".equals(node.getType()) && node.getChildByFieldName("body") != null) {
+            namespace = null;
+            imports.clear();
+        }
+    }
+
+    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
+    }
+
+    public void token(CompleteIndexer.Ctx ctx, Node node, String field) {
+    }
+
+    public void extra(CompleteIndexer.Ctx ctx, Node node) {
+    }
+
+    public void error(CompleteIndexer.Ctx ctx, Node node) {
+    }
+
+    public void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field) {
+    }
+
+    public void unknown(CompleteIndexer.Ctx ctx, Node node) {
+    }
+}

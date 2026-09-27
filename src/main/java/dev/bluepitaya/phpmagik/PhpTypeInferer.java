@@ -5,6 +5,7 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
@@ -78,7 +79,7 @@ public final class PhpTypeInferer {
         return switch (Nodes.type(expr)) {
             case "variable_name" -> variableType(Nodes.text(expr), owner, symbols);
             case "member_access_expression" -> memberType(expr, owner, symbols);
-            case "object_creation_expression" -> createdType(expr);
+            case "object_creation_expression" -> createdType(expr, symbols);
             case "parenthesized_expression" -> typeOf(firstNamedChild(expr), owner, symbols);
             case null, default -> null;
         };
@@ -92,7 +93,7 @@ public final class PhpTypeInferer {
         }
         if ("$this".equals(name)) {
             if (owner instanceof PhpMethodDeclaration method && method.owner() != null) {
-                String className = method.owner().name();
+                String className = method.owner().fqn();
                 return className == null ? null : PhpType.named(className);
             }
             return null;
@@ -130,14 +131,21 @@ public final class PhpTypeInferer {
         return null;
     }
 
-    private static @Nullable PhpType createdType(Node expr) {
+    private static @Nullable PhpType createdType(Node expr, PhpSymbolCollection symbols) {
         int count = expr.getNamedChildCount();
         for (int i = 0; i < count; i++) {
             Node child = expr.getNamedChild(i);
             switch (Nodes.type(child)) {
-                case "name", "qualified_name" -> {
-                    String text = Nodes.text(child);
-                    return text == null ? null : PhpType.named(text);
+                case "name", "qualified_name", "relative_name" -> {
+                    Range range = Range.of(child);
+                    for (PhpReference reference : symbols.references()) {
+                        String fqn = reference.name();
+                        if (reference.kind() == PhpReference.Kind.CLASS && range.equals(reference.range())
+                                && fqn != null) {
+                            return PhpType.named(fqn);
+                        }
+                    }
+                    return null;
                 }
                 default -> {
                 }
@@ -151,7 +159,7 @@ public final class PhpTypeInferer {
             return null;
         }
         for (PhpClassDeclaration declared : symbols.classDeclarations()) {
-            if (classType.name().equals(declared.name())) {
+            if (classType.fqn().equals(declared.fqn())) {
                 return declared;
             }
         }

@@ -8,7 +8,6 @@ import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -19,41 +18,29 @@ public final class PhpClassDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpClassDeclaration> declarations = new ArrayDeque<>();
-    private @Nullable String namespace;
+    private final PhpNameResolver names;
 
     public PhpClassDeclarationListener(
-            PhpSymbolCollection collection, PhpFile file
+            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
     ) {
         this.collection = collection;
         this.file = file;
+        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        switch (node.getType()) {
-            case "namespace_definition" -> namespace = null;
-            case "namespace_name" -> {
-                if ("namespace_definition".equals(Nodes.type(ctx.parent()))) {
-                    namespace = Nodes.text(node);
-                }
+        if ("class_declaration".equals(node.getType())) {
+            PhpClassDeclaration declaration = new PhpClassDeclaration(file, ctx.depth());
+            String namespace = names.namespace();
+            if (namespace != null) {
+                declaration.namespace(namespace);
             }
-            case "class_declaration" -> {
-                PhpClassDeclaration declaration = new PhpClassDeclaration(file, ctx.depth());
-                if (namespace != null) {
-                    declaration.namespace(namespace);
-                }
-                declarations.push(declaration);
-                ctx.push(declaration);
-            }
-            case null, default -> {
-            }
+            declarations.push(declaration);
+            ctx.push(declaration);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("namespace_definition".equals(node.getType())
-                && node.getChildByFieldName("body") != null) {
-            namespace = null;
-        }
         if ("class_declaration".equals(node.getType())) {
             PhpClassDeclaration declaration = declarations.poll();
             ctx.pop();

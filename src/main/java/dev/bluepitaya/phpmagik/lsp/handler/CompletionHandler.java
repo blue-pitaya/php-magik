@@ -133,7 +133,7 @@ public final class CompletionHandler {
             return null;
         }
         for (PhpClassDeclaration declared : workspace.symbols().classDeclarations()) {
-            if (classType.name().equals(declared.name())) {
+            if (classType.fqn().equals(declared.fqn())) {
                 return declared;
             }
         }

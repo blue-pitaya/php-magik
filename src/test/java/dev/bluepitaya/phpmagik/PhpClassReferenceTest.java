@@ -3,19 +3,24 @@ package dev.bluepitaya.phpmagik;
 import dev.bluepitaya.phpmagik.lsp.Json;
 import dev.bluepitaya.phpmagik.lsp.dto.Hover;
 import dev.bluepitaya.phpmagik.lsp.dto.Position;
+import dev.bluepitaya.phpmagik.lsp.dto.ReferenceContext;
+import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentIdentifier;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
+import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.node.ArrayNode;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,7 +33,7 @@ class PhpClassReferenceTest {
         try (Fixture fixture = Fixture.index("php_class_reference")) {
             var classReferences = classReferences(fixture, "Service.php");
             assertEquals(
-                    List.of("User", "User", "Missing", "User"),
+                    List.of("App\\Models\\User", "App\\Models\\User", "App\\Missing", "App\\Models\\User"),
                     classReferences.stream()
                             .map(PhpReference::name)
                             .toList()
@@ -92,7 +97,7 @@ class PhpClassReferenceTest {
         try (Fixture fixture = Fixture.index("php_class_reference_property")) {
             var classReferences = classReferences(fixture, "Car.php");
             assertEquals(
-                    List.of("Engine", "Engine", "Engine", "Engine", "Engine", "Engine", "Engine"),
+                    Collections.nCopies(7, "App\\Models\\Engine"),
                     classReferences.stream()
                             .map(PhpReference::name)
                             .toList()
@@ -132,7 +137,8 @@ class PhpClassReferenceTest {
         try (Fixture fixture = Fixture.index("php_class_reference_positions")) {
             var classReferences = classReferences(fixture, "Car.php");
             assertEquals(
-                    List.of("Base", "Drivable", "Base", "Car", "Car", "Car", "Car", "Car"),
+                    List.of("App\\Base", "App\\Drivable", "App\\Base", "App\\Car", "App\\Car", "App\\Car", "App\\Car",
+                            "App\\Car"),
                     classReferences.stream()
                             .map(PhpReference::name)
                             .toList()
@@ -162,6 +168,38 @@ class PhpClassReferenceTest {
             String car = php("namespace App;\nclass Car");
             assertEquals(car, hover(fixture, "Car.php", 9, 20));
             assertEquals(car, hover(fixture, "Car.php", 12, 16));
+        }
+    }
+
+    @Test
+    void findsReferencesOfTheImportedClassAmongClassesSharingAShortName() throws IOException {
+        try (Fixture fixture = Fixture.index("php_class_reference_fqn")) {
+            var handler = new ReferencesHandler(fixture.workspace(), fixture.finder(), fixture.log());
+            String declarationUri = fixture.file("Users/ShowProps.php").uri();
+            String controllerUri = fixture.file("Controller.php").uri();
+
+            ArrayNode expected = Json.array();
+            expected.add(Json.location(controllerUri, range(4, 4, 28)));
+            expected.add(Json.location(controllerUri, range(8, 28, 37)));
+            expected.add(Json.location(controllerUri, range(10, 19, 28)));
+            expected.add(Json.location(controllerUri, range(13, 26, 35)));
+            assertEquals(expected, handler.handle(new ReferenceParams(
+                    new TextDocumentIdentifier(declarationUri),
+                    new Position(5, 6),
+                    new ReferenceContext(false)
+            )));
+        }
+    }
+
+    @Test
+    void jumpsFromAMethodCallToTheMethodOfTheImportedClass() throws IOException {
+        try (Fixture fixture = Fixture.index("php_class_reference_fqn")) {
+            var handler = new DefinitionHandler(fixture.workspace(), fixture.finder(), fixture.log());
+
+            assertEquals(
+                    Json.location(fixture.file("Users/ShowProps.php").uri(), range(7, 20, 25)),
+                    handler.handle(at(fixture, "Controller.php", 15, 24))
+            );
         }
     }
 

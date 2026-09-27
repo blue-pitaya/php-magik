@@ -24,16 +24,8 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
         };
     }
 
-    static PhpType named(String name) {
-        return new ClassType(name);
-    }
-
-    static @Nullable PhpType parse(@Nullable String text) {
-        if (text == null) {
-            return null;
-        }
-        PhpType builtin = of(text);
-        return builtin != null ? builtin : new ClassType(text);
+    static PhpType named(String fqn) {
+        return new ClassType(fqn);
     }
 
     enum Builtin implements PhpType {
@@ -60,11 +52,11 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
         }
     }
 
-    record ClassType(String name) implements PhpType {
+    record ClassType(String fqn) implements PhpType {
 
         @Override
         public String php() {
-            return name;
+            return fqn.substring(fqn.lastIndexOf('\\') + 1);
         }
     }
 }

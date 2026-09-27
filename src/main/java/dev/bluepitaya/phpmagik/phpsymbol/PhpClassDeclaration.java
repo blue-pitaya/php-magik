@@ -34,6 +34,12 @@ public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
         return PhpSymbol.code(namespace == null ? declaration : "namespace " + namespace + ";\n" + declaration);
     }
 
+    public @Nullable String fqn() {
+        if (name == null) return null;
+
+        return namespace == null ? name : namespace + "\\" + name;
+    }
+
     public @Nullable String namespace() {
         return namespace;
     }

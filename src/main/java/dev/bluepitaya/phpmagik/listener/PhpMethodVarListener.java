@@ -20,12 +20,14 @@ public final class PhpMethodVarListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
+    private final PhpNameResolver names;
 
     public PhpMethodVarListener(
-            PhpSymbolCollection collection, PhpFile file
+            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
     ) {
         this.collection = collection;
         this.file = file;
+        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
@@ -58,7 +60,7 @@ public final class PhpMethodVarListener implements Listener {
             declaration.range(Range.of(node));
             String createdType = createdTypeOf(parent);
             if (createdType != null) {
-                declaration.type(PhpType.named(createdType));
+                declaration.type(PhpType.named(names.resolve(createdType)));
             }
             collection.add(declaration);
             return;
