@@ -1,12 +1,13 @@
 package dev.bluepitaya.phpmagik.phpsymbol;
 
 import dev.bluepitaya.phpmagik.PhpFile;
+import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public final class PhpFunctionDefinition implements PhpSymbol, PhpSymbolOwner {
+public final class PhpFunctionDefinition implements PhpSymbol, PhpFunctionLike {
 
     private final PhpFile file;
     private final int depth;
@@ -14,6 +15,8 @@ public final class PhpFunctionDefinition implements PhpSymbol, PhpSymbolOwner {
     private @Nullable String name;
     private String parameters = "";
     private @Nullable String declaredReturnType;
+    private @Nullable PhpDoc doc;
+    private @Nullable PhpType returnType;
     private @Nullable Range range;
     private @Nullable Range scope;
 
@@ -49,6 +52,22 @@ public final class PhpFunctionDefinition implements PhpSymbol, PhpSymbolOwner {
 
     public void declaredReturnType(String declaredReturnType) {
         this.declaredReturnType = declaredReturnType;
+    }
+
+    public @Nullable PhpDoc doc() {
+        return doc;
+    }
+
+    public void doc(PhpDoc doc) {
+        this.doc = doc;
+    }
+
+    public @Nullable PhpType returnType() {
+        return returnType;
+    }
+
+    public void returnType(PhpType returnType) {
+        this.returnType = returnType;
     }
 
     public @Nullable String name() {

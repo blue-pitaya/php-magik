@@ -7,7 +7,7 @@ import dev.bluepitaya.phpmagik.lsp.Json;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
@@ -144,15 +144,7 @@ public final class CompletionHandler {
         PhpSymbolOwner found = null;
         Range best = null;
 
-        for (PhpMethodDeclaration method : workspace.symbols().methodDeclarations()) {
-            Range scope = method.scope();
-            if (method.file() == file && scope != null && scope.contains(at)
-                    && (best == null || scope.isWithin(best))) {
-                found = method;
-                best = scope;
-            }
-        }
-        for (PhpFunctionDefinition function : workspace.symbols().functionDefinitions()) {
+        for (PhpFunctionLike function : workspace.symbols().functionLikes()) {
             Range scope = function.scope();
             if (function.file() == file && scope != null && scope.contains(at)
                     && (best == null || scope.isWithin(best))) {

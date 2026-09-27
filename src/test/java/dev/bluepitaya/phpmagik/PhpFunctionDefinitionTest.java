@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.testing.Fixture;
@@ -23,6 +24,24 @@ class PhpFunctionDefinitionTest {
                     functionDefinitions.stream()
                             .map(PhpFunctionDefinition::name)
                             .toList()
+            );
+        }
+    }
+
+    @Test
+    void attachesTheDocBlockRightAboveAFunction() throws IOException {
+        try (Fixture fixture = Fixture.index("php_doc")) {
+            PhpFunctionDefinition makeFoo = fixture.symbols().functionDefinitions().getFirst();
+
+            assertEquals(
+                    new PhpDoc(
+                            "Makes a foo.",
+                            "",
+                            List.of(),
+                            List.of(new PhpDoc.Param("int", "$bar", "")),
+                            new PhpDoc.Return("Foo", "")
+                    ),
+                    makeFoo.doc()
             );
         }
     }

@@ -1,6 +1,8 @@
 package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
+import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
+import dev.bluepitaya.phpmagik.phpdoc.PhpDocTypes;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
@@ -11,9 +13,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @NullMarked
 public final class PhpNameResolver implements Listener {
+
+    private static final Set<String> UNMAPPED = Set.of(
+            "void", "never", "false", "true", "resource", "scalar", "numeric", "number");
 
     private final Map<String, String> imports = new HashMap<>();
     private @Nullable String namespace;
@@ -23,14 +29,46 @@ public final class PhpNameResolver implements Listener {
     }
 
     public @Nullable PhpType type(@Nullable String text) {
-        if (text == null) {
+        return type(text, List.of());
+    }
+
+    public @Nullable PhpType type(@Nullable String text, List<PhpDoc.Template> templates) {
+        String member = text == null ? null : onlyMember(text);
+        if (member == null) {
             return null;
         }
-        if (text.startsWith("?")) {
-            text = text.substring(1);
+        if (member.endsWith("[]")) {
+            return PhpType.Builtin.Array;
         }
-        PhpType builtin = PhpType.of(text);
-        return builtin != null ? builtin : PhpType.named(resolve(text));
+
+        String name = PhpDocTypes.withoutArguments(member);
+        if (name.isEmpty() || name.contains("-") || UNMAPPED.contains(name)
+                || templates.stream().anyMatch(template -> template.name().equals(name))) {
+            return null;
+        }
+        if ("$this".equals(name)) {
+            return PhpType.named("static");
+        }
+        if ("list".equals(name)) {
+            return PhpType.Builtin.Array;
+        }
+        PhpType builtin = PhpType.of(name);
+        return builtin != null ? builtin : PhpType.named(resolve(name));
+    }
+
+    private static @Nullable String onlyMember(String text) {
+        List<String> members = new ArrayList<>();
+        for (String member : PhpDocTypes.split(text, '|')) {
+            String stripped = member.strip();
+            members.add(stripped.startsWith("?") ? stripped.substring(1) : stripped);
+        }
+        if (members.size() > 1) {
+            members.removeIf("null"::equalsIgnoreCase);
+        }
+        if (members.size() != 1 || PhpDocTypes.split(members.getFirst(), '&').size() != 1) {
+            return null;
+        }
+        return members.getFirst();
     }
 
     public String resolve(String name) {

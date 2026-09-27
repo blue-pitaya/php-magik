@@ -1,21 +1,23 @@
 package dev.bluepitaya.phpmagik.phpsymbol;
 
 import dev.bluepitaya.phpmagik.PhpFile;
+import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
+public final class PhpMethodDeclaration implements PhpSymbol, PhpFunctionLike {
 
     private final PhpFile file;
     private final int depth;
 
     private @Nullable PhpClassDeclaration owner;
     private @Nullable String name;
-    private @Nullable PhpType returnType;
     private String parameters = "";
     private @Nullable String declaredReturnType;
+    private @Nullable PhpDoc doc;
+    private @Nullable PhpType returnType;
     private @Nullable Range range;
     private @Nullable Range scope;
 
@@ -54,6 +56,22 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
         this.declaredReturnType = declaredReturnType;
     }
 
+    public @Nullable PhpDoc doc() {
+        return doc;
+    }
+
+    public void doc(PhpDoc doc) {
+        this.doc = doc;
+    }
+
+    public @Nullable PhpType returnType() {
+        return returnType;
+    }
+
+    public void returnType(PhpType returnType) {
+        this.returnType = returnType;
+    }
+
     public @Nullable PhpClassDeclaration owner() {
         return owner;
     }
@@ -68,14 +86,6 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
 
     public void name(String name) {
         this.name = name;
-    }
-
-    public @Nullable PhpType returnType() {
-        return returnType;
-    }
-
-    public void returnType(PhpType returnType) {
-        this.returnType = returnType;
     }
 
     @Override

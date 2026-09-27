@@ -5,7 +5,6 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -56,18 +55,7 @@ public final class PhpMethodDeclarationListener implements Listener {
         if (ctx.peek() instanceof PhpClassDeclaration owner) {
             declaration.owner(owner);
         }
-        declaration.scope(Range.of(node));
-
-        declaration.parameters(names.parametersText(node.getChildByFieldName("parameters")));
-
-        Node returnTypeNode = node.getChildByFieldName("return_type");
-        PhpType returnType = names.type(Nodes.text(returnTypeNode));
-        if (returnType != null) {
-            declaration.returnType(returnType);
-        }
-        if (returnTypeNode != null) {
-            declaration.declaredReturnType(names.typeText(returnTypeNode));
-        }
+        PhpSignatureReader.read(declaration, node, names);
 
         declarations.push(declaration);
         ctx.push(declaration);

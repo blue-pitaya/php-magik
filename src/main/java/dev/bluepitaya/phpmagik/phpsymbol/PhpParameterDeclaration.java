@@ -37,11 +37,7 @@ public final class PhpParameterDeclaration implements PhpSymbol {
     }
 
     private @Nullable String ownerName() {
-        return switch (owner) {
-            case PhpMethodDeclaration m -> m.name();
-            case PhpFunctionDefinition f -> f.name();
-            case null, default -> null;
-        };
+        return owner instanceof PhpFunctionLike function ? function.name() : null;
     }
 
     public @Nullable PhpSymbolOwner owner() {

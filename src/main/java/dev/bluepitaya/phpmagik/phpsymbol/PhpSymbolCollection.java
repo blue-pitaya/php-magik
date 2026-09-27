@@ -77,6 +77,12 @@ public final class PhpSymbolCollection {
         return functionDefinitions;
     }
 
+    public List<PhpFunctionLike> functionLikes() {
+        List<PhpFunctionLike> functionLikes = new ArrayList<>(methodDeclarations);
+        functionLikes.addAll(functionDefinitions);
+        return functionLikes;
+    }
+
     public List<PhpParameterDeclaration> parameterDeclarations() {
         return parameterDeclarations;
     }

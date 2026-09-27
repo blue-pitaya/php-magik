@@ -2,12 +2,10 @@ package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
@@ -37,11 +35,9 @@ public final class PhpMethodVarListener implements Listener {
     }
 
     private void collect(CompleteIndexer.Ctx ctx, Node node) {
-        if (!(ctx.peek() instanceof PhpMethodDeclaration)
-                && !(ctx.peek() instanceof PhpFunctionDefinition)) {
+        if (!(ctx.peek() instanceof PhpFunctionLike owner)) {
             return;
         }
-        PhpSymbolOwner owner = (PhpSymbolOwner) ctx.peek();
 
         Node parent = ctx.parent();
         if (isParameter(parent)) {

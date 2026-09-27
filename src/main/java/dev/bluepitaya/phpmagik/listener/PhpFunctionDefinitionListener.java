@@ -32,12 +32,7 @@ public final class PhpFunctionDefinitionListener implements Listener {
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         if ("function_definition".equals(node.getType())) {
             PhpFunctionDefinition definition = new PhpFunctionDefinition(file, ctx.depth());
-            definition.scope(Range.of(node));
-            definition.parameters(names.parametersText(node.getChildByFieldName("parameters")));
-            Node returnType = node.getChildByFieldName("return_type");
-            if (returnType != null) {
-                definition.declaredReturnType(names.typeText(returnType));
-            }
+            PhpSignatureReader.read(definition, node, names);
             stack.push(definition);
             ctx.push(definition);
         }

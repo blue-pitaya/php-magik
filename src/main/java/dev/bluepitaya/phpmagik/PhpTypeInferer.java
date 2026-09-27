@@ -19,11 +19,6 @@ import org.jspecify.annotations.Nullable;
 public final class PhpTypeInferer {
 
     public void infer(PhpSymbolCollection symbols, Node root) {
-        inferLocals(symbols, root);
-        inferMethodReturns(symbols, root);
-    }
-
-    private void inferLocals(PhpSymbolCollection symbols, Node root) {
         for (PhpMethodLocalVarDeclaration local : symbols.localVarDeclarations()) {
             if (local.type() != null) {
                 continue;
@@ -44,29 +39,7 @@ public final class PhpTypeInferer {
         }
     }
 
-    private void inferMethodReturns(PhpSymbolCollection symbols, Node root) {
-        for (PhpMethodDeclaration method : symbols.methodDeclarations()) {
-            if (method.returnType() != null) {
-                continue;
-            }
-            Range range = method.range();
-            if (range == null) {
-                continue;
-            }
-            Node name = root.getDescendant(range.start(), range.end());
-            Node declaration = climbTo(name, "method_declaration");
-            if (declaration == null) {
-                continue;
-            }
-            Node returned = returnedExpression(declaration.getChildByFieldName("body"));
-            PhpType type = typeOf(returned, method, symbols);
-            if (type != null) {
-                method.returnType(type);
-            }
-        }
-    }
-
-    private @Nullable PhpType typeOf(
+    @Nullable PhpType typeOf(
             @Nullable Node expr, @Nullable PhpSymbolOwner owner, PhpSymbolCollection symbols
     ) {
         if (expr == null) {
@@ -80,7 +53,7 @@ public final class PhpTypeInferer {
             case "variable_name" -> variableType(Nodes.text(expr), owner, symbols);
             case "member_access_expression" -> memberType(expr, owner, symbols);
             case "object_creation_expression" -> createdType(expr, symbols);
-            case "parenthesized_expression" -> typeOf(firstNamedChild(expr), owner, symbols);
+            case "parenthesized_expression" -> typeOf(Nodes.namedChild(expr, 0), owner, symbols);
             case null, default -> null;
         };
     }
@@ -164,30 +137,6 @@ public final class PhpTypeInferer {
             }
         }
         return null;
-    }
-
-    private static @Nullable Node returnedExpression(@Nullable Node body) {
-        if (body == null) {
-            return null;
-        }
-        for (Node child : body.getChildren()) {
-            if ("return_statement".equals(child.getType())) {
-                return firstNamedChild(child);
-            }
-        }
-        return null;
-    }
-
-    private static @Nullable Node climbTo(@Nullable Node node, String type) {
-        Node current = node;
-        while (current != null && !type.equals(current.getType())) {
-            current = current.getParent();
-        }
-        return current;
-    }
-
-    private static @Nullable Node firstNamedChild(Node node) {
-        return node.getNamedChildCount() > 0 ? node.getNamedChild(0) : null;
     }
 
     private static @Nullable String withoutDollar(@Nullable String name) {
