@@ -10,6 +10,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.Position;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceContext;
 import dev.bluepitaya.phpmagik.lsp.dto.ReferenceParams;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentIdentifier;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
@@ -93,6 +94,7 @@ public final class ReferencesHandler {
             case PhpMethodVarUsage usage -> usage.definition();
             case PhpMethodLocalVarDeclaration declaration -> declaration;
             case PhpParameterDeclaration declaration -> declaration;
+            case PhpClassDeclaration declaration -> declaration;
             case PhpFunctionDefinition definition -> definition;
             case PhpMethodDeclaration definition -> definition;
             case PhpPropertyDeclaration definition -> definition;

@@ -46,6 +46,7 @@ public final class ReferenceResolver {
             case FUNCTION -> index.functions.get(name);
             case PROPERTY -> propertyOf(receiverClass(reference, index), name, index);
             case METHOD -> methodOf(receiverClass(reference, index), name, index);
+            case CLASS -> index.classes.get(name);
         };
     }
 

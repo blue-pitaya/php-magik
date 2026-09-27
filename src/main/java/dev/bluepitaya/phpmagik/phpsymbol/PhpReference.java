@@ -11,7 +11,8 @@ public final class PhpReference implements PhpSymbol {
     public enum Kind {
         FUNCTION,
         PROPERTY,
-        METHOD
+        METHOD,
+        CLASS
     }
 
     private final PhpFile file;
@@ -34,7 +35,7 @@ public final class PhpReference implements PhpSymbol {
 
     @Override
     public @Nullable String hover() {
-        return null;
+        return definition == null ? null : definition.hover();
     }
 
     public @Nullable PhpSymbolOwner owner() {

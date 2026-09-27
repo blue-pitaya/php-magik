@@ -112,7 +112,10 @@ public final class Workspace implements AutoCloseable {
         if (sources.size() <= 1 || cores <= 1) {
             List<Indexed> indexed = new ArrayList<>(sources.size());
             for (int i = 0; i < sources.size(); i++) {
-                collect(indexed, indexOne(i, sources.get(i), parser));
+                var one = indexOne(i, sources.get(i), parser);
+                if (one != null) {
+                    indexed.add(one);
+                }
             }
             return indexed;
         }
@@ -127,7 +130,7 @@ public final class Workspace implements AutoCloseable {
             return created;
         });
         ExecutorService pool = Executors.newFixedThreadPool(workers);
-        List<Future<Indexed>> futures = new ArrayList<>(sources.size());
+        List<Future<@Nullable Indexed>> futures = new ArrayList<>(sources.size());
         List<Indexed> indexed = new ArrayList<>(sources.size());
         try {
             for (int i = 0; i < sources.size(); i++) {
@@ -135,8 +138,11 @@ public final class Workspace implements AutoCloseable {
                 Path path = sources.get(i);
                 futures.add(pool.submit(() -> indexOne(fileId, path, threadParser.get())));
             }
-            for (Future<Indexed> future : futures) {
-                collect(indexed, future.get());
+            for (Future<@Nullable Indexed> future : futures) {
+                @Nullable Indexed one = future.get();
+                if (one != null) {
+                    indexed.add(one);
+                }
             }
         } catch (InterruptedException cause) {
             Thread.currentThread().interrupt();
@@ -152,13 +158,8 @@ public final class Workspace implements AutoCloseable {
         } finally {
             shutdown(pool, parsers);
         }
-        return indexed;
-    }
 
-    private static void collect(List<Indexed> indexed, @Nullable Indexed one) {
-        if (one != null) {
-            indexed.add(one);
-        }
+        return indexed;
     }
 
     private void shutdown(ExecutorService pool, List<Parser> parsers) {

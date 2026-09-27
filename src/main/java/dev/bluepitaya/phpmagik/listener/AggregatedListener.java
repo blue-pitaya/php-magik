@@ -26,7 +26,8 @@ public final class AggregatedListener implements Listener {
                 new PhpFunctionDefinitionListener(collection, file),
                 new PhpParameterDeclarationListener(collection, file),
                 new PhpMethodVarListener(collection, file),
-                new PhpReferenceListener(collection, file)
+                new PhpReferenceListener(collection, file),
+                new PhpClassReferenceListener(collection, file)
         );
     }
 

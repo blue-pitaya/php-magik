@@ -212,10 +212,10 @@ class OldFixtureTest {
     }
 
     @Test
-    void test_13_functionCallNotResolved() throws IOException {
+    void test_13_functionCallHoversItsDefinition() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_13")) {
             assertEquals(php("function greet"), hover(f, "main.php", 2, 9));
-            assertNull(hover(f, "main.php", 7, 5));
+            assertEquals(php("function greet"), hover(f, "main.php", 7, 5));
         }
     }
 
