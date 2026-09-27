@@ -14,6 +14,8 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
     private @Nullable PhpClassDeclaration owner;
     private @Nullable String name;
     private @Nullable PhpType returnType;
+    private String parameters = "";
+    private @Nullable String declaredReturnType;
     private @Nullable Range range;
     private @Nullable Range scope;
 
@@ -31,8 +33,25 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
         if (name == null) return null;
 
         String ownerName = owner == null ? null : owner.fqn();
+        String signature = (ownerName == null ? name : ownerName + "::" + name) + "(" + parameters + ")";
 
-        return PhpSymbol.code("function " + (ownerName == null ? name : ownerName + "::" + name));
+        return PhpSymbol.code("function " + (declaredReturnType == null ? signature : signature + ": " + declaredReturnType));
+    }
+
+    public String parameters() {
+        return parameters;
+    }
+
+    public void parameters(String parameters) {
+        this.parameters = parameters;
+    }
+
+    public @Nullable String declaredReturnType() {
+        return declaredReturnType;
+    }
+
+    public void declaredReturnType(String declaredReturnType) {
+        this.declaredReturnType = declaredReturnType;
     }
 
     public @Nullable PhpClassDeclaration owner() {

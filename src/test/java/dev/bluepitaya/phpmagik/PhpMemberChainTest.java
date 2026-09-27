@@ -24,7 +24,7 @@ class PhpMemberChainTest {
             var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
             Hover hover = handler.handle(at(fixture, 12, 21));
 
-            assertEquals("```php\nfunction App\\Models\\Bar::baz\n```", hover.contents().value());
+            assertEquals("```php\nfunction App\\Models\\Bar::baz($value)\n```", hover.contents().value());
         }
     }
 

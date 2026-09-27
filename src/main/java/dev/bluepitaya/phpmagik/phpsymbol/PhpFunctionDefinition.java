@@ -12,6 +12,8 @@ public final class PhpFunctionDefinition implements PhpSymbol, PhpSymbolOwner {
     private final int depth;
 
     private @Nullable String name;
+    private String parameters = "";
+    private @Nullable String declaredReturnType;
     private @Nullable Range range;
     private @Nullable Range scope;
 
@@ -28,7 +30,25 @@ public final class PhpFunctionDefinition implements PhpSymbol, PhpSymbolOwner {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        return PhpSymbol.code("function " + name);
+        String signature = name + "(" + parameters + ")";
+
+        return PhpSymbol.code("function " + (declaredReturnType == null ? signature : signature + ": " + declaredReturnType));
+    }
+
+    public String parameters() {
+        return parameters;
+    }
+
+    public void parameters(String parameters) {
+        this.parameters = parameters;
+    }
+
+    public @Nullable String declaredReturnType() {
+        return declaredReturnType;
+    }
+
+    public void declaredReturnType(String declaredReturnType) {
+        this.declaredReturnType = declaredReturnType;
     }
 
     public @Nullable String name() {

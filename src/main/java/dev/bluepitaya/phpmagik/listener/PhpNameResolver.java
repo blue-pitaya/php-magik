@@ -7,7 +7,9 @@ import dev.bluepitaya.phpmagik.ts.Nodes;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @NullMarked
@@ -48,6 +50,60 @@ public final class PhpNameResolver implements Listener {
             return slash < 0 ? imported : imported + name.substring(slash);
         }
         return qualify(name);
+    }
+
+    public String parametersText(@Nullable Node parameters) {
+        if (parameters == null) {
+            return "";
+        }
+
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < parameters.getNamedChildCount(); i++) {
+            Node parameter = parameters.getNamedChild(i);
+            switch (parameter.getType()) {
+                case "simple_parameter", "variadic_parameter", "property_promotion_parameter" -> {
+                    String name = Nodes.text(parameter.getChildByFieldName("name"));
+                    if (name == null) {
+                        continue;
+                    }
+                    if ("variadic_parameter".equals(parameter.getType())) {
+                        name = "..." + name;
+                    }
+                    Node type = parameter.getChildByFieldName("type");
+                    parts.add(type == null ? name : typeText(type) + " " + name);
+                }
+                case null, default -> {
+                }
+            }
+        }
+        return String.join(", ", parts);
+    }
+
+    public String typeText(Node type) {
+        return switch (type.getType()) {
+            case "named_type" -> {
+                String text = Nodes.text(type);
+                yield text == null ? "" : resolve(text);
+            }
+            case "optional_type" -> "?" + joined(type, "");
+            case "union_type", "disjunctive_normal_form_type" -> joined(type, "|");
+            case "intersection_type" -> joined(type, "&");
+            case null, default -> {
+                String text = Nodes.text(type);
+                yield text == null ? "" : text;
+            }
+        };
+    }
+
+    private String joined(Node type, String separator) {
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < type.getNamedChildCount(); i++) {
+            Node child = type.getNamedChild(i);
+            String part = typeText(child);
+            boolean grouped = "|".equals(separator) && "intersection_type".equals(child.getType());
+            parts.add(grouped ? "(" + part + ")" : part);
+        }
+        return String.join(separator, parts);
     }
 
     private String qualify(String name) {

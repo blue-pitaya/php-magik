@@ -19,18 +19,25 @@ public final class PhpFunctionDefinitionListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpFunctionDefinition> stack = new ArrayDeque<>();
+    private final PhpNameResolver names;
 
     public PhpFunctionDefinitionListener(
-            PhpSymbolCollection collection, PhpFile file
+            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
     ) {
         this.collection = collection;
         this.file = file;
+        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         if ("function_definition".equals(node.getType())) {
             PhpFunctionDefinition definition = new PhpFunctionDefinition(file, ctx.depth());
             definition.scope(Range.of(node));
+            definition.parameters(names.parametersText(node.getChildByFieldName("parameters")));
+            Node returnType = node.getChildByFieldName("return_type");
+            if (returnType != null) {
+                definition.declaredReturnType(names.typeText(returnType));
+            }
             stack.push(definition);
             ctx.push(definition);
         }

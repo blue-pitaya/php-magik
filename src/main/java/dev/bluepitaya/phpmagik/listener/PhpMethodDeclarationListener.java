@@ -58,10 +58,15 @@ public final class PhpMethodDeclarationListener implements Listener {
         }
         declaration.scope(Range.of(node));
 
+        declaration.parameters(names.parametersText(node.getChildByFieldName("parameters")));
+
         Node returnTypeNode = node.getChildByFieldName("return_type");
         PhpType returnType = names.type(Nodes.text(returnTypeNode));
         if (returnType != null) {
             declaration.returnType(returnType);
+        }
+        if (returnTypeNode != null) {
+            declaration.declaredReturnType(names.typeText(returnTypeNode));
         }
 
         declarations.push(declaration);
