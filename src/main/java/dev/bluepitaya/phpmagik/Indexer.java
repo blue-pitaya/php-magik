@@ -25,6 +25,9 @@ import java.util.stream.Stream;
 @NullMarked
 final class Indexer {
 
+    record Indexed(PhpFile file, PhpSymbolCollection collection) {
+    }
+
     private final Parser parser;
     private final Logger log;
 
@@ -115,12 +118,17 @@ final class Indexer {
         }
     }
 
-    private static void shutdown(ExecutorService pool, List<Parser> parsers) {
+    private void shutdown(ExecutorService pool, List<Parser> parsers) {
         pool.shutdownNow();
+        boolean terminated = false;
         try {
-            pool.awaitTermination(1, TimeUnit.MINUTES);
+            terminated = pool.awaitTermination(1, TimeUnit.MINUTES);
         } catch (InterruptedException cause) {
             Thread.currentThread().interrupt();
+        }
+        if (!terminated) {
+            log.log("index: pool did not terminate in 1m; leaking " + parsers.size() + " parsers still in use");
+            return;
         }
         for (Parser parser : parsers) {
             parser.close();
@@ -137,7 +145,7 @@ final class Indexer {
         log.log("index: " + path);
 
         Tree tree = parser.parse(content);
-        PhpFile file = new PhpFile(fileId, pathToUri(path), path.toString(), content, tree);
+        PhpFile file = new PhpFile(fileId, path, content, tree);
         return new Indexed(file, indexInto(file));
     }
 
@@ -151,16 +159,4 @@ final class Indexer {
         return Files.isRegularFile(path);
     }
 
-    private String pathToUri(Path path) {
-        Path absolute;
-        try {
-            absolute = path.toRealPath();
-        } catch (IOException cause) {
-            absolute = path.toAbsolutePath();
-        }
-        return "file://" + absolute;
-    }
-
-    record Indexed(PhpFile file, PhpSymbolCollection collection) {
-    }
 }

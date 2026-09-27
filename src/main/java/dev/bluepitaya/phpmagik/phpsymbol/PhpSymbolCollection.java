@@ -51,7 +51,7 @@ public final class PhpSymbolCollection {
         }
     }
 
-    public void removeFile(PhpFile file) {
+    public void removeSymbolsOfFile(PhpFile file) {
         for (List<? extends PhpSymbol> symbols : lists()) {
             symbols.removeIf(symbol -> symbol.file() == file);
         }

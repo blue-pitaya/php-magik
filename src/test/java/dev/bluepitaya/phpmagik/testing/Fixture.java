@@ -16,14 +16,13 @@ public final class Fixture implements AutoCloseable {
 
     private static final Path LSP_TESTS = Path.of("lsp-tests");
 
-    private final Parser parser;
     private final Logger log;
     private final Workspace workspace;
 
     private final SymbolFinder finder;
 
     private Fixture(Path root) throws IOException {
-        this.parser = new Parser();
+        Parser parser = new Parser();
         Path logPath = Files.createTempFile("php-magik-test", ".log");
         logPath.toFile().deleteOnExit();
         this.log = new Logger(logPath);

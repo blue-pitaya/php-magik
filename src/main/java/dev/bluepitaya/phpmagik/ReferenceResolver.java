@@ -20,7 +20,13 @@ import java.util.Map;
 @NullMarked
 public final class ReferenceResolver {
 
-    public void resolve(PhpSymbolCollection symbols) {
+    private final PhpSymbolCollection symbols;
+
+    public ReferenceResolver(PhpSymbolCollection symbols) {
+        this.symbols = symbols;
+    }
+
+    public void resolve() {
         Index index = new Index(symbols);
         for (PhpReference reference : symbols.references()) {
             PhpSymbol definition = definitionOf(reference, index);
@@ -30,7 +36,7 @@ public final class ReferenceResolver {
         }
     }
 
-    private static @Nullable PhpSymbol definitionOf(PhpReference reference, Index index) {
+    private @Nullable PhpSymbol definitionOf(PhpReference reference, Index index) {
         String name = reference.name();
         if (name == null) {
             return null;
@@ -43,7 +49,7 @@ public final class ReferenceResolver {
         };
     }
 
-    private static @Nullable PhpPropertyDeclaration propertyOf(
+    private @Nullable PhpPropertyDeclaration propertyOf(
             @Nullable PhpClassDeclaration owner, String name, Index index
     ) {
         if (owner == null) {
@@ -53,7 +59,7 @@ public final class ReferenceResolver {
         return byName == null ? null : byName.get(name);
     }
 
-    private static @Nullable PhpMethodDeclaration methodOf(
+    private @Nullable PhpMethodDeclaration methodOf(
             @Nullable PhpClassDeclaration owner, String name, Index index
     ) {
         if (owner == null) {
@@ -63,7 +69,7 @@ public final class ReferenceResolver {
         return byName == null ? null : byName.get(name);
     }
 
-    private static @Nullable PhpClassDeclaration receiverClass(PhpReference reference, Index index) {
+    private @Nullable PhpClassDeclaration receiverClass(PhpReference reference, Index index) {
         String receiver = reference.receiverVar();
         PhpSymbolOwner owner = reference.owner();
         if (receiver == null) {
@@ -78,7 +84,7 @@ public final class ReferenceResolver {
         return typeName == null ? null : index.classes.get(typeName);
     }
 
-    private static @Nullable String receiverTypeName(
+    private @Nullable String receiverTypeName(
             String receiver, @Nullable PhpSymbolOwner owner, Index index
     ) {
         PhpParameterDeclaration parameter = index.parameters.get(new Scoped(owner, receiver));
@@ -92,8 +98,8 @@ public final class ReferenceResolver {
         return null;
     }
 
-    private static @Nullable String classTypeName(@Nullable PhpType type) {
-        return type instanceof PhpType.ClassType classType ? classType.name() : null;
+    private @Nullable String classTypeName(@Nullable PhpType type) {
+        return type instanceof PhpType.ClassType(String name) ? name : null;
     }
 
     private static @Nullable String withoutDollar(@Nullable String name) {

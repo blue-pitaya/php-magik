@@ -3,12 +3,15 @@ package dev.bluepitaya.phpmagik;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Parser;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+@NullMarked
 public final class Workspace implements AutoCloseable {
 
     private final Parser parser;
@@ -31,11 +34,11 @@ public final class Workspace implements AutoCloseable {
         return symbols;
     }
 
-    public PhpFile findFile(String uri) {
-        for (PhpFile file : files) {
-            if (file.uri() != null && file.uri().equals(uri)) return file;
-        }
-        return null;
+    public @Nullable PhpFile findFile(String uri) {
+        return files.stream()
+                .filter(x -> x.uri().equals(uri))
+                .findFirst()
+                .orElse(null);
     }
 
     public void index(Path root) throws IOException {
@@ -46,17 +49,18 @@ public final class Workspace implements AutoCloseable {
             symbols.addAll(indexed.collection());
         }
 
-        new ReferenceResolver().resolve(symbols);
+        new ReferenceResolver(symbols).resolve();
         log.log("indexed " + files.size() + " file(s)");
     }
 
     public void reparse(PhpFile file, byte[] content) {
-        /* the file takes the new source before the walk, which reads both off it */
         file.replace(content, parser.parse(content));
 
-        symbols.removeFile(file);
+        symbols.removeSymbolsOfFile(file);
         symbols.addAll(indexer.indexInto(file));
-        new ReferenceResolver().resolve(symbols);
+
+        new ReferenceResolver(symbols).resolve();
+        log.log("reparsed: " + file.path().getFileName());
     }
 
     @Override
