@@ -26,21 +26,21 @@ class PhpClassReferenceTest {
     @Test
     void recordsTheScopeOfStaticAccessesButNotTheMember() throws IOException {
         try (Fixture fixture = Fixture.index("php_class_reference")) {
-            var classReferences = classReferences(fixture);
+            var classReferences = classReferences(fixture, "Service.php");
             assertEquals(
-                    List.of("User", "Missing", "User"),
+                    List.of("User", "User", "Missing", "User"),
                     classReferences.stream()
                             .map(PhpReference::name)
                             .toList()
             );
             assertEquals(
-                    List.of(range(10, 16, 20), range(11, 8, 15), range(13, 15, 31)),
+                    List.of(range(4, 4, 19), range(10, 16, 20), range(11, 8, 15), range(13, 15, 31)),
                     classReferences.stream()
                             .map(PhpReference::range)
                             .toList()
             );
             assertEquals(
-                    Arrays.asList("User", null, "User"),
+                    Arrays.asList("User", "User", null, "User"),
                     classReferences.stream()
                             .map(PhpReference::definition)
                             .map(definition -> definition instanceof PhpClassDeclaration declaration
@@ -54,15 +54,15 @@ class PhpClassReferenceTest {
     @Test
     void hoversTheClassOfAStaticCall() throws IOException {
         try (Fixture fixture = Fixture.index("php_class_reference")) {
-            assertEquals(php("class User"), hover(fixture, 10, 17));
+            assertEquals(php("namespace App\\Models;\nclass User"), hover(fixture, 10, 17));
         }
     }
 
     @Test
     void hoversTheClassOfAQualifiedClassConstant() throws IOException {
         try (Fixture fixture = Fixture.index("php_class_reference")) {
-            assertEquals(php("class User"), hover(fixture, 13, 16));
-            assertEquals(php("class User"), hover(fixture, 13, 28));
+            assertEquals(php("namespace App\\Models;\nclass User"), hover(fixture, 13, 16));
+            assertEquals(php("namespace App\\Models;\nclass User"), hover(fixture, 13, 28));
         }
     }
 
@@ -87,20 +87,108 @@ class PhpClassReferenceTest {
         }
     }
 
-    private static List<PhpReference> classReferences(Fixture fixture) {
+    @Test
+    void recordsClassImportsAndClassNamesInPropertyAndParameterTypes() throws IOException {
+        try (Fixture fixture = Fixture.index("php_class_reference_property")) {
+            var classReferences = classReferences(fixture, "Car.php");
+            assertEquals(
+                    List.of("Engine", "Engine", "Engine", "Engine", "Engine", "Engine", "Engine"),
+                    classReferences.stream()
+                            .map(PhpReference::name)
+                            .toList()
+            );
+            assertEquals(
+                    List.of(range(4, 4, 21), range(5, 4, 21), range(9, 11, 17), range(11, 13, 19),
+                            range(13, 15, 21), range(15, 40, 46), range(15, 58, 64)),
+                    classReferences.stream()
+                            .map(PhpReference::range)
+                            .toList()
+            );
+        }
+    }
+
+    @Test
+    void hoversTheClassOfAnImport() throws IOException {
+        try (Fixture fixture = Fixture.index("php_class_reference_property")) {
+            String engine = php("namespace App\\Models;\nclass Engine");
+            assertEquals(engine, hover(fixture, "Car.php", 4, 16));
+            assertEquals(engine, hover(fixture, "Car.php", 5, 16));
+        }
+    }
+
+    @Test
+    void hoversTheClassOfAPropertyType() throws IOException {
+        try (Fixture fixture = Fixture.index("php_class_reference_property")) {
+            String engine = php("namespace App\\Models;\nclass Engine");
+            assertEquals(engine, hover(fixture, "Car.php", 9, 12));
+            assertEquals(engine, hover(fixture, "Car.php", 11, 14));
+            assertEquals(engine, hover(fixture, "Car.php", 13, 16));
+            assertEquals(engine, hover(fixture, "Car.php", 15, 41));
+        }
+    }
+
+    @Test
+    void recordsClassNamesInInheritanceInstanceofAndInstantiation() throws IOException {
+        try (Fixture fixture = Fixture.index("php_class_reference_positions")) {
+            var classReferences = classReferences(fixture, "Car.php");
+            assertEquals(
+                    List.of("Base", "Drivable", "Base", "Car", "Car", "Car", "Car", "Car"),
+                    classReferences.stream()
+                            .map(PhpReference::name)
+                            .toList()
+            );
+            assertEquals(
+                    List.of(range(4, 18, 22), range(4, 34, 42), range(6, 32, 36), range(6, 45, 48),
+                            range(8, 29, 32), range(9, 19, 23), range(12, 15, 21), range(12, 33, 36)),
+                    classReferences.stream()
+                            .map(PhpReference::range)
+                            .toList()
+            );
+            assertEquals(
+                    Arrays.asList("Base", null, "Base", "Car", "Car", "Car", "Car", "Car"),
+                    classReferences.stream()
+                            .map(PhpReference::definition)
+                            .map(definition -> definition instanceof PhpClassDeclaration declaration
+                                    ? declaration.name()
+                                    : null)
+                            .toList()
+            );
+        }
+    }
+
+    @Test
+    void hoversSelfAndStaticAsTheEnclosingClass() throws IOException {
+        try (Fixture fixture = Fixture.index("php_class_reference_positions")) {
+            String car = php("namespace App;\nclass Car");
+            assertEquals(car, hover(fixture, "Car.php", 9, 20));
+            assertEquals(car, hover(fixture, "Car.php", 12, 16));
+        }
+    }
+
+    private static List<PhpReference> classReferences(Fixture fixture, String file) {
+        PhpFile phpFile = fixture.file(file);
         return fixture.symbols().references().stream()
                 .filter(reference -> reference.kind() == PhpReference.Kind.CLASS)
+                .filter(reference -> reference.file() == phpFile)
                 .toList();
     }
 
     private static String hover(Fixture fixture, int line, int character) {
+        return hover(fixture, "Service.php", line, character);
+    }
+
+    private static String hover(Fixture fixture, String file, int line, int character) {
         var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
-        Hover result = handler.handle(at(fixture, line, character));
+        Hover result = handler.handle(at(fixture, file, line, character));
         return result == null ? null : result.contents().value();
     }
 
     private static TextDocumentPosition at(Fixture fixture, int line, int character) {
-        String uri = fixture.file("Service.php").uri();
+        return at(fixture, "Service.php", line, character);
+    }
+
+    private static TextDocumentPosition at(Fixture fixture, String file, int line, int character) {
+        String uri = fixture.file(file).uri();
         return new TextDocumentPosition(new TextDocumentIdentifier(uri), new Position(line, character));
     }
 

@@ -2,6 +2,8 @@ package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
@@ -27,7 +29,7 @@ public final class PhpClassReferenceListener implements Listener {
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
             case "qualified_name", "relative_name" -> {
-                if (isScopeOf(node, ctx.parent())) {
+                if (isClassName(node, ctx.parent())) {
                     add(ctx, lastName(node), node);
                 }
             }
@@ -37,8 +39,23 @@ public final class PhpClassReferenceListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if ("name".equals(node.getType()) && isScopeOf(node, ctx.parent())) {
-            add(ctx, Nodes.text(node), node);
+        switch (node.getType()) {
+            case "name" -> {
+                if (isClassName(node, ctx.parent())) {
+                    String name = Nodes.text(node);
+                    boolean self = "self".equalsIgnoreCase(name) || "static".equalsIgnoreCase(name);
+                    add(ctx, self ? enclosingClassName(ctx) : name, node);
+                }
+            }
+            case "relative_scope" -> {
+                String scope = Nodes.text(node);
+                if (isScope(node, ctx.parent())
+                        && ("self".equalsIgnoreCase(scope) || "static".equalsIgnoreCase(scope))) {
+                    add(ctx, enclosingClassName(ctx), node);
+                }
+            }
+            case null, default -> {
+            }
         }
     }
 
@@ -56,20 +73,54 @@ public final class PhpClassReferenceListener implements Listener {
         collection.add(reference);
     }
 
-    private static boolean isScopeOf(Node node, @Nullable Node parent) {
+    private boolean isClassName(Node node, @Nullable Node parent) {
         if (parent == null) {
             return false;
         }
 
-        Node scope = switch (parent.getType()) {
-            case "scoped_call_expression", "scoped_property_access_expression" -> parent.getChildByFieldName("scope");
-            case "class_constant_access_expression" -> Nodes.namedChild(parent, 0);
-            case null, default -> null;
+        return switch (parent.getType()) {
+            case "named_type", "object_creation_expression", "base_clause", "class_interface_clause" -> true;
+            case "binary_expression" -> node.equals(parent.getChildByFieldName("right"))
+                    && "instanceof".equalsIgnoreCase(Nodes.text(parent.getChildByFieldName("operator")));
+            case "namespace_use_clause" -> isClassImport(node, parent);
+            case null, default -> isScope(node, parent);
         };
-        return node.equals(scope);
     }
 
-    private static @Nullable String lastName(Node qualified) {
+    private boolean isClassImport(Node node, Node clause) {
+        if (node.equals(clause.getChildByFieldName("alias")) || clause.getChildByFieldName("type") != null) {
+            return false;
+        }
+
+        Node declaration = clause.getParent();
+        if (declaration != null && "namespace_use_group".equals(declaration.getType())) {
+            declaration = declaration.getParent();
+        }
+        return declaration == null || declaration.getChildByFieldName("type") == null;
+    }
+
+    private boolean isScope(Node node, @Nullable Node parent) {
+        if (parent == null) {
+            return false;
+        }
+
+        return switch (parent.getType()) {
+            case "scoped_call_expression", "scoped_property_access_expression" ->
+                    node.equals(parent.getChildByFieldName("scope"));
+            case "class_constant_access_expression" -> node.equals(Nodes.namedChild(parent, 0));
+            case null, default -> false;
+        };
+    }
+
+    private @Nullable String enclosingClassName(CompleteIndexer.Ctx ctx) {
+        @Nullable PhpSymbolOwner owner = ctx.peek();
+        if (owner instanceof PhpMethodDeclaration method) {
+            owner = method.owner();
+        }
+        return owner instanceof PhpClassDeclaration declaration ? declaration.name() : null;
+    }
+
+    private @Nullable String lastName(Node qualified) {
         String name = null;
         int count = qualified.getNamedChildCount();
         for (int i = 0; i < count; i++) {

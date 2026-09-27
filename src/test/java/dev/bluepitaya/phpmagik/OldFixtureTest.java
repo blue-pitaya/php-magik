@@ -152,7 +152,7 @@ class OldFixtureTest {
     void test_8_multiFileNamespaces() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_8")) {
             assertEquals(php("namespace App"), hover(f, "Foo.php", 2, 10));
-            assertEquals(php("class Foo"), hover(f, "Foo.php", 7, 6));
+            assertEquals(php("namespace App;\nclass Foo"), hover(f, "Foo.php", 7, 6));
             assertEquals(php("function Foo::call"), hover(f, "Foo.php", 9, 20));
             assertEquals(php("call(): $a"), hover(f, "Foo.php", 11, 8));
             assertEquals(php("call(): $b"), hover(f, "Foo.php", 12, 8));
@@ -160,11 +160,11 @@ class OldFixtureTest {
             assertEquals(php("call(): B $b"), hover(f, "Foo.php", 15, 13));
 
             assertEquals(php("namespace App\\NSA"), hover(f, "A.php", 2, 10));
-            assertEquals(php("class A"), hover(f, "A.php", 4, 6));
+            assertEquals(php("namespace App\\NSA;\nclass A"), hover(f, "A.php", 4, 6));
             assertEquals(php("function A::get"), hover(f, "A.php", 6, 20));
 
             assertEquals(php("namespace App\\NSB"), hover(f, "B.php", 2, 10));
-            assertEquals(php("class B"), hover(f, "B.php", 4, 6));
+            assertEquals(php("namespace App\\NSB;\nclass B"), hover(f, "B.php", 4, 6));
             assertEquals(php("function B::get"), hover(f, "B.php", 6, 20));
         }
     }
@@ -327,9 +327,9 @@ class OldFixtureTest {
     @Test
     void test_41_bracedNamespaces() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_41")) {
-            assertEquals(php("class A"), hover(f, "main.php", 3, 10));
+            assertEquals(php("namespace App\\NSA;\nclass A"), hover(f, "main.php", 3, 10));
             assertEquals(php("function A::get"), hover(f, "main.php", 5, 24));
-            assertEquals(php("class Foo"), hover(f, "main.php", 16, 10));
+            assertEquals(php("namespace App;\nclass Foo"), hover(f, "main.php", 16, 10));
             assertEquals(php("function Foo::call"), hover(f, "main.php", 18, 24));
             assertEquals(php("call(A $a)"), hover(f, "main.php", 18, 31));
             assertEquals(php("call(int $n)"), hover(f, "main.php", 18, 51));

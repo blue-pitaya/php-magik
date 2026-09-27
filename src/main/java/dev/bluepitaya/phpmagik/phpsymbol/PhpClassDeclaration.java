@@ -12,6 +12,7 @@ public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
     private final int depth;
 
     private String $modifier = "";
+    private @Nullable String namespace;
     private @Nullable String name;
     private @Nullable Range range;
     private @Nullable Range scope;
@@ -29,7 +30,16 @@ public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        return PhpSymbol.code($modifier.isEmpty() ? "class " + name : $modifier + " class " + name);
+        String declaration = $modifier.isEmpty() ? "class " + name : $modifier + " class " + name;
+        return PhpSymbol.code(namespace == null ? declaration : "namespace " + namespace + ";\n" + declaration);
+    }
+
+    public @Nullable String namespace() {
+        return namespace;
+    }
+
+    public void namespace(String namespace) {
+        this.namespace = namespace;
     }
 
     public String $modifier() {

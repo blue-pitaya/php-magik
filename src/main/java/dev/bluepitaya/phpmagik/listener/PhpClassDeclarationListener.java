@@ -8,6 +8,7 @@ import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -18,6 +19,7 @@ public final class PhpClassDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpClassDeclaration> declarations = new ArrayDeque<>();
+    private @Nullable String namespace;
 
     public PhpClassDeclarationListener(
             PhpSymbolCollection collection, PhpFile file
@@ -27,14 +29,31 @@ public final class PhpClassDeclarationListener implements Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        if ("class_declaration".equals(node.getType())) {
-            PhpClassDeclaration declaration = new PhpClassDeclaration(file, ctx.depth());
-            declarations.push(declaration);
-            ctx.push(declaration);
+        switch (node.getType()) {
+            case "namespace_definition" -> namespace = null;
+            case "namespace_name" -> {
+                if ("namespace_definition".equals(Nodes.type(ctx.parent()))) {
+                    namespace = Nodes.text(node);
+                }
+            }
+            case "class_declaration" -> {
+                PhpClassDeclaration declaration = new PhpClassDeclaration(file, ctx.depth());
+                if (namespace != null) {
+                    declaration.namespace(namespace);
+                }
+                declarations.push(declaration);
+                ctx.push(declaration);
+            }
+            case null, default -> {
+            }
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
+        if ("namespace_definition".equals(node.getType())
+                && node.getChildByFieldName("body") != null) {
+            namespace = null;
+        }
         if ("class_declaration".equals(node.getType())) {
             PhpClassDeclaration declaration = declarations.poll();
             ctx.pop();
