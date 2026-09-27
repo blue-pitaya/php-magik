@@ -24,19 +24,7 @@ public final class PhpMethodVarUsage implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String typeStr = type != null ? type.php() : null;
-        String declared = typeStr == null ? name : typeStr + " " + name;
-        String ownerName = ownerName();
-
-        return PhpSymbol.code(ownerName == null ? declared : ownerName + "(): " + declared);
-    }
-
-    private @Nullable String ownerName() {
-        return switch (owner) {
-            case PhpMethodDeclaration m -> m.name();
-            case PhpFunctionDefinition f -> f.name();
-            case null, default -> null;
-        };
+        return PhpSymbol.code(PhpType.declared(type, name));
     }
 
     public @Nullable PhpSymbolOwner owner() {

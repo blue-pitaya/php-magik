@@ -11,6 +11,9 @@ import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @NullMarked
 public final class PhpReferenceListener implements Listener {
 
@@ -46,11 +49,8 @@ public final class PhpReferenceListener implements Listener {
         if (ctx.peek() instanceof PhpSymbolOwner owner) {
             reference.owner(owner);
         }
-        if (kind != PhpReference.Kind.FUNCTION) {
-            String receiver = receiverOf(parent);
-            if (receiver != null) {
-                reference.receiverVar(receiver);
-            }
+        if (kind != PhpReference.Kind.FUNCTION && parent != null) {
+            receive(reference, parent.getChildByFieldName("object"));
         }
         collection.add(reference);
     }
@@ -58,21 +58,39 @@ public final class PhpReferenceListener implements Listener {
     private static PhpReference.@Nullable Kind kindOf(@Nullable Node parent) {
         return switch (Nodes.type(parent)) {
             case "function_call_expression" -> PhpReference.Kind.FUNCTION;
-            case "member_access_expression" -> PhpReference.Kind.PROPERTY;
-            case "member_call_expression" -> PhpReference.Kind.METHOD;
+            case "member_access_expression", "nullsafe_member_access_expression" -> PhpReference.Kind.PROPERTY;
+            case "member_call_expression", "nullsafe_member_call_expression" -> PhpReference.Kind.METHOD;
             case null, default -> null;
         };
     }
 
-    private static @Nullable String receiverOf(@Nullable Node parent) {
-        if (parent == null) {
-            return null;
+    private static void receive(PhpReference reference, @Nullable Node object) {
+        List<PhpReference.Step> path = new ArrayList<>();
+        @Nullable Node current = object;
+        while (current != null) {
+            switch (current.getType()) {
+                case "variable_name" -> {
+                    String receiver = Nodes.text(current);
+                    if (receiver != null) {
+                        reference.receiverVar(receiver);
+                        reference.receiverPath(List.copyOf(path.reversed()));
+                    }
+                    return;
+                }
+                case "member_access_expression", "nullsafe_member_access_expression",
+                     "member_call_expression", "nullsafe_member_call_expression" -> {
+                    String name = Nodes.text(current.getChildByFieldName("name"));
+                    if (name == null) {
+                        return;
+                    }
+                    path.add(new PhpReference.Step(name, current.getType().endsWith("call_expression")));
+                    current = current.getChildByFieldName("object");
+                }
+                case null, default -> {
+                    return;
+                }
+            }
         }
-        Node object = parent.getChildByFieldName("object");
-        if (object == null || !"variable_name".equals(object.getType())) {
-            return null;
-        }
-        return Nodes.text(object);
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {

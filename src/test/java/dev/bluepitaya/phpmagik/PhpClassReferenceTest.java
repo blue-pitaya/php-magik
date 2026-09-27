@@ -175,14 +175,14 @@ class PhpClassReferenceTest {
     void findsReferencesOfTheImportedClassAmongClassesSharingAShortName() throws IOException {
         try (Fixture fixture = Fixture.index("php_class_reference_fqn")) {
             var handler = new ReferencesHandler(fixture.workspace(), fixture.finder(), fixture.log());
-            String declarationUri = fixture.file("Users/ShowProps.php").uri();
-            String controllerUri = fixture.file("Controller.php").uri();
+            String declarationUri = fixture.file("Qux/Foo.php").uri();
+            String mainUri = fixture.file("Main.php").uri();
 
             ArrayNode expected = Json.array();
-            expected.add(Json.location(controllerUri, range(4, 4, 28)));
-            expected.add(Json.location(controllerUri, range(8, 28, 37)));
-            expected.add(Json.location(controllerUri, range(10, 19, 28)));
-            expected.add(Json.location(controllerUri, range(13, 26, 35)));
+            expected.add(Json.location(mainUri, range(4, 4, 15)));
+            expected.add(Json.location(mainUri, range(8, 28, 31)));
+            expected.add(Json.location(mainUri, range(10, 19, 22)));
+            expected.add(Json.location(mainUri, range(13, 25, 28)));
             assertEquals(expected, handler.handle(new ReferenceParams(
                     new TextDocumentIdentifier(declarationUri),
                     new Position(5, 6),
@@ -197,8 +197,8 @@ class PhpClassReferenceTest {
             var handler = new DefinitionHandler(fixture.workspace(), fixture.finder(), fixture.log());
 
             assertEquals(
-                    Json.location(fixture.file("Users/ShowProps.php").uri(), range(7, 20, 25)),
-                    handler.handle(at(fixture, "Controller.php", 15, 24))
+                    Json.location(fixture.file("Qux/Foo.php").uri(), range(7, 20, 23)),
+                    handler.handle(at(fixture, "Main.php", 15, 22))
             );
         }
     }

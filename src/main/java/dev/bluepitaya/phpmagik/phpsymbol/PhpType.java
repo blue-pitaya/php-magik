@@ -28,6 +28,14 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
         return new ClassType(fqn);
     }
 
+    static String declared(@Nullable PhpType type, String name) {
+        return switch (type) {
+            case ClassType(String fqn) -> fqn + " " + name;
+            case null -> name;
+            default -> type.php() + " " + name;
+        };
+    }
+
     enum Builtin implements PhpType {
         Integer("int"),
         Float("float"),

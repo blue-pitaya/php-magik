@@ -71,6 +71,38 @@ public final class ReferenceResolver {
     }
 
     private @Nullable PhpClassDeclaration receiverClass(PhpReference reference, Index index) {
+        PhpClassDeclaration current = baseClass(reference, index);
+        for (PhpReference.Step step : reference.receiverPath()) {
+            if (current == null) {
+                return null;
+            }
+            PhpType type;
+            if (step.call()) {
+                PhpMethodDeclaration method = methodOf(current, step.name(), index);
+                type = method == null ? null : method.returnType();
+            } else {
+                PhpPropertyDeclaration property = propertyOf(current, step.name(), index);
+                type = property == null ? null : property.type();
+            }
+            current = classOf(type, current, index);
+        }
+        return current;
+    }
+
+    private @Nullable PhpClassDeclaration classOf(
+            @Nullable PhpType type, PhpClassDeclaration current, Index index
+    ) {
+        String fqn = classTypeName(type);
+        if (fqn == null) {
+            return null;
+        }
+        if ("self".equalsIgnoreCase(fqn) || "static".equalsIgnoreCase(fqn)) {
+            return current;
+        }
+        return index.classes.get(fqn);
+    }
+
+    private @Nullable PhpClassDeclaration baseClass(PhpReference reference, Index index) {
         String receiver = reference.receiverVar();
         PhpSymbolOwner owner = reference.owner();
         if (receiver == null) {

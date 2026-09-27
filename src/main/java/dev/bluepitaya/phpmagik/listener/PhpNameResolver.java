@@ -24,6 +24,9 @@ public final class PhpNameResolver implements Listener {
         if (text == null) {
             return null;
         }
+        if (text.startsWith("?")) {
+            text = text.substring(1);
+        }
         PhpType builtin = PhpType.of(text);
         return builtin != null ? builtin : PhpType.named(resolve(text));
     }

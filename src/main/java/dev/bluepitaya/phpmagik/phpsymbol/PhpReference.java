@@ -5,6 +5,8 @@ import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 @NullMarked
 public final class PhpReference implements PhpSymbol {
 
@@ -15,12 +17,16 @@ public final class PhpReference implements PhpSymbol {
         CLASS
     }
 
+    public record Step(String name, boolean call) {
+    }
+
     private final PhpFile file;
     private final Kind kind;
 
     private @Nullable PhpSymbolOwner owner;
     private @Nullable String name;
     private @Nullable String receiverVar;
+    private List<Step> receiverPath = List.of();
     private @Nullable PhpSymbol definition;
     private @Nullable Range range;
 
@@ -60,6 +66,14 @@ public final class PhpReference implements PhpSymbol {
 
     public void receiverVar(String receiverVar) {
         this.receiverVar = receiverVar;
+    }
+
+    public List<Step> receiverPath() {
+        return receiverPath;
+    }
+
+    public void receiverPath(List<Step> receiverPath) {
+        this.receiverPath = receiverPath;
     }
 
     public @Nullable PhpSymbol definition() {

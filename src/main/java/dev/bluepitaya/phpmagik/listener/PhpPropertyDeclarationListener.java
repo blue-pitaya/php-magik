@@ -57,9 +57,9 @@ public final class PhpPropertyDeclarationListener implements Listener {
             declaration.owner(owner);
         }
 
-        Node parent = node.getParent();
-        if (parent != null) {
-            PhpType type = names.type(Nodes.text(parent.getChildByFieldName("type")));
+        Node typed = "property_promotion_parameter".equals(node.getType()) ? node : node.getParent();
+        if (typed != null) {
+            PhpType type = names.type(Nodes.text(typed.getChildByFieldName("type")));
             if (type != null) {
                 declaration.type(type);
             }

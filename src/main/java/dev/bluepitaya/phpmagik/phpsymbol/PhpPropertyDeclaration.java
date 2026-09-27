@@ -29,9 +29,7 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String ownerName = owner == null ? null : owner.name();
-
-        return PhpSymbol.code(ownerName == null ? name : ownerName + "::" + name);
+        return PhpSymbol.code(PhpType.declared(type, name));
     }
 
     public @Nullable PhpClassDeclaration owner() {

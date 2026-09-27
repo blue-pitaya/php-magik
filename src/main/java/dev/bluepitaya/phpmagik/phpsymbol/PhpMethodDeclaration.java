@@ -30,7 +30,7 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpSymbolOwner {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String ownerName = owner == null ? null : owner.name();
+        String ownerName = owner == null ? null : owner.fqn();
 
         return PhpSymbol.code("function " + (ownerName == null ? name : ownerName + "::" + name));
     }
