@@ -8,6 +8,10 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
 
     String php();
 
+    default String qualified() {
+        return php();
+    }
+
     static @Nullable PhpType of(@Nullable String node) {
         return switch (node) {
             case "int", "integer" -> Builtin.Integer;
@@ -29,11 +33,7 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
     }
 
     static String declared(@Nullable PhpType type, String name) {
-        return switch (type) {
-            case ClassType(String fqn) -> fqn + " " + name;
-            case null -> name;
-            default -> type.php() + " " + name;
-        };
+        return type == null ? name : type.qualified() + " " + name;
     }
 
     enum Builtin implements PhpType {
@@ -65,6 +65,11 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
         @Override
         public String php() {
             return fqn.substring(fqn.lastIndexOf('\\') + 1);
+        }
+
+        @Override
+        public String qualified() {
+            return fqn;
         }
     }
 }

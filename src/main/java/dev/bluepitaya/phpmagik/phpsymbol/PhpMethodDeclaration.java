@@ -35,9 +35,8 @@ public final class PhpMethodDeclaration implements PhpSymbol, PhpFunctionLike {
         if (name == null) return null;
 
         String ownerName = owner == null ? null : owner.fqn();
-        String signature = (ownerName == null ? name : ownerName + "::" + name) + "(" + parameters + ")";
 
-        return PhpSymbol.code("function " + (declaredReturnType == null ? signature : signature + ": " + declaredReturnType));
+        return PhpSymbol.code("function " + signature(ownerName == null ? name : ownerName + "::" + name));
     }
 
     public String parameters() {

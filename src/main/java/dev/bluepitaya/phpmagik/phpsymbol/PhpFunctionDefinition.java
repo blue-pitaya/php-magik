@@ -33,9 +33,7 @@ public final class PhpFunctionDefinition implements PhpSymbol, PhpFunctionLike {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String signature = name + "(" + parameters + ")";
-
-        return PhpSymbol.code("function " + (declaredReturnType == null ? signature : signature + ": " + declaredReturnType));
+        return PhpSymbol.code("function " + signature(name));
     }
 
     public String parameters() {

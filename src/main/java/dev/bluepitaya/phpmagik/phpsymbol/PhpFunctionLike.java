@@ -32,4 +32,14 @@ public sealed interface PhpFunctionLike extends PhpSymbolOwner permits PhpMethod
     @Nullable PhpType returnType();
 
     void returnType(PhpType returnType);
+
+    default String signature(String name) {
+        String signature = name + "(" + parameters() + ")";
+        String returns = declaredReturnType();
+        PhpType inferred = returnType();
+        if (returns == null && inferred != null) {
+            returns = inferred.qualified();
+        }
+        return returns == null ? signature : signature + ": " + returns;
+    }
 }
