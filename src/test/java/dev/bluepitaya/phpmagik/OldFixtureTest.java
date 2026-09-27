@@ -11,7 +11,6 @@ import dev.bluepitaya.phpmagik.lsp.handler.CompletionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
-import dev.bluepitaya.phpmagik.resolver.PhpMethodDeclarationResolver;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -31,10 +30,7 @@ class OldFixtureTest {
     }
 
     private static String hover(Fixture fixture, String fileName, int line, int character) {
-        var handler = new HoverHandler(
-                fixture.workspace(), fixture.finder(),
-                new PhpMethodDeclarationResolver(fixture.workspace()),
-                fixture.log());
+        var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
         String uri = fixture.file(fileName).uri();
         Hover result = handler.handle(at(uri, line, character));
         return result == null ? null : result.contents().value();
@@ -47,7 +43,7 @@ class OldFixtureTest {
     }
 
     private static ArrayNode references(Fixture fixture, String fileName, int line, int character,
-                                         boolean includeDeclaration) {
+                                        boolean includeDeclaration) {
         var handler = new ReferencesHandler(fixture.workspace(), fixture.finder(), fixture.log());
         String uri = fixture.file(fileName).uri();
         return handler.handle(ref(uri, line, character, includeDeclaration));

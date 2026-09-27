@@ -15,7 +15,6 @@ import dev.bluepitaya.phpmagik.lsp.handler.DidOpenHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.InitializeHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
-import dev.bluepitaya.phpmagik.resolver.PhpMethodDeclarationResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
@@ -57,7 +56,7 @@ public final class LspServer {
         this.didOpen = new DidOpenHandler(app, log);
         this.didChange = new DidChangeHandler(app, log);
         this.didClose = new DidCloseHandler(log);
-        this.hover = new HoverHandler(app, symbols, new PhpMethodDeclarationResolver(app), log);
+        this.hover = new HoverHandler(app, symbols, log);
         this.definition = new DefinitionHandler(app, symbols, log);
         this.references = new ReferencesHandler(app, symbols, log);
         this.completion = new CompletionHandler(app, log);

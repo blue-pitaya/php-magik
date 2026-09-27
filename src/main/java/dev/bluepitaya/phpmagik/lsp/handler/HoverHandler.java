@@ -9,7 +9,6 @@ import dev.bluepitaya.phpmagik.lsp.dto.Hover;
 import dev.bluepitaya.phpmagik.lsp.dto.MarkupContent;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
-import dev.bluepitaya.phpmagik.resolver.PhpMethodDeclarationResolver;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -22,8 +21,7 @@ public final class HoverHandler {
 
     private final Logger log;
 
-    public HoverHandler(Workspace workspace, SymbolFinder symbols,
-                        PhpMethodDeclarationResolver methodDeclarations, Logger log) {
+    public HoverHandler(Workspace workspace, SymbolFinder symbols, Logger log) {
         this.workspace = workspace;
         this.symbols = symbols;
         this.log = log;
