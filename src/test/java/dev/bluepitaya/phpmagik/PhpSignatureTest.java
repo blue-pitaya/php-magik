@@ -54,6 +54,6 @@ class PhpSignatureTest {
     }
 
     private static String php(String text) {
-        return "```php\n" + text + "\n```";
+        return "```php\n<?php\n" + text + "\n```";
     }
 }

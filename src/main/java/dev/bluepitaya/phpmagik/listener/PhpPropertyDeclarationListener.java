@@ -9,8 +9,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -57,9 +55,10 @@ public final class PhpPropertyDeclarationListener implements Listener {
             declaration.owner(owner);
         }
 
-        Node typed = "property_promotion_parameter".equals(node.getType()) ? node : node.getParent();
-        if (typed != null) {
-            PhpType type = names.type(Nodes.text(typed.getChildByFieldName("type")));
+        Node typed = node.isType("property_promotion_parameter") ? node : node.getParent();
+        Node typeNode = typed == null ? null : typed.getChildByFieldName("type");
+        if (typeNode != null) {
+            PhpType type = names.type(typeNode.getContent());
             if (type != null) {
                 declaration.type(type);
             }
@@ -75,10 +74,9 @@ public final class PhpPropertyDeclarationListener implements Listener {
         }
 
         /* the first one names it; a later one is the default value */
-        String text = Nodes.text(node);
-        if (declaration.name() == null && text != null) {
-            declaration.name(text);
-            declaration.range(Range.of(node));
+        if (declaration.name() == null) {
+            declaration.name(node.getContent());
+            declaration.range(node.getRange());
         }
     }
 

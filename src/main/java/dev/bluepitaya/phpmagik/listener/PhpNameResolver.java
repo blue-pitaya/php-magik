@@ -5,7 +5,6 @@ import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
 import dev.bluepitaya.phpmagik.phpdoc.PhpDocTypes;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -100,11 +99,12 @@ public final class PhpNameResolver implements Listener {
             Node parameter = parameters.getNamedChild(i);
             switch (parameter.getType()) {
                 case "simple_parameter", "variadic_parameter", "property_promotion_parameter" -> {
-                    String name = Nodes.text(parameter.getChildByFieldName("name"));
-                    if (name == null) {
+                    Node nameNode = parameter.getChildByFieldName("name");
+                    if (nameNode == null) {
                         continue;
                     }
-                    if ("variadic_parameter".equals(parameter.getType())) {
+                    String name = nameNode.getContent();
+                    if (parameter.isType("variadic_parameter")) {
                         name = "..." + name;
                     }
                     Node type = parameter.getChildByFieldName("type");
@@ -119,17 +119,11 @@ public final class PhpNameResolver implements Listener {
 
     public String typeText(Node type) {
         return switch (type.getType()) {
-            case "named_type" -> {
-                String text = Nodes.text(type);
-                yield text == null ? "" : resolve(text);
-            }
+            case "named_type" -> resolve(type.getContent());
             case "optional_type" -> "?" + joined(type, "");
             case "union_type", "disjunctive_normal_form_type" -> joined(type, "|");
             case "intersection_type" -> joined(type, "&");
-            case null, default -> {
-                String text = Nodes.text(type);
-                yield text == null ? "" : text;
-            }
+            case null, default -> type.getContent();
         };
     }
 
@@ -138,7 +132,7 @@ public final class PhpNameResolver implements Listener {
         for (int i = 0; i < type.getNamedChildCount(); i++) {
             Node child = type.getNamedChild(i);
             String part = typeText(child);
-            boolean grouped = "|".equals(separator) && "intersection_type".equals(child.getType());
+            boolean grouped = "|".equals(separator) && child.isType("intersection_type");
             parts.add(grouped ? "(" + part + ")" : part);
         }
         return String.join(separator, parts);
@@ -152,27 +146,27 @@ public final class PhpNameResolver implements Listener {
         @Nullable Node imported = null;
         for (int i = 0; i < clause.getNamedChildCount() && imported == null; i++) {
             Node child = clause.getNamedChild(i);
-            if ("name".equals(child.getType()) || "qualified_name".equals(child.getType())) {
+            if (child.isType("name") || child.isType("qualified_name")) {
                 imported = child;
             }
         }
-        String text = Nodes.text(imported);
-        if (text == null) {
+        if (imported == null) {
             return null;
         }
+        String text = imported.getContent();
         if (text.startsWith("\\")) {
             text = text.substring(1);
         }
 
         @Nullable Node group = clause.getParent();
         @Nullable Node declaration = group == null ? null : group.getParent();
-        if (declaration == null || !"namespace_use_group".equals(Nodes.type(group))) {
+        if (group == null || declaration == null || !group.isType("namespace_use_group")) {
             return text;
         }
         for (int i = 0; i < declaration.getNamedChildCount(); i++) {
             Node child = declaration.getNamedChild(i);
-            if ("namespace_name".equals(child.getType())) {
-                return Nodes.text(child) + "\\" + text;
+            if (child.isType("namespace_name")) {
+                return child.getContent() + "\\" + text;
             }
         }
         return text;
@@ -184,7 +178,7 @@ public final class PhpNameResolver implements Listener {
         }
 
         Node declaration = clause.getParent();
-        if (declaration != null && "namespace_use_group".equals(declaration.getType())) {
+        if (declaration != null && declaration.isType("namespace_use_group")) {
             declaration = declaration.getParent();
         }
         return declaration == null || declaration.getChildByFieldName("type") == null;
@@ -197,15 +191,16 @@ public final class PhpNameResolver implements Listener {
                 imports.clear();
             }
             case "namespace_name" -> {
-                if ("namespace_definition".equals(Nodes.type(ctx.parent()))) {
-                    namespace = Nodes.text(node);
+                Node parent = ctx.parent();
+                if (parent != null && parent.isType("namespace_definition")) {
+                    namespace = node.getContent();
                 }
             }
             case "namespace_use_clause" -> {
                 String imported = importedName(node);
                 if (imported != null && importsClass(node)) {
                     Node alias = node.getChildByFieldName("alias");
-                    String key = alias != null ? Nodes.text(alias) : imported.substring(imported.lastIndexOf('\\') + 1);
+                    String key = alias != null ? alias.getContent() : imported.substring(imported.lastIndexOf('\\') + 1);
                     imports.put(key, imported);
                 }
             }
@@ -215,7 +210,7 @@ public final class PhpNameResolver implements Listener {
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("namespace_definition".equals(node.getType()) && node.getChildByFieldName("body") != null) {
+        if (node.isType("namespace_definition") && node.getChildByFieldName("body") != null) {
             namespace = null;
             imports.clear();
         }

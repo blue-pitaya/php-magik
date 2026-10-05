@@ -5,8 +5,6 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -30,7 +28,7 @@ public final class PhpFunctionDefinitionListener implements Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        if ("function_definition".equals(node.getType())) {
+        if (node.isType("function_definition")) {
             PhpFunctionDefinition definition = new PhpFunctionDefinition(file, ctx.depth());
             PhpSignatureReader.read(definition, node, names);
             stack.push(definition);
@@ -39,7 +37,7 @@ public final class PhpFunctionDefinitionListener implements Listener {
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("function_definition".equals(node.getType())) {
+        if (node.isType("function_definition")) {
             PhpFunctionDefinition definition = stack.poll();
             ctx.pop();
             commit(definition);
@@ -47,7 +45,7 @@ public final class PhpFunctionDefinitionListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if ("name".equals(node.getType())) {
+        if (node.isType("name")) {
             fill(ctx, node);
         }
     }
@@ -58,11 +56,8 @@ public final class PhpFunctionDefinitionListener implements Listener {
             return;
         }
 
-        String text = Nodes.text(node);
-        if (text != null) {
-            definition.name(text);
-            definition.range(Range.of(node));
-        }
+        definition.name(node.getContent());
+        definition.range(node.getRange());
     }
 
     private void commit(@Nullable PhpFunctionDefinition definition) {

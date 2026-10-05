@@ -16,7 +16,7 @@ public sealed interface PhpSymbol permits
         PhpReference {
 
     static String code(String php) {
-        return "```php\n" + php + "\n```";
+        return "```php\n<?php\n" + php + "\n```";
     }
 
     @Nullable String hover();

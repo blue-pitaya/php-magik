@@ -5,8 +5,6 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayDeque;
@@ -29,7 +27,7 @@ public final class PhpClassDeclarationListener implements Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        if ("class_declaration".equals(node.getType())) {
+        if (node.isType("class_declaration")) {
             PhpClassDeclaration declaration = new PhpClassDeclaration(file, ctx.depth());
             String namespace = names.namespace();
             if (namespace != null) {
@@ -41,7 +39,7 @@ public final class PhpClassDeclarationListener implements Listener {
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("class_declaration".equals(node.getType())) {
+        if (node.isType("class_declaration")) {
             PhpClassDeclaration declaration = declarations.poll();
             ctx.pop();
             if (declaration == null || declaration.name() == null
@@ -49,7 +47,7 @@ public final class PhpClassDeclarationListener implements Listener {
                 return;
             }
 
-            declaration.scope(Range.of(node));
+            declaration.scope(node.getRange());
             collection.add(declaration);
         }
     }
@@ -62,19 +60,14 @@ public final class PhpClassDeclarationListener implements Listener {
 
         switch (node.getType()) {
             case "abstract_modifier", "final_modifier", "readonly_modifier" -> {
-                String text = Nodes.text(node);
-                if (text != null) {
-                    String modifier = declaration.$modifier();
-                    declaration.$modifier(
-                            modifier.isEmpty() ? text : modifier + " " + text);
-                }
+                String text = node.getContent();
+                String modifier = declaration.$modifier();
+                declaration.$modifier(
+                        modifier.isEmpty() ? text : modifier + " " + text);
             }
             case "name" -> {
-                String text = Nodes.text(node);
-                if (text != null) {
-                    declaration.name(text);
-                    declaration.range(Range.of(node));
-                }
+                declaration.name(node.getContent());
+                declaration.range(node.getRange());
             }
         }
     }

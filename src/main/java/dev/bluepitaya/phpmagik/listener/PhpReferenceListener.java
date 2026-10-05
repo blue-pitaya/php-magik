@@ -6,8 +6,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -28,39 +26,45 @@ public final class PhpReferenceListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if (!"name".equals(node.getType())) {
+        if (!node.isType("name")) {
             return;
         }
 
         Node parent = ctx.parent();
-        PhpReference.Kind kind = kindOf(parent);
+        if (parent == null) {
+            return;
+        }
+        
+        PhpReference.Kind kind = kindOf(node, parent);
         if (kind == null) {
             return;
         }
 
-        String text = Nodes.text(node);
-        if (text == null) {
-            return;
-        }
-
         var reference = new PhpReference(file, kind);
-        reference.name(text);
-        reference.range(Range.of(node));
+        reference.name(node.getContent());
+        reference.range(node.getRange());
         if (ctx.peek() instanceof PhpSymbolOwner owner) {
             reference.owner(owner);
         }
-        if (kind != PhpReference.Kind.FUNCTION && parent != null) {
+        if (kind != PhpReference.Kind.FUNCTION) {
             receive(reference, parent.getChildByFieldName("object"));
+            Node scope = parent.getChildByFieldName("scope");
+            if (scope != null) {
+                reference.receiverScope(scope.getContent());
+            }
         }
         collection.add(reference);
     }
 
-    private static PhpReference.@Nullable Kind kindOf(@Nullable Node parent) {
-        return switch (Nodes.type(parent)) {
+    private static PhpReference.@Nullable Kind kindOf(Node node, Node parent) {
+        return switch (parent.getType()) {
             case "function_call_expression" -> PhpReference.Kind.FUNCTION;
             case "member_access_expression", "nullsafe_member_access_expression" -> PhpReference.Kind.PROPERTY;
             case "member_call_expression", "nullsafe_member_call_expression" -> PhpReference.Kind.METHOD;
-            case null, default -> null;
+            case "scoped_call_expression" -> node.equals(parent.getChildByFieldName("name"))
+                    ? PhpReference.Kind.METHOD
+                    : null;
+            default -> null;
         };
     }
 
@@ -70,20 +74,17 @@ public final class PhpReferenceListener implements Listener {
         while (current != null) {
             switch (current.getType()) {
                 case "variable_name" -> {
-                    String receiver = Nodes.text(current);
-                    if (receiver != null) {
-                        reference.receiverVar(receiver);
-                        reference.receiverPath(List.copyOf(path.reversed()));
-                    }
+                    reference.receiverVar(current.getContent());
+                    reference.receiverPath(List.copyOf(path.reversed()));
                     return;
                 }
                 case "member_access_expression", "nullsafe_member_access_expression",
                      "member_call_expression", "nullsafe_member_call_expression" -> {
-                    String name = Nodes.text(current.getChildByFieldName("name"));
+                    Node name = current.getChildByFieldName("name");
                     if (name == null) {
                         return;
                     }
-                    path.add(new PhpReference.Step(name, current.getType().endsWith("call_expression")));
+                    path.add(new PhpReference.Step(name.getContent(), current.getType().endsWith("call_expression")));
                     current = current.getChildByFieldName("object");
                 }
                 case null, default -> {

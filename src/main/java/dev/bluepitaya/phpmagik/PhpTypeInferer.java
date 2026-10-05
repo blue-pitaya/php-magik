@@ -10,7 +10,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -29,7 +28,7 @@ public final class PhpTypeInferer {
             }
             Node node = root.getDescendant(range.start(), range.end());
             Node assignment = node == null ? null : node.getParent();
-            if (assignment == null || !"assignment_expression".equals(assignment.getType())) {
+            if (assignment == null || !assignment.isType("assignment_expression")) {
                 continue;
             }
             PhpType type = typeOf(assignment.getChildByFieldName("right"), local.owner(), symbols);
@@ -45,15 +44,15 @@ public final class PhpTypeInferer {
         if (expr == null) {
             return null;
         }
-        PhpType builtin = PhpType.of(Nodes.type(expr));
+        PhpType builtin = PhpType.of(expr.getType());
         if (builtin != null) {
             return builtin;
         }
-        return switch (Nodes.type(expr)) {
-            case "variable_name" -> variableType(Nodes.text(expr), owner, symbols);
+        return switch (expr.getType()) {
+            case "variable_name" -> variableType(expr.getContent(), owner, symbols);
             case "member_access_expression" -> memberType(expr, owner, symbols);
             case "object_creation_expression" -> createdType(expr, symbols);
-            case "parenthesized_expression" -> typeOf(Nodes.namedChild(expr, 0), owner, symbols);
+            case "parenthesized_expression" -> typeOf(Node.namedChild(expr, 0), owner, symbols);
             case null, default -> null;
         };
     }
@@ -88,10 +87,11 @@ public final class PhpTypeInferer {
             Node expr, @Nullable PhpSymbolOwner owner, PhpSymbolCollection symbols
     ) {
         PhpType objectType = typeOf(expr.getChildByFieldName("object"), owner, symbols);
-        String member = Nodes.text(expr.getChildByFieldName("name"));
-        if (objectType == null || member == null) {
+        Node name = expr.getChildByFieldName("name");
+        if (objectType == null || name == null) {
             return null;
         }
+        String member = name.getContent();
         PhpClassDeclaration owningClass = classNamed(objectType, symbols);
         if (owningClass == null) {
             return null;
@@ -108,9 +108,9 @@ public final class PhpTypeInferer {
         int count = expr.getNamedChildCount();
         for (int i = 0; i < count; i++) {
             Node child = expr.getNamedChild(i);
-            switch (Nodes.type(child)) {
+            switch (child.getType()) {
                 case "name", "qualified_name", "relative_name" -> {
-                    Range range = Range.of(child);
+                    Range range = child.getRange();
                     for (PhpReference reference : symbols.references()) {
                         String fqn = reference.name();
                         if (reference.kind() == PhpReference.Kind.CLASS && range.equals(reference.range())

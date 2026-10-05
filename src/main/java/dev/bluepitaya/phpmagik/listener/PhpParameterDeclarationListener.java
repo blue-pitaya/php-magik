@@ -7,8 +7,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -40,7 +38,7 @@ public final class PhpParameterDeclarationListener implements Listener {
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("simple_parameter".equals(node.getType())) {
+        if (node.isType("simple_parameter")) {
             commit(declarations.poll());
         }
     }
@@ -61,10 +59,9 @@ public final class PhpParameterDeclarationListener implements Listener {
         }
 
         /* the first one names it; a later one is the default value */
-        String text = Nodes.text(node);
-        if (declaration.name() == null && text != null) {
-            declaration.name(text);
-            declaration.range(Range.of(node));
+        if (declaration.name() == null) {
+            declaration.name(node.getContent());
+            declaration.range(node.getRange());
         }
     }
 
@@ -74,10 +71,7 @@ public final class PhpParameterDeclarationListener implements Listener {
             return;
         }
 
-        String text = Nodes.text(node);
-        if (text != null) {
-            declaration.type(PhpType.named(names.resolve(text)));
-        }
+        declaration.type(PhpType.named(names.resolve(node.getContent())));
     }
 
     private void commit(@Nullable PhpParameterDeclaration declaration) {
@@ -90,7 +84,7 @@ public final class PhpParameterDeclarationListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if ("primitive_type".equals(node.getType())) {
+        if (node.isType("primitive_type")) {
             fillType(ctx, node);
         }
     }
@@ -101,7 +95,7 @@ public final class PhpParameterDeclarationListener implements Listener {
             return;
         }
 
-        PhpType phpType = PhpType.of(Nodes.text(node));
+        PhpType phpType = PhpType.of(node.getContent());
         if (phpType != null) {
             declaration.type(phpType);
         }

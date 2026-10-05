@@ -6,7 +6,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -18,7 +17,7 @@ public final class PhpReturnTypeInferer {
 
     public static @Nullable PhpType declared(@Nullable Node hint, @Nullable PhpDoc doc, PhpNameResolver names) {
         if (hint != null) {
-            return names.type(Nodes.text(hint));
+            return names.type(hint.getContent());
         }
         if (doc == null || doc.returns() == null) {
             return null;
@@ -40,7 +39,7 @@ public final class PhpReturnTypeInferer {
                 continue;
             }
 
-            PhpType type = expressions.typeOf(Nodes.namedChild(statement, 0), function, symbols);
+            PhpType type = expressions.typeOf(Node.namedChild(statement, 0), function, symbols);
             if (type != null) {
                 function.returnType(type);
             }

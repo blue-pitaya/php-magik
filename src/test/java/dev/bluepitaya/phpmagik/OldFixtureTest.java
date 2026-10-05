@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class OldFixtureTest {
 
     private static String php(String text) {
-        return "```php\n" + text + "\n```";
+        return "```php\n<?php\n" + text + "\n```";
     }
 
     private static String hover(Fixture fixture, String fileName, int line, int character) {

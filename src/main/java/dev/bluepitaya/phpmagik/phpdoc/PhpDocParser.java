@@ -1,7 +1,6 @@
 package dev.bluepitaya.phpmagik.phpdoc;
 
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -20,7 +19,7 @@ public final class PhpDocParser {
 
     public static @Nullable PhpDoc of(Node declaration) {
         Node previous = declaration.getPrevSibling();
-        return previous != null && "comment".equals(previous.getType()) ? parse(Nodes.text(previous)) : null;
+        return previous != null && previous.isType("comment") ? parse(previous.getContent()) : null;
     }
 
     public static @Nullable PhpDoc parse(@Nullable String comment) {

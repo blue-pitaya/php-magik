@@ -6,7 +6,6 @@ import dev.bluepitaya.phpmagik.phpdoc.PhpDocParser;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
@@ -16,7 +15,7 @@ final class PhpSignatureReader {
     }
 
     static void read(PhpFunctionLike function, Node declaration, PhpNameResolver names) {
-        function.scope(Range.of(declaration));
+        function.scope(declaration.getRange());
         function.parameters(names.parametersText(declaration.getChildByFieldName("parameters")));
 
         PhpDoc doc = PhpDocParser.of(declaration);

@@ -8,8 +8,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodVarUsage;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -29,7 +27,7 @@ public final class PhpMethodVarListener implements Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        if ("variable_name".equals(node.getType())) {
+        if (node.isType("variable_name")) {
             collect(ctx, node);
         }
     }
@@ -44,16 +42,13 @@ public final class PhpMethodVarListener implements Listener {
             return;
         }
 
-        String text = Nodes.text(node);
-        if (text == null) {
-            return;
-        }
+        String text = node.getContent();
 
         if (isAssigned(node, parent)) {
             var declaration = new PhpMethodLocalVarDeclaration(file);
             declaration.owner(owner);
             declaration.name(text);
-            declaration.range(Range.of(node));
+            declaration.range(node.getRange());
             String createdType = createdTypeOf(parent);
             if (createdType != null) {
                 declaration.type(PhpType.named(names.resolve(createdType)));
@@ -65,7 +60,7 @@ public final class PhpMethodVarListener implements Listener {
         var usage = new PhpMethodVarUsage(file);
         usage.owner(owner);
         usage.name(text);
-        usage.range(Range.of(node));
+        usage.range(node.getRange());
         collection.add(usage);
     }
 
@@ -74,16 +69,16 @@ public final class PhpMethodVarListener implements Listener {
             return null;
         }
         Node right = parent.getChildByFieldName("right");
-        if (right == null || !"object_creation_expression".equals(right.getType())) {
+        if (right == null || !right.isType("object_creation_expression")) {
             return null;
         }
 
         int count = right.getNamedChildCount();
         for (int i = 0; i < count; i++) {
             Node child = right.getNamedChild(i);
-            switch (Nodes.type(child)) {
+            switch (child.getType()) {
                 case "name", "qualified_name" -> {
-                    return Nodes.text(child);
+                    return child.getContent();
                 }
                 default -> {
                 }
@@ -93,7 +88,7 @@ public final class PhpMethodVarListener implements Listener {
     }
 
     private static boolean isAssigned(Node node, @Nullable Node parent) {
-        if (parent == null || !"assignment_expression".equals(parent.getType())) {
+        if (parent == null || !parent.isType("assignment_expression")) {
             return false;
         }
 
@@ -101,7 +96,11 @@ public final class PhpMethodVarListener implements Listener {
     }
 
     private static boolean isParameter(@Nullable Node parent) {
-        return switch (Nodes.type(parent)) {
+        if (parent == null) {
+            return false;
+        }
+
+        return switch (parent.getType()) {
             case "simple_parameter", "variadic_parameter", "property_promotion_parameter" -> true;
             case null, default -> false;
         };

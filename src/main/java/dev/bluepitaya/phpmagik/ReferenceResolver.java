@@ -103,8 +103,13 @@ public final class ReferenceResolver {
     }
 
     private @Nullable PhpClassDeclaration baseClass(PhpReference reference, Index index) {
-        String receiver = reference.receiverVar();
         PhpSymbolOwner owner = reference.owner();
+        String scope = reference.receiverScope();
+        if ("self".equalsIgnoreCase(scope) || "static".equalsIgnoreCase(scope)) {
+            return owner instanceof PhpMethodDeclaration method ? method.owner() : null;
+        }
+
+        String receiver = reference.receiverVar();
         if (receiver == null) {
             return null;
         }

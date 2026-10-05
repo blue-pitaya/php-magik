@@ -26,6 +26,7 @@ public final class PhpReference implements PhpSymbol {
     private @Nullable PhpSymbolOwner owner;
     private @Nullable String name;
     private @Nullable String receiverVar;
+    private @Nullable String receiverScope;
     private List<Step> receiverPath = List.of();
     private @Nullable PhpSymbol definition;
     private @Nullable Range range;
@@ -66,6 +67,14 @@ public final class PhpReference implements PhpSymbol {
 
     public void receiverVar(String receiverVar) {
         this.receiverVar = receiverVar;
+    }
+
+    public @Nullable String receiverScope() {
+        return receiverScope;
+    }
+
+    public void receiverScope(String receiverScope) {
+        this.receiverScope = receiverScope;
     }
 
     public List<Step> receiverPath() {

@@ -25,6 +25,11 @@ public final class Node {
         this.index = index;
     }
 
+    public static @Nullable Node namedChild(@Nullable Node node, int index) {
+        if (node == null || index < 0 || index >= node.getNamedChildCount()) return null;
+        return node.getNamedChild(index);
+    }
+
     public List<Node> getChildren() {
         return children(false);
     }
@@ -91,8 +96,16 @@ public final class Node {
         return tree.end(index);
     }
 
+    public Range getRange() {
+        return new Range(getStartPoint(), getEndPoint());
+    }
+
     public String getType() {
         return tree.type(index);
+    }
+
+    public boolean isType(String type) {
+        return type.equals(getType());
     }
 
     public String getContent() {

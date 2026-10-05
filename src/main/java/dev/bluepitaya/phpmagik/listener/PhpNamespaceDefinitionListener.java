@@ -5,8 +5,6 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpNamespaceDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayDeque;
@@ -38,17 +36,14 @@ public final class PhpNamespaceDefinitionListener implements Listener {
                     return;
                 }
 
-                String name = Nodes.text(node);
-                if (name != null) {
-                    definition.name(name);
-                    definition.range(Range.of(node));
-                }
+                definition.name(node.getContent());
+                definition.range(node.getRange());
             }
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("namespace_definition".equals(node.getType())) {
+        if (node.isType("namespace_definition")) {
             PhpNamespaceDefinition definition = definitions.poll();
             if (definition == null || definition.name() == null
                     || definition.range() == null) {

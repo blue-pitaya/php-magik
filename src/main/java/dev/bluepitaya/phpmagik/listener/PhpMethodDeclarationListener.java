@@ -6,8 +6,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -31,13 +29,13 @@ public final class PhpMethodDeclarationListener implements Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        if ("method_declaration".equals(node.getType())) {
+        if (node.isType("method_declaration")) {
             open(ctx, node);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if ("method_declaration".equals(node.getType())) {
+        if (node.isType("method_declaration")) {
             PhpMethodDeclaration declaration = declarations.poll();
             ctx.pop();
             commit(declaration);
@@ -45,7 +43,7 @@ public final class PhpMethodDeclarationListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if ("name".equals(node.getType())) {
+        if (node.isType("name")) {
             fill(ctx, node);
         }
     }
@@ -67,11 +65,8 @@ public final class PhpMethodDeclarationListener implements Listener {
             return;
         }
 
-        String text = Nodes.text(node);
-        if (text != null) {
-            declaration.name(text);
-            declaration.range(Range.of(node));
-        }
+        declaration.name(node.getContent());
+        declaration.range(node.getRange());
     }
 
     private void commit(@Nullable PhpMethodDeclaration declaration) {

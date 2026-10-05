@@ -10,10 +10,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public record Range(Point start, Point end) {
 
-    public static Range of(Node node) {
-        return new Range(node.getStartPoint(), node.getEndPoint());
-    }
-
     /** Start inclusive, end exclusive, so adjacent ranges never both match. */
     public boolean contains(Point point) {
         return start.compareTo(point) <= 0 && end.compareTo(point) > 0;

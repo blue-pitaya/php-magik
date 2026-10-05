@@ -49,9 +49,9 @@ class PhpReturnTypeInfererTest {
     @Test
     void hoversTheInferredReturnTypeWhenThereIsNoHint() throws IOException {
         try (Fixture fixture = Fixture.index("php_return_type")) {
-            assertEquals("```php\nfunction App\\Foo::documented(): App\\Models\\Bar\n```", hover(fixture, 19, 21));
-            assertEquals("```php\nfunction App\\Foo::returned(): App\\Models\\Bar\n```", hover(fixture, 24, 21));
-            assertEquals("```php\nfunction made(): App\\Models\\Bar\n```", hover(fixture, 46, 10));
+            assertEquals("```php\n<?php\nfunction App\\Foo::documented(): App\\Models\\Bar\n```", hover(fixture, 19, 21));
+            assertEquals("```php\n<?php\nfunction App\\Foo::returned(): App\\Models\\Bar\n```", hover(fixture, 24, 21));
+            assertEquals("```php\n<?php\nfunction made(): App\\Models\\Bar\n```", hover(fixture, 46, 10));
         }
     }
 

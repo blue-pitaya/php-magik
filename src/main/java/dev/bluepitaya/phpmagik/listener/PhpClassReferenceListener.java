@@ -8,8 +8,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Nodes;
-import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -44,13 +42,13 @@ public final class PhpClassReferenceListener implements Listener {
         switch (node.getType()) {
             case "name" -> {
                 if (isClassName(node, ctx.parent())) {
-                    String name = Nodes.text(node);
+                    String name = node.getContent();
                     boolean self = "self".equalsIgnoreCase(name) || "static".equalsIgnoreCase(name);
                     add(ctx, self ? enclosingClassFqn(ctx) : fqnOf(node, ctx.parent()), node);
                 }
             }
             case "relative_scope" -> {
-                String scope = Nodes.text(node);
+                String scope = node.getContent();
                 if (isScope(node, ctx.parent())
                         && ("self".equalsIgnoreCase(scope) || "static".equalsIgnoreCase(scope))) {
                     add(ctx, enclosingClassFqn(ctx), node);
@@ -68,7 +66,7 @@ public final class PhpClassReferenceListener implements Listener {
 
         var reference = new PhpReference(file, PhpReference.Kind.CLASS);
         reference.name(fqn);
-        reference.range(Range.of(node));
+        reference.range(node.getRange());
         if (ctx.peek() instanceof PhpSymbolOwner owner) {
             reference.owner(owner);
         }
@@ -76,12 +74,11 @@ public final class PhpClassReferenceListener implements Listener {
     }
 
     private @Nullable String fqnOf(Node node, @Nullable Node parent) {
-        if (parent != null && "namespace_use_clause".equals(parent.getType())) {
+        if (parent != null && parent.isType("namespace_use_clause")) {
             return names.importedName(parent);
         }
 
-        String text = Nodes.text(node);
-        return text == null ? null : names.resolve(text);
+        return names.resolve(node.getContent());
     }
 
     private boolean isClassName(Node node, @Nullable Node parent) {
@@ -91,8 +88,11 @@ public final class PhpClassReferenceListener implements Listener {
 
         return switch (parent.getType()) {
             case "named_type", "object_creation_expression", "base_clause", "class_interface_clause" -> true;
-            case "binary_expression" -> node.equals(parent.getChildByFieldName("right"))
-                    && "instanceof".equalsIgnoreCase(Nodes.text(parent.getChildByFieldName("operator")));
+            case "binary_expression" -> {
+                Node operator = parent.getChildByFieldName("operator");
+                yield operator != null && node.equals(parent.getChildByFieldName("right"))
+                        && "instanceof".equalsIgnoreCase(operator.getContent());
+            }
             case "namespace_use_clause" -> !node.equals(parent.getChildByFieldName("alias")) && names.importsClass(parent);
             case null, default -> isScope(node, parent);
         };
@@ -106,7 +106,7 @@ public final class PhpClassReferenceListener implements Listener {
         return switch (parent.getType()) {
             case "scoped_call_expression", "scoped_property_access_expression" ->
                     node.equals(parent.getChildByFieldName("scope"));
-            case "class_constant_access_expression" -> node.equals(Nodes.namedChild(parent, 0));
+            case "class_constant_access_expression" -> node.equals(Node.namedChild(parent, 0));
             case null, default -> false;
         };
     }

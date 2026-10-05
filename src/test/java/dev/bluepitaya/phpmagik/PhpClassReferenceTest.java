@@ -231,7 +231,7 @@ class PhpClassReferenceTest {
     }
 
     private static String php(String text) {
-        return "```php\n" + text + "\n```";
+        return "```php\n<?php\n" + text + "\n```";
     }
 
     private static Range range(int line, int start, int end) {
