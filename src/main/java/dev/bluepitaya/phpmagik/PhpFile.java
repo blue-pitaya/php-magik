@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.ts.Tree;
 import org.jspecify.annotations.NullMarked;
 
 import java.io.IOException;
@@ -14,13 +13,11 @@ public final class PhpFile {
     private final Path path;
 
     private byte[] content;
-    private Tree tree;
 
-    PhpFile(int fileId, Path path, byte[] content, Tree tree) {
+    PhpFile(int fileId, Path path, byte[] content) {
         this.fileId = fileId;
         this.path = path;
         this.content = content;
-        this.tree = tree;
     }
 
     public int fileId() {
@@ -45,13 +42,7 @@ public final class PhpFile {
         return content;
     }
 
-    public Tree tree() {
-        return tree;
-    }
-
-    void replace(byte[] content, Tree tree) {
-        this.tree.close();
+    void replace(byte[] content) {
         this.content = content;
-        this.tree = tree;
     }
 }

@@ -39,20 +39,11 @@ class Paths:
         return self._require(self.root / "pom.xml", "not a Maven project")
 
     def jni_sources(self):
-        native = self.root / "src/main/c"
-        return [
-            self._require(native / "tsjni.c"),
-            self._require(native / "tsjni_node.c"),
-            self._require(native / "tsjni_tree.c"),
-            self._require(native / "tsjni_parser.c"),
-        ]
-
-    def jni_include(self):
-        return self._require(self.root / "src/main/c/tsjni.h")
+        return [self._require(self.root / "src/main/c/tsjni.c")]
 
     def jni_header(self):
         return self._require(
-            self.headers / "dev_bluepitaya_phpmagik_ts_Node.h",
+            self.headers / "dev_bluepitaya_phpmagik_ts_Tree.h",
             "run ./build.py build_java first",
         )
 
@@ -144,7 +135,7 @@ class Runner:
     def build_native(self):
         self.paths.objects.mkdir(parents=True, exist_ok=True)
         include_flags = [f"-I{path}" for path in self.paths.include_dirs()]
-        dependencies = [self.paths.jni_include(), self.paths.jni_header()]
+        dependencies = [self.paths.jni_header()]
         objects = [
             self.compile_object(source, ["-O2", "-fPIC"], include_flags, [])
             for source in self.paths.vendor_sources()

@@ -12,4 +12,4 @@ Needs JDK 21 (with JAVA_HOME set), maven and c compiler. See `build.py` code for
 ./build.py test
 ```
 
-The `ts/` binding is a minimal port of [seart-group/java-tree-sitter](https://github.com/seart-group/java-tree-sitter) (MIT).
+The `ts/` binding parses in a single JNI call that copies the whole syntax tree into a Java `int[]`; a `Node` is an index into it.

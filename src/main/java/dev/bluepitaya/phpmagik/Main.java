@@ -2,7 +2,6 @@ package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.lsp.LspServer;
-import dev.bluepitaya.phpmagik.ts.Parser;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -22,10 +21,10 @@ public final class Main {
             return;
         }
 
-        try (var parser = new Parser(); var log = new Logger(LOG_PATH)) {
+        try (var log = new Logger(LOG_PATH)) {
             log.log("=== php-magik started, pid " + ProcessHandle.current().pid());
 
-            var workspace = new Workspace(parser, log);
+            var workspace = new Workspace(log);
             try {
                 workspace.index(programParams.rootPath());
             } catch (IOException cause) {

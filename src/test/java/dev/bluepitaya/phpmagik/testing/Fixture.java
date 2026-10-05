@@ -5,7 +5,6 @@ import dev.bluepitaya.phpmagik.SymbolFinder;
 import dev.bluepitaya.phpmagik.Workspace;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
-import dev.bluepitaya.phpmagik.ts.Parser;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -22,12 +21,11 @@ public final class Fixture implements AutoCloseable {
     private final SymbolFinder finder;
 
     private Fixture(Path root) throws IOException {
-        Parser parser = new Parser();
         Path logPath = Files.createTempFile("php-magik-test", ".log");
         logPath.toFile().deleteOnExit();
         this.log = new Logger(logPath);
 
-        this.workspace = new Workspace(parser, log);
+        this.workspace = new Workspace(log);
         this.workspace.index(root);
 
         this.finder = new SymbolFinder(workspace);
@@ -66,7 +64,6 @@ public final class Fixture implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
-        workspace.close();
         log.close();
     }
 }

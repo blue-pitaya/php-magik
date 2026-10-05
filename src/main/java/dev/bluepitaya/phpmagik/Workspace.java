@@ -4,7 +4,6 @@ import dev.bluepitaya.phpmagik.listener.AggregatedListener;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
-import dev.bluepitaya.phpmagik.ts.Parser;
 import dev.bluepitaya.phpmagik.ts.Tree;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -13,28 +12,24 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 @NullMarked
-public final class Workspace implements AutoCloseable {
+public final class Workspace {
 
     record Indexed(PhpFile file, PhpSymbolCollection collection) {
     }
 
-    private final Parser parser;
     private final Logger log;
     private final List<PhpFile> files = new ArrayList<>();
     private final PhpSymbolCollection symbols = new PhpSymbolCollection();
 
-    public Workspace(Parser parser, Logger log) {
-        this.parser = parser;
+    public Workspace(Logger log) {
         this.log = log;
     }
 
@@ -75,7 +70,7 @@ public final class Workspace implements AutoCloseable {
     }
 
     public void reparse(PhpFile file, byte[] content) {
-        file.replace(content, parser.parse(content));
+        file.replace(content);
 
         symbols.removeSymbolsOfFile(file);
         symbols.addAll(indexInto(file));
@@ -84,27 +79,15 @@ public final class Workspace implements AutoCloseable {
         log.log("reparsed: " + file.path().getFileName());
     }
 
-    @Override
-    public void close() {
-        for (PhpFile file : files) {
-            file.tree().close();
-        }
-        parser.close();
-    }
-
     PhpSymbolCollection indexInto(PhpFile file) {
         var collection = new PhpSymbolCollection();
-        try (Tree tree = file.tree()) {
-            Node root = tree.getRootNode();
-            if (root != null) {
-                new CompleteIndexer().walk(root, AggregatedListener.create(collection, file));
+        Node root = Tree.parse(file.content()).getRootNode();
+        new CompleteIndexer().walk(root, AggregatedListener.create(collection, file));
 
-                new DefinitionFiller().fill(collection);
-                new PhpTypeInferer().infer(collection, root);
-                new PhpReturnTypeInferer().infer(collection, root);
-                new VarUsageTypePropagator().propagate(collection);
-            }
-        }
+        new DefinitionFiller().fill(collection);
+        new PhpTypeInferer().infer(collection, root);
+        new PhpReturnTypeInferer().infer(collection, root);
+        new VarUsageTypePropagator().propagate(collection);
         return collection;
     }
 
@@ -113,7 +96,7 @@ public final class Workspace implements AutoCloseable {
         if (sources.size() <= 1 || cores <= 1) {
             List<Indexed> indexed = new ArrayList<>(sources.size());
             for (int i = 0; i < sources.size(); i++) {
-                var one = indexOne(i, sources.get(i), parser);
+                var one = indexOne(i, sources.get(i));
                 if (one != null) {
                     indexed.add(one);
                 }
@@ -124,12 +107,6 @@ public final class Workspace implements AutoCloseable {
     }
 
     private List<Indexed> indexConcurrently(List<Path> sources, int workers) throws IOException {
-        List<Parser> parsers = Collections.synchronizedList(new ArrayList<>());
-        ThreadLocal<Parser> threadParser = ThreadLocal.withInitial(() -> {
-            Parser created = new Parser();
-            parsers.add(created);
-            return created;
-        });
         ExecutorService pool = Executors.newFixedThreadPool(workers);
         List<Future<@Nullable Indexed>> futures = new ArrayList<>(sources.size());
         List<Indexed> indexed = new ArrayList<>(sources.size());
@@ -137,7 +114,7 @@ public final class Workspace implements AutoCloseable {
             for (int i = 0; i < sources.size(); i++) {
                 int fileId = i;
                 Path path = sources.get(i);
-                futures.add(pool.submit(() -> indexOne(fileId, path, threadParser.get())));
+                futures.add(pool.submit(() -> indexOne(fileId, path)));
             }
             for (Future<@Nullable Indexed> future : futures) {
                 @Nullable Indexed one = future.get();
@@ -157,30 +134,13 @@ public final class Workspace implements AutoCloseable {
                 case null, default -> throw new AppException("indexing failed");
             }
         } finally {
-            shutdown(pool, parsers);
+            pool.shutdownNow();
         }
 
         return indexed;
     }
 
-    private void shutdown(ExecutorService pool, List<Parser> parsers) {
-        pool.shutdownNow();
-        boolean terminated = false;
-        try {
-            terminated = pool.awaitTermination(1, TimeUnit.MINUTES);
-        } catch (InterruptedException cause) {
-            Thread.currentThread().interrupt();
-        }
-        if (!terminated) {
-            log.log("index: pool did not terminate in 1m; leaking " + parsers.size() + " parsers still in use");
-            return;
-        }
-        for (Parser parser : parsers) {
-            parser.close();
-        }
-    }
-
-    private @Nullable Indexed indexOne(int fileId, Path path, Parser parser) throws IOException {
+    private @Nullable Indexed indexOne(int fileId, Path path) throws IOException {
         byte[] content = Files.readAllBytes(path);
         if (content.length == 0) {
             log.log("index: " + path + " (empty, skipped)");
@@ -188,8 +148,7 @@ public final class Workspace implements AutoCloseable {
         }
         log.log("index: " + path);
 
-        Tree tree = parser.parse(content);
-        PhpFile file = new PhpFile(fileId, path, content, tree);
+        PhpFile file = new PhpFile(fileId, path, content);
         return new Indexed(file, indexInto(file));
     }
 

@@ -63,9 +63,8 @@ public final class CompleteIndexer {
         public List<Slot> slots(Node node) {
             List<Node> children = node.getChildren();
             List<Slot> slots = new ArrayList<>(children.size());
-            for (int i = 0; i < children.size(); i++) {
-                Node child = children.get(i);
-                String field = node.getFieldNameForChild(i);
+            for (Node child : children) {
+                String field = child.getFieldName();
 
                 if (child.isError() || child.isMissing()) {
                     listener.error(this, child);

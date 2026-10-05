@@ -18,11 +18,6 @@ public final class Nodes {
         return node.getNamedChild(index);
     }
 
-    public static Node child(Node node, int index) {
-        if (node == null || index < 0 || index >= node.getChildCount()) return null;
-        return node.getChild(index);
-    }
-
     public static String type(Node node) {
         return node == null ? null : node.getType();
     }
