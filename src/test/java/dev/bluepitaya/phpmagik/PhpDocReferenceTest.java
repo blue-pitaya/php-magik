@@ -5,6 +5,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.Position;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentIdentifier;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
+import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -27,6 +28,28 @@ class PhpDocReferenceTest {
     void jumpsFromAClassInsideAMultilineVarDocToItsDeclaration() throws IOException {
         try (Fixture fixture = Fixture.index("php_doc_reference")) {
             assertEquals(barDeclaration(fixture), definition(fixture, 12, 24));
+        }
+    }
+
+    @Test
+    void jumpsFromAClassInsideANullableArrayParamDocToItsDeclaration() throws IOException {
+        try (Fixture fixture = Fixture.index("php_doc_reference")) {
+            assertEquals(barDeclaration(fixture), definition(fixture, 16, 27));
+        }
+    }
+
+    @Test
+    void hoversAClassInsideANullableArrayParamDoc() throws IOException {
+        try (Fixture fixture = Fixture.index("php_doc_reference")) {
+            var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
+            String uri = fixture.file("Foo.php").uri();
+
+            assertEquals(
+                    "```php\n<?php\nnamespace App\\Models;\nclass Bar\n```",
+                    handler.handle(new TextDocumentPosition(new TextDocumentIdentifier(uri), new Position(16, 27)))
+                            .contents()
+                            .value()
+            );
         }
     }
 

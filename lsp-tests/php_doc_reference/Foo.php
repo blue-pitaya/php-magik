@@ -13,4 +13,7 @@ class Foo
      * @var array<int, Bar>
      */
     private array $byId = [];
+
+    /** @param null|array<Bar> $bars */
+    public function take($bars) {}
 }

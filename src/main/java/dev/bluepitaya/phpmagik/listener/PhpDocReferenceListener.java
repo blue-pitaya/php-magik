@@ -19,7 +19,8 @@ import java.util.regex.Pattern;
 @NullMarked
 public final class PhpDocReferenceListener implements Listener {
 
-    private static final Pattern VAR_TAG = Pattern.compile("@var(?=\\s)");
+    private static final Pattern TYPE_TAG = Pattern.compile(
+            "@(?:var|param|return|throws|property(?:-read|-write)?)(?=\\s)");
     private static final Pattern CLASS_NAME =
             Pattern.compile("\\\\?[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*");
 
@@ -41,7 +42,7 @@ public final class PhpDocReferenceListener implements Listener {
 
         PhpDoc doc = PhpDoc.parse(comment);
         List<PhpDoc.Template> templates = doc == null ? List.of() : doc.templates();
-        Matcher tag = VAR_TAG.matcher(comment);
+        Matcher tag = TYPE_TAG.matcher(comment);
         while (tag.find()) {
             int start = blanksEnd(comment, tag.end());
             int end = start + PhpDocTypes.end(comment.substring(start));
