@@ -12,7 +12,7 @@ public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
     private final int depth;
 
     private String $modifier = "";
-    private @Nullable String namespace;
+    private @Nullable PhpNamespaceDefinition namespace;
     private @Nullable String name;
     private @Nullable Range range;
     private @Nullable Range scope;
@@ -31,20 +31,26 @@ public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
         if (name == null) return null;
 
         String declaration = $modifier.isEmpty() ? "class " + name : $modifier + " class " + name;
-        return PhpSymbol.code(namespace == null ? declaration : "namespace " + namespace + ";\n" + declaration);
+        String namespaceName = namespaceName();
+        return PhpSymbol.code(namespaceName == null ? declaration : "namespace " + namespaceName + ";\n" + declaration);
     }
 
     public @Nullable String fqn() {
         if (name == null) return null;
 
-        return namespace == null ? name : namespace + "\\" + name;
+        String namespaceName = namespaceName();
+        return namespaceName == null ? name : namespaceName + "\\" + name;
     }
 
-    public @Nullable String namespace() {
+    private @Nullable String namespaceName() {
+        return namespace == null ? null : namespace.name();
+    }
+
+    public @Nullable PhpNamespaceDefinition namespace() {
         return namespace;
     }
 
-    public void namespace(String namespace) {
+    public void namespace(PhpNamespaceDefinition namespace) {
         this.namespace = namespace;
     }
 

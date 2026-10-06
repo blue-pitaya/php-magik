@@ -3,6 +3,7 @@ package dev.bluepitaya.phpmagik.listener;
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpNamespaceDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
@@ -16,20 +17,16 @@ public final class PhpClassDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpClassDeclaration> declarations = new ArrayDeque<>();
-    private final PhpNameResolver names;
 
-    public PhpClassDeclarationListener(
-            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
-    ) {
+    public PhpClassDeclarationListener(PhpSymbolCollection collection, PhpFile file) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         if (node.isType("class_declaration")) {
             PhpClassDeclaration declaration = new PhpClassDeclaration(file, ctx.depth());
-            String namespace = names.namespace();
+            PhpNamespaceDefinition namespace = collection.namespaceOf(file, node.getRange());
             if (namespace != null) {
                 declaration.namespace(namespace);
             }

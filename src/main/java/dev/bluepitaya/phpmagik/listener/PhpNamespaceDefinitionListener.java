@@ -5,6 +5,8 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpNamespaceDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
+import dev.bluepitaya.phpmagik.ts.Point;
+import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayDeque;
@@ -26,7 +28,11 @@ public final class PhpNamespaceDefinitionListener implements Listener {
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "namespace_definition" -> definitions.push(new PhpNamespaceDefinition(file, ctx.depth()));
+            case "namespace_definition" -> {
+                PhpNamespaceDefinition definition = new PhpNamespaceDefinition(file, ctx.depth());
+                definition.scope(scope(node));
+                definitions.push(definition);
+            }
             case "namespace_name" -> {
                 PhpNamespaceDefinition definition = definitions.peek();
                 /* the first such subtree names it; anything later belongs to
@@ -38,20 +44,33 @@ public final class PhpNamespaceDefinitionListener implements Listener {
 
                 definition.name(node.getContent());
                 definition.range(node.getRange());
+                collection.add(definition);
             }
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         if (node.isType("namespace_definition")) {
-            PhpNamespaceDefinition definition = definitions.poll();
-            if (definition == null || definition.name() == null
-                    || definition.range() == null) {
-                return;
-            }
-
-            collection.add(definition);
+            definitions.poll();
         }
+    }
+
+    private Range scope(Node definition) {
+        Node parent = definition.getParent();
+        if (definition.getChildByFieldName("body") != null || parent == null) {
+            return definition.getRange();
+        }
+
+        Point end = parent.getEndPoint();
+        boolean after = false;
+        for (Node sibling : parent.getNamedChildren()) {
+            if (after && sibling.isType("namespace_definition")) {
+                end = sibling.getStartPoint();
+                break;
+            }
+            after = after || sibling.equals(definition);
+        }
+        return new Range(definition.getStartPoint(), end);
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {

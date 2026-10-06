@@ -1,6 +1,8 @@
 package dev.bluepitaya.phpmagik.phpsymbol;
 
 import dev.bluepitaya.phpmagik.PhpFile;
+import dev.bluepitaya.phpmagik.ts.Range;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +61,16 @@ public final class PhpSymbolCollection {
 
     public List<PhpNamespaceDefinition> nsDefinitions() {
         return nsDefinitions;
+    }
+
+    public @Nullable PhpNamespaceDefinition namespaceOf(PhpFile file, Range range) {
+        for (PhpNamespaceDefinition definition : nsDefinitions) {
+            Range scope = definition.scope();
+            if (definition.file() == file && scope != null && range.isWithin(scope)) {
+                return definition;
+            }
+        }
+        return null;
     }
 
     public List<PhpClassDeclaration> classDeclarations() {

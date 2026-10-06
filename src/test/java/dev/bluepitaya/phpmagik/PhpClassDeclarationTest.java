@@ -26,4 +26,19 @@ class PhpClassDeclarationTest {
             );
         }
     }
+
+    @Test
+    void takesNamespaceWhoseScopeContainsIt() throws IOException {
+        try (Fixture fixture = Fixture.index("php_namespace_scope")) {
+            assertEquals(
+                    List.of("App\\Braced\\Gamma", "App\\First\\Alpha", "App\\Second\\Beta", "Delta"),
+                    fixture.symbols()
+                            .classDeclarations()
+                            .stream()
+                            .map(PhpClassDeclaration::fqn)
+                            .sorted()
+                            .toList()
+            );
+        }
+    }
 }
