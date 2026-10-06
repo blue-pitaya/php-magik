@@ -6,7 +6,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -32,15 +31,12 @@ public final class PhpFunctionDefinitionListener implements Listener {
             PhpFunctionDefinition definition = new PhpFunctionDefinition(file, ctx.depth());
             PhpSignatureReader.read(definition, node, names);
             stack.push(definition);
-            ctx.push(definition);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         if (node.isType("function_definition")) {
-            PhpFunctionDefinition definition = stack.poll();
-            ctx.pop();
-            commit(definition);
+            stack.poll();
         }
     }
 
@@ -52,20 +48,13 @@ public final class PhpFunctionDefinitionListener implements Listener {
 
     private void fill(CompleteIndexer.Ctx ctx, Node node) {
         PhpFunctionDefinition definition = stack.peek();
-        if (definition == null || ctx.depth() != definition.depth() + 1) {
+        if (definition == null || ctx.depth() != definition.depth() + 1
+                || definition.name() != null) {
             return;
         }
 
         definition.name(node.getContent());
         definition.range(node.getRange());
-    }
-
-    private void commit(@Nullable PhpFunctionDefinition definition) {
-        if (definition == null || definition.name() == null
-                || definition.range() == null) {
-            return;
-        }
-
         collection.add(definition);
     }
 

@@ -32,14 +32,12 @@ public final class PhpClassDeclarationListener implements Listener {
             }
             declaration.scope(node.getRange());
             declarations.push(declaration);
-            ctx.push(declaration);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         if (node.isType("class_declaration")) {
             declarations.poll();
-            ctx.pop();
         }
     }
 

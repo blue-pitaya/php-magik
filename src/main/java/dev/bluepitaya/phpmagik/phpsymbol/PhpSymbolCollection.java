@@ -64,23 +64,31 @@ public final class PhpSymbolCollection {
     }
 
     public @Nullable PhpNamespaceDefinition namespaceOf(PhpFile file, Range range) {
-        for (PhpNamespaceDefinition definition : nsDefinitions) {
-            Range scope = definition.scope();
-            if (definition.file() == file && scope != null && range.isWithin(scope)) {
-                return definition;
-            }
-        }
-        return null;
+        return innermost(file, range, nsDefinitions, null);
     }
 
     public @Nullable PhpClassDeclaration classOf(PhpFile file, Range range) {
-        PhpClassDeclaration innermost = null;
-        Range innermostScope = null;
-        for (PhpClassDeclaration declaration : classDeclarations) {
-            Range scope = declaration.scope();
-            if (declaration.file() == file && scope != null && range.isWithin(scope)
+        return innermost(file, range, classDeclarations, null);
+    }
+
+    public @Nullable PhpFunctionLike functionLikeOf(PhpFile file, Range range) {
+        return innermost(file, range, functionDefinitions, innermost(file, range, methodDeclarations, null));
+    }
+
+    public @Nullable PhpSymbolOwner ownerOf(PhpFile file, Range range) {
+        return innermost(file, range, classDeclarations, functionLikeOf(file, range));
+    }
+
+    private static <T extends PhpSymbolOwner> @Nullable T innermost(
+            PhpFile file, Range range, List<? extends T> owners, @Nullable T found
+    ) {
+        T innermost = found;
+        Range innermostScope = found == null ? null : found.scope();
+        for (T owner : owners) {
+            Range scope = owner.scope();
+            if (owner.file() == file && scope != null && range.isWithin(scope)
                     && (innermostScope == null || scope.isWithin(innermostScope))) {
-                innermost = declaration;
+                innermost = owner;
                 innermostScope = scope;
             }
         }

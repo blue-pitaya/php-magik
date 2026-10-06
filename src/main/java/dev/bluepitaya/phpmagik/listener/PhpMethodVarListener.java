@@ -33,7 +33,7 @@ public final class PhpMethodVarListener implements Listener {
     }
 
     private void collect(CompleteIndexer.Ctx ctx, Node node) {
-        if (!(ctx.peek() instanceof PhpFunctionLike owner)) {
+        if (!(collection.ownerOf(file, node.getRange()) instanceof PhpFunctionLike owner)) {
             return;
         }
 

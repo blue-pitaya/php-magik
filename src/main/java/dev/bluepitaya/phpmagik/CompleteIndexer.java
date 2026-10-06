@@ -1,14 +1,11 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.listener.Listener;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 
 /**
@@ -30,7 +27,6 @@ public final class CompleteIndexer {
 
         private final Listener listener;
         private final List<Node> path = new ArrayList<>();
-        private final Deque<PhpSymbolOwner> owners = new ArrayDeque<>();
 
         public Ctx(Listener listener) {
             this.listener = listener;
@@ -46,18 +42,6 @@ public final class CompleteIndexer {
 
         public @Nullable Node parent() {
             return path.size() < 2 ? null : path.get(path.size() - 2);
-        }
-
-        public void push(PhpSymbolOwner owner) {
-            owners.push(owner);
-        }
-
-        public @Nullable PhpSymbolOwner pop() {
-            return owners.poll();
-        }
-
-        public @Nullable PhpSymbolOwner peek() {
-            return owners.peek();
         }
 
         public List<Slot> slots(Node node) {

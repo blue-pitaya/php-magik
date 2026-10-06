@@ -7,7 +7,6 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -36,9 +35,7 @@ public final class PhpMethodDeclarationListener implements Listener {
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         if (node.isType("method_declaration")) {
-            PhpMethodDeclaration declaration = declarations.poll();
-            ctx.pop();
-            commit(declaration);
+            declarations.poll();
         }
     }
 
@@ -57,25 +54,17 @@ public final class PhpMethodDeclarationListener implements Listener {
         PhpSignatureReader.read(declaration, node, names);
 
         declarations.push(declaration);
-        ctx.push(declaration);
     }
 
     private void fill(CompleteIndexer.Ctx ctx, Node node) {
         PhpMethodDeclaration declaration = declarations.peek();
-        if (declaration == null || ctx.depth() != declaration.depth() + 1) {
+        if (declaration == null || ctx.depth() != declaration.depth() + 1
+                || declaration.name() != null) {
             return;
         }
 
         declaration.name(node.getContent());
         declaration.range(node.getRange());
-    }
-
-    private void commit(@Nullable PhpMethodDeclaration declaration) {
-        if (declaration == null || declaration.name() == null
-                || declaration.range() == null) {
-            return;
-        }
-
         collection.add(declaration);
     }
 

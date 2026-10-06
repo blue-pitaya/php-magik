@@ -43,7 +43,8 @@ public final class PhpReferenceListener implements Listener {
         var reference = new PhpReference(file, kind);
         reference.name(node.getContent());
         reference.range(node.getRange());
-        if (ctx.peek() instanceof PhpSymbolOwner owner) {
+        PhpSymbolOwner owner = collection.ownerOf(file, node.getRange());
+        if (owner != null) {
             reference.owner(owner);
         }
         if (kind != PhpReference.Kind.FUNCTION) {

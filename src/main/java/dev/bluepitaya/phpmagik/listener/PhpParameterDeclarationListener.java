@@ -31,7 +31,7 @@ public final class PhpParameterDeclarationListener implements Listener {
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "simple_parameter" -> open(ctx);
+            case "simple_parameter" -> open(ctx, node);
             case "variable_name" -> fill(ctx, node);
             case "named_type" -> fillNamedType(ctx, node);
         }
@@ -43,9 +43,10 @@ public final class PhpParameterDeclarationListener implements Listener {
         }
     }
 
-    private void open(CompleteIndexer.Ctx ctx) {
+    private void open(CompleteIndexer.Ctx ctx, Node node) {
         PhpParameterDeclaration declaration = new PhpParameterDeclaration(file, ctx.depth());
-        if (ctx.peek() instanceof PhpSymbolOwner owner) {
+        PhpSymbolOwner owner = collection.ownerOf(file, node.getRange());
+        if (owner != null) {
             declaration.owner(owner);
         }
 
