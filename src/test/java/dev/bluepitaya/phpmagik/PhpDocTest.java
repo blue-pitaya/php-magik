@@ -1,4 +1,4 @@
-package dev.bluepitaya.phpmagik.phpdoc;
+package dev.bluepitaya.phpmagik;
 
 import org.junit.jupiter.api.Test;
 
@@ -6,11 +6,11 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class PhpDocParserTest {
+class PhpDocTest {
 
     @Test
     void parsesLaravelsAppHelper() {
-        PhpDoc doc = PhpDocParser.parse("""
+        PhpDoc doc = PhpDoc.parse("""
                 /**
                      * Get the available container instance.
                      *
@@ -30,7 +30,8 @@ class PhpDocParserTest {
                                 "($abstract is class-string<TClass> ? TClass"
                                         + " : ($abstract is null ? \\Illuminate\\Foundation\\Application : mixed))",
                                 ""
-                        )
+                        ),
+                        List.of()
                 ),
                 doc
         );
@@ -38,7 +39,7 @@ class PhpDocParserTest {
 
     @Test
     void parsesParagraphsMultilineDescriptionsAndUntypedParams() {
-        PhpDoc doc = PhpDocParser.parse("""
+        PhpDoc doc = PhpDoc.parse("""
                 /**
                  * Sends the invoice.
                  *
@@ -62,7 +63,8 @@ class PhpDocParserTest {
                                 new PhpDoc.Param("Invoice", "$invoice", "The invoice\nto send."),
                                 new PhpDoc.Param(null, "$force", "")
                         ),
-                        new PhpDoc.Return("bool", "Whether it was sent.")
+                        new PhpDoc.Return("bool", "Whether it was sent."),
+                        List.of()
                 ),
                 doc
         );
@@ -70,7 +72,7 @@ class PhpDocParserTest {
 
     @Test
     void keepsSpacesInsideCallableShapeAndUnionTypes() {
-        PhpDoc doc = PhpDocParser.parse("""
+        PhpDoc doc = PhpDoc.parse("""
                 /**
                  * @param callable(int, string): bool $filter
                  * @param array{id: int, name: string} $row
@@ -88,9 +90,27 @@ class PhpDocParserTest {
                                 new PhpDoc.Param("array{id: int, name: string}", "$row", ""),
                                 new PhpDoc.Param("Foo|Bar", "...$rest", "")
                         ),
-                        new PhpDoc.Return("int | string", "")
+                        new PhpDoc.Return("int | string", ""),
+                        List.of()
                 ),
                 doc
+        );
+    }
+
+    @Test
+    void parsesVarTagsWithAndWithoutAName() {
+        PhpDoc doc = PhpDoc.parse("""
+                /**
+                 * @var array<int, Bar>
+                 * @var Bar|null $second The fallback.
+                 */""");
+
+        assertEquals(
+                List.of(
+                        new PhpDoc.Var("array<int, Bar>", null, ""),
+                        new PhpDoc.Var("Bar|null", "$second", "The fallback.")
+                ),
+                doc.vars()
         );
     }
 }

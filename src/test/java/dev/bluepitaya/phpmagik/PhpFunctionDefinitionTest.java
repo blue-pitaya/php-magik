@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.testing.Fixture;
@@ -39,7 +38,8 @@ class PhpFunctionDefinitionTest {
                             "",
                             List.of(),
                             List.of(new PhpDoc.Param("int", "$bar", "")),
-                            new PhpDoc.Return("Foo", "")
+                            new PhpDoc.Return("Foo", ""),
+                            List.of()
                     ),
                     makeFoo.doc()
             );

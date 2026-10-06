@@ -31,15 +31,15 @@ public final class PhpParameterDeclarationListener implements Listener {
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         switch (node.getType()) {
-            case "simple_parameter" -> open(ctx, node);
+            case "simple_parameter", "property_promotion_parameter" -> open(ctx, node);
             case "variable_name" -> fill(ctx, node);
             case "named_type" -> fillNamedType(ctx, node);
         }
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
-        if (node.isType("simple_parameter")) {
-            commit(declarations.poll());
+        switch (node.getType()) {
+            case "simple_parameter", "property_promotion_parameter" -> commit(declarations.poll());
         }
     }
 

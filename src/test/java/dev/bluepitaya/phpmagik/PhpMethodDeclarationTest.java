@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,7 @@ class PhpMethodDeclarationTest {
         try (Fixture fixture = Fixture.index("php_doc")) {
             PhpMethodDeclaration run = fixture.symbols().methodDeclarations().getFirst();
 
-            assertEquals(new PhpDoc("Runs the bar.", "", List.of(), List.of(), null), run.doc());
+            assertEquals(new PhpDoc("Runs the bar.", "", List.of(), List.of(), null, List.of()), run.doc());
         }
     }
 }

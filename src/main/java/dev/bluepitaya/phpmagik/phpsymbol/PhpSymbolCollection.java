@@ -79,6 +79,17 @@ public final class PhpSymbolCollection {
         return innermost(file, range, classDeclarations, functionLikeOf(file, range));
     }
 
+    public List<PhpPropertyDeclaration> propertiesIn(PhpFile file, Range range) {
+        List<PhpPropertyDeclaration> properties = new ArrayList<>();
+        for (PhpPropertyDeclaration property : propertyDeclarations) {
+            Range propertyRange = property.range();
+            if (property.file() == file && propertyRange != null && propertyRange.isWithin(range)) {
+                properties.add(property);
+            }
+        }
+        return properties;
+    }
+
     private static <T extends PhpSymbolOwner> @Nullable T innermost(
             PhpFile file, Range range, List<? extends T> owners, @Nullable T found
     ) {

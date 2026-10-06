@@ -36,7 +36,7 @@ public final class PhpDocTypes {
         return type;
     }
 
-    static int end(String text) {
+    public static int end(String text) {
         int depth = 0;
         char quote = 0;
         for (int i = 0; i < text.length(); i++) {
@@ -60,7 +60,7 @@ public final class PhpDocTypes {
         return text.length();
     }
 
-    static boolean isVariableAt(String text, int index) {
+    public static boolean isVariableAt(String text, int index) {
         return text.startsWith("$", index) || text.startsWith("&", index) || text.startsWith("...", index);
     }
 

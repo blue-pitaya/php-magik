@@ -1,7 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.listener.PhpNameResolver;
-import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;

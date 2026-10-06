@@ -38,7 +38,7 @@ class PhpReturnTypeInfererTest {
     void takesTheDocThenTheLastReturnOfAFunction() throws IOException {
         try (Fixture fixture = Fixture.index("php_return_type")) {
             assertEquals(
-                    List.of(PhpType.Builtin.Array, PhpType.named("App\\Models\\Bar")),
+                    List.of(PhpType.arrayOf(PhpType.named("App\\Models\\Bar")), PhpType.named("App\\Models\\Bar")),
                     fixture.symbols().functionDefinitions().stream()
                             .map(PhpFunctionDefinition::returnType)
                             .toList()

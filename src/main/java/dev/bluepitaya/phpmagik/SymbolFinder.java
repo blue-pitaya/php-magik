@@ -29,7 +29,7 @@ public final class SymbolFinder {
         PhpSymbol found = null;
         for (PhpSymbol sym : symbolsIn(file)) {
             if (!sym.range().contains(at)) continue;
-            if (found == null || sym.range().isWithin(found.range())) found = sym;
+            if (found == null || sym.range().isWithin(found.range()) && !sym.range().equals(found.range())) found = sym;
         }
         return found;
     }

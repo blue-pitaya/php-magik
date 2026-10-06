@@ -1,8 +1,7 @@
 package dev.bluepitaya.phpmagik.listener;
 
+import dev.bluepitaya.phpmagik.PhpDoc;
 import dev.bluepitaya.phpmagik.PhpReturnTypeInferer;
-import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
-import dev.bluepitaya.phpmagik.phpdoc.PhpDocParser;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
@@ -18,7 +17,7 @@ final class PhpSignatureReader {
         function.scope(declaration.getRange());
         function.parameters(names.parametersText(declaration.getChildByFieldName("parameters")));
 
-        PhpDoc doc = PhpDocParser.of(declaration);
+        PhpDoc doc = PhpDoc.of(declaration);
         if (doc != null) {
             function.doc(doc);
         }

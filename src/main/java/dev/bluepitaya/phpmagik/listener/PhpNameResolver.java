@@ -1,7 +1,7 @@
 package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
-import dev.bluepitaya.phpmagik.phpdoc.PhpDoc;
+import dev.bluepitaya.phpmagik.PhpDoc;
 import dev.bluepitaya.phpmagik.phpdoc.PhpDocTypes;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
@@ -37,7 +37,7 @@ public final class PhpNameResolver implements Listener {
             return null;
         }
         if (member.endsWith("[]")) {
-            return PhpType.Builtin.Array;
+            return arrayOf(type(member.substring(0, member.length() - 2), templates));
         }
 
         String name = PhpDocTypes.withoutArguments(member);
@@ -48,11 +48,24 @@ public final class PhpNameResolver implements Listener {
         if ("$this".equals(name)) {
             return PhpType.named("static");
         }
-        if ("list".equals(name)) {
-            return PhpType.Builtin.Array;
+        if ("array".equals(name) || "list".equals(name)) {
+            return arrayOf(elementOf(member.substring(name.length()).strip(), templates));
         }
         PhpType builtin = PhpType.of(name);
         return builtin != null ? builtin : PhpType.named(resolve(name));
+    }
+
+    private @Nullable PhpType elementOf(String arguments, List<PhpDoc.Template> templates) {
+        if (!arguments.startsWith("<") || !arguments.endsWith(">")) {
+            return null;
+        }
+
+        List<String> parts = PhpDocTypes.split(arguments.substring(1, arguments.length() - 1), ',');
+        return type(parts.getLast(), templates);
+    }
+
+    private static PhpType arrayOf(@Nullable PhpType element) {
+        return element == null ? PhpType.Builtin.Array : PhpType.arrayOf(element);
     }
 
     private static @Nullable String onlyMember(String text) {

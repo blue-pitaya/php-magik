@@ -4,7 +4,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
+public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpType.ArrayType {
 
     String php();
 
@@ -30,6 +30,10 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
 
     static PhpType named(String fqn) {
         return new ClassType(fqn);
+    }
+
+    static PhpType arrayOf(PhpType element) {
+        return new ArrayType(element);
     }
 
     static String declared(@Nullable PhpType type, String name) {
@@ -70,6 +74,19 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType {
         @Override
         public String qualified() {
             return fqn;
+        }
+    }
+
+    record ArrayType(PhpType element) implements PhpType {
+
+        @Override
+        public String php() {
+            return "array<" + element.php() + ">";
+        }
+
+        @Override
+        public String qualified() {
+            return "array<" + element.qualified() + ">";
         }
     }
 }

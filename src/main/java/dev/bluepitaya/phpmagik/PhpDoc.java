@@ -1,5 +1,6 @@
-package dev.bluepitaya.phpmagik.phpdoc;
+package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpdoc.PhpDocTypes;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -10,11 +11,27 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @NullMarked
-public final class PhpDocParser {
+public record PhpDoc(
+        String summary,
+        String description,
+        List<Template> templates,
+        List<Param> params,
+        @Nullable Return returns,
+        List<Var> vars
+) {
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
-    private PhpDocParser() {
+    public record Template(String name, @Nullable String bound) {
+    }
+
+    public record Param(@Nullable String type, String name, String description) {
+    }
+
+    public record Return(String type, String description) {
+    }
+
+    public record Var(String type, @Nullable String name, String description) {
     }
 
     public static @Nullable PhpDoc of(Node declaration) {
@@ -39,22 +56,29 @@ public final class PhpDocParser {
             }
         }
 
-        List<PhpDoc.Template> templates = new ArrayList<>();
-        List<PhpDoc.Param> params = new ArrayList<>();
-        PhpDoc.@Nullable Return returns = null;
+        List<Template> templates = new ArrayList<>();
+        List<Param> params = new ArrayList<>();
+        @Nullable Return returns = null;
+        List<Var> vars = new ArrayList<>();
         for (String tag : tags) {
             int nameEnd = wordEnd(tag);
             String body = tag.substring(nameEnd).strip();
             switch (tag.substring(1, nameEnd)) {
                 case "param" -> {
-                    PhpDoc.Param param = param(body);
+                    Param param = param(body);
                     if (param != null) {
                         params.add(param);
                     }
                 }
                 case "return" -> returns = returns(body);
+                case "var" -> {
+                    Var var = var(body);
+                    if (var != null) {
+                        vars.add(var);
+                    }
+                }
                 case "template", "template-covariant", "template-contravariant" -> {
-                    PhpDoc.Template template = template(body);
+                    Template template = template(body);
                     if (template != null) {
                         templates.add(template);
                     }
@@ -68,7 +92,7 @@ public final class PhpDocParser {
                 .skip(1)
                 .map(paragraph -> String.join("\n", paragraph))
                 .collect(Collectors.joining("\n\n"));
-        return new PhpDoc(summary, description, List.copyOf(templates), List.copyOf(params), returns);
+        return new PhpDoc(summary, description, List.copyOf(templates), List.copyOf(params), returns, List.copyOf(vars));
     }
 
     private static List<String> lines(String body) {
@@ -95,7 +119,7 @@ public final class PhpDocParser {
         return paragraphs;
     }
 
-    private static PhpDoc.@Nullable Param param(String body) {
+    private static @Nullable Param param(String body) {
         @Nullable String type = null;
         String rest = body;
         if (!PhpDocTypes.isVariableAt(rest, 0)) {
@@ -108,26 +132,41 @@ public final class PhpDocParser {
         }
 
         int nameEnd = wordEnd(rest);
-        return new PhpDoc.Param(type, rest.substring(0, nameEnd), rest.substring(nameEnd).strip());
+        return new Param(type, rest.substring(0, nameEnd), rest.substring(nameEnd).strip());
     }
 
-    private static PhpDoc.@Nullable Return returns(String body) {
+    private static @Nullable Return returns(String body) {
         if (body.isEmpty()) {
             return null;
         }
 
         Typed typed = typed(body);
-        return new PhpDoc.Return(typed.type(), typed.rest());
+        return new Return(typed.type(), typed.rest());
     }
 
-    private static PhpDoc.@Nullable Template template(String body) {
+    private static @Nullable Var var(String body) {
+        if (body.isEmpty() || body.startsWith("$")) {
+            return null;
+        }
+
+        Typed typed = typed(body);
+        String rest = typed.rest();
+        if (!rest.startsWith("$")) {
+            return new Var(typed.type(), null, rest);
+        }
+
+        int nameEnd = wordEnd(rest);
+        return new Var(typed.type(), rest.substring(0, nameEnd), rest.substring(nameEnd).strip());
+    }
+
+    private static @Nullable Template template(String body) {
         if (body.isEmpty()) {
             return null;
         }
 
         String[] parts = WHITESPACE.split(body, 3);
         boolean bounded = parts.length == 3 && ("of".equals(parts[1]) || "as".equals(parts[1]));
-        return new PhpDoc.Template(parts[0], bounded ? typed(parts[2]).type() : null);
+        return new Template(parts[0], bounded ? typed(parts[2]).type() : null);
     }
 
     private record Typed(String type, String rest) {
