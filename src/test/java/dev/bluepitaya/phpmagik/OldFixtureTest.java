@@ -137,9 +137,9 @@ class OldFixtureTest {
     @Test
     void test_6_typedPropertiesAndThis() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_6")) {
-            assertEquals(php("int $bar"), hover(f, "main.php", 6, 15));
-            assertEquals(php("string $x1"), hover(f, "main.php", 8, 18));
-            assertEquals(php("string $x2"), hover(f, "main.php", 10, 18));
+            assertEquals(php("public int $bar"), hover(f, "main.php", 6, 15));
+            assertEquals(php("public string $x1"), hover(f, "main.php", 8, 18));
+            assertEquals(php("public string $x2"), hover(f, "main.php", 10, 18));
             assertEquals(php("print(int $a)"), hover(f, "main.php", 12, 30));
             assertEquals(php("print(): $b"), hover(f, "main.php", 15, 8));
             assertEquals(php("print(): $c"), hover(f, "main.php", 16, 8));
@@ -180,7 +180,7 @@ class OldFixtureTest {
     void test_10_multiFileClassAndGlobalScope() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_10")) {
             assertEquals(php("class Greeter"), hover(f, "Greeter.php", 2, 6));
-            assertEquals(php("string $name"), hover(f, "Greeter.php", 4, 18));
+            assertEquals(php("public string $name"), hover(f, "Greeter.php", 4, 18));
             assertEquals(php("function Greeter::__construct(string $name)"), hover(f, "Greeter.php", 6, 20));
             assertEquals(php("__construct(string $name)"), hover(f, "Greeter.php", 6, 39));
             assertEquals(php("string $name"), hover(f, "Greeter.php", 8, 22));
@@ -203,7 +203,7 @@ class OldFixtureTest {
     void test_12_classAndStandaloneFunction() throws IOException {
         try (Fixture f = Fixture.index("old_tests/test_12")) {
             assertEquals(php("class Box"), hover(f, "main.php", 2, 6));
-            assertEquals(php("int $value"), hover(f, "main.php", 4, 15));
+            assertEquals(php("public int $value"), hover(f, "main.php", 4, 15));
             assertEquals(php("function Box::get(): int"), hover(f, "main.php", 6, 20));
             assertEquals(php("function main()"), hover(f, "main.php", 12, 9));
             assertEquals(php("main(): $b"), hover(f, "main.php", 14, 4));
@@ -277,9 +277,9 @@ class OldFixtureTest {
         try (Fixture f = Fixture.index("old_tests/test_7")) {
             assertEquals(php("class Engine"), hover(f, "main.php", 2, 6));
             assertEquals(php("class Car"), hover(f, "main.php", 9, 6));
-            assertEquals(php("int $power"), hover(f, "main.php", 4, 15));
-            assertEquals(php("string $fuel"), hover(f, "main.php", 6, 18));
-            assertEquals(php("Engine $engine"), hover(f, "main.php", 11, 19));
+            assertEquals(php("public int $power"), hover(f, "main.php", 4, 15));
+            assertEquals(php("public string $fuel"), hover(f, "main.php", 6, 18));
+            assertEquals(php("private Engine $engine"), hover(f, "main.php", 11, 19));
             assertEquals(php("function Car::__construct(Engine $engine)"), hover(f, "main.php", 13, 20));
             assertEquals(php("function Car::describe(): string"), hover(f, "main.php", 18, 20));
             assertEquals(php("__construct(Engine $engine)"), hover(f, "main.php", 13, 39));

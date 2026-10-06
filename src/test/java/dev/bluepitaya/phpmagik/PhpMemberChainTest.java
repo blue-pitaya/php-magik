@@ -46,7 +46,7 @@ class PhpMemberChainTest {
             var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
             Hover hover = handler.handle(at(fixture, 13, 25));
 
-            assertEquals("```php\n<?php\nbool $qux\n```", hover.contents().value());
+            assertEquals("```php\n<?php\npublic bool $qux\n```", hover.contents().value());
         }
     }
 
@@ -56,7 +56,7 @@ class PhpMemberChainTest {
             var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
             Hover hover = handler.handle(at(fixture, 12, 16));
 
-            assertEquals("```php\n<?php\nApp\\Models\\Bar $bar\n```", hover.contents().value());
+            assertEquals("```php\n<?php\nprivate App\\Models\\Bar $bar\n```", hover.contents().value());
         }
     }
 

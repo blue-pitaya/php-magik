@@ -11,6 +11,7 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
     private final PhpFile file;
     private final int depth;
 
+    private String $modifier = "";
     private @Nullable PhpClassDeclaration owner;
     private @Nullable String name;
     private @Nullable PhpType type;
@@ -29,7 +30,16 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        return PhpSymbol.code(PhpType.declared(type, name));
+        String declared = PhpType.declared(type, name);
+        return PhpSymbol.code($modifier.isEmpty() ? declared : $modifier + " " + declared);
+    }
+
+    public String $modifier() {
+        return $modifier;
+    }
+
+    public void $modifier(String $modifier) {
+        this.$modifier = $modifier;
     }
 
     public @Nullable PhpClassDeclaration owner() {

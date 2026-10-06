@@ -12,6 +12,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.StringJoiner;
 
 @NullMarked
 public final class PhpPropertyDeclarationListener implements Listener {
@@ -49,16 +50,32 @@ public final class PhpPropertyDeclarationListener implements Listener {
             declaration.owner(owner);
         }
 
-        Node typed = node.isType("property_promotion_parameter") ? node : node.getParent();
-        Node typeNode = typed == null ? null : typed.getChildByFieldName("type");
-        if (typeNode != null) {
-            PhpType type = names.type(typeNode.getContent());
-            if (type != null) {
-                declaration.type(type);
+        Node declared = node.isType("property_promotion_parameter") ? node : node.getParent();
+        if (declared != null) {
+            declaration.$modifier(modifiersOf(declared));
+            Node typeNode = declared.getChildByFieldName("type");
+            if (typeNode != null) {
+                PhpType type = names.type(typeNode.getContent());
+                if (type != null) {
+                    declaration.type(type);
+                }
             }
         }
 
         declarations.push(declaration);
+    }
+
+    private static String modifiersOf(Node declared) {
+        StringJoiner modifiers = new StringJoiner(" ");
+        for (Node child : declared.getChildren()) {
+            switch (child.getType()) {
+                case "visibility_modifier", "static_modifier", "readonly_modifier", "var_modifier",
+                     "abstract_modifier", "final_modifier" -> modifiers.add(child.getContent());
+                case null, default -> {
+                }
+            }
+        }
+        return modifiers.toString();
     }
 
     private void fill(CompleteIndexer.Ctx ctx, Node node) {

@@ -33,6 +33,27 @@ class PhpPropertyDeclarationTest {
     }
 
     @Test
+    void hoversWithModifiersInSourceOrder() throws IOException {
+        try (Fixture fixture = Fixture.index("php_property_modifiers")) {
+            assertEquals(
+                    List.of(
+                            php("public static int $count"),
+                            php("protected readonly string $label"),
+                            php("var $legacy"),
+                            php("private int $x"),
+                            php("private int $y"),
+                            php("private readonly Engine $engine")
+                    ),
+                    fixture.symbols()
+                            .propertyDeclarations()
+                            .stream()
+                            .map(PhpPropertyDeclaration::hover)
+                            .toList()
+            );
+        }
+    }
+
+    @Test
     void ownerIsInnermostClassWhoseScopeContainsIt() throws IOException {
         try (Fixture fixture = Fixture.index("php_property_owner")) {
             assertEquals(
@@ -44,5 +65,9 @@ class PhpPropertyDeclarationTest {
                             .toList()
             );
         }
+    }
+
+    private static String php(String text) {
+        return "```php\n<?php\n" + text + "\n```";
     }
 }
