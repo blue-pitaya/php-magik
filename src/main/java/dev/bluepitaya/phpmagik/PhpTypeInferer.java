@@ -21,29 +21,48 @@ public final class PhpTypeInferer {
 
     public void infer(PhpSymbolCollection symbols, Node root) {
         for (PhpMethodLocalVarDeclaration local : symbols.localVarDeclarations()) {
-            if (local.type() != null) {
-                continue;
-            }
             Range range = local.range();
-            if (range == null) {
+            if (local.type() != null || range == null) {
                 continue;
             }
             Node node = root.getDescendant(range.start(), range.end());
-            Node assignment = node == null ? null : node.getParent();
-            if (assignment == null || !assignment.isType("assignment_expression")) {
+            Node parent = node == null ? null : node.getParent();
+            if (node == null || parent == null) {
                 continue;
             }
-            Node right = assignment.getChildByFieldName("right");
-            PhpType type = typeOf(right, local.owner(), symbols);
-            if (type != null) {
-                local.type(type);
-                continue;
-            }
-            PhpMemberReference source = memberReferenceOf(right, symbols);
-            if (source != null) {
-                local.source(source);
+            if (parent.isType("assignment_expression")) {
+                infer(local, parent.getChildByFieldName("right"), false, symbols);
+            } else if (isForeachValue(node, parent)) {
+                Node foreach = parent.isType("pair") ? parent.getParent() : parent;
+                infer(local, Node.namedChild(foreach, 0), true, symbols);
             }
         }
+    }
+
+    private void infer(
+            PhpMethodLocalVarDeclaration local, @Nullable Node source, boolean element, PhpSymbolCollection symbols
+    ) {
+        PhpType type = typeOf(source, local.owner(), symbols);
+        if (element) {
+            type = PhpType.elementOf(type);
+        }
+        if (type != null) {
+            local.type(type);
+            return;
+        }
+        PhpMemberReference reference = memberReferenceOf(source, symbols);
+        if (reference != null) {
+            local.source(reference, element);
+        }
+    }
+
+    private static boolean isForeachValue(Node node, Node parent) {
+        if (parent.isType("foreach_statement")) {
+            return !node.equals(Node.namedChild(parent, 0));
+        }
+        Node foreach = parent.getParent();
+        return parent.isType("pair") && foreach != null && foreach.isType("foreach_statement")
+                && node.equals(Node.namedChild(parent, 1));
     }
 
     private static @Nullable PhpMemberReference memberReferenceOf(@Nullable Node expr, PhpSymbolCollection symbols) {

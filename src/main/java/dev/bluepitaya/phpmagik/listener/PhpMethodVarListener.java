@@ -44,7 +44,7 @@ public final class PhpMethodVarListener implements Listener {
 
         String text = node.getContent();
 
-        if (isAssigned(node, parent)) {
+        if (isAssigned(node, parent) || isIterated(node, parent)) {
             var declaration = new PhpMethodLocalVarDeclaration(file);
             declaration.owner(owner);
             declaration.name(text);
@@ -93,6 +93,17 @@ public final class PhpMethodVarListener implements Listener {
         }
 
         return node.equals(parent.getChildByFieldName("left"));
+    }
+
+    private static boolean isIterated(Node node, @Nullable Node parent) {
+        if (parent == null) {
+            return false;
+        }
+        if (parent.isType("foreach_statement")) {
+            return !node.equals(Node.namedChild(parent, 0));
+        }
+        Node foreach = parent.getParent();
+        return parent.isType("pair") && foreach != null && foreach.isType("foreach_statement");
     }
 
     private static boolean isParameter(@Nullable Node parent) {

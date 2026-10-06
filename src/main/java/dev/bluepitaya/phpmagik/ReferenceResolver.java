@@ -47,9 +47,14 @@ public final class ReferenceResolver {
         for (PhpMethodLocalVarDeclaration local : symbols.localVarDeclarations()) {
             PhpMemberReference source = local.source();
             if (source != null) {
-                local.type(memberType(source, index));
+                local.type(sourceType(local, source, index));
             }
         }
+    }
+
+    private @Nullable PhpType sourceType(PhpMethodLocalVarDeclaration local, PhpMemberReference source, Index index) {
+        PhpType type = memberType(source, index);
+        return local.elementOfSource() ? PhpType.elementOf(type) : type;
     }
 
     private @Nullable PhpPropertyDeclaration propertyOf(
@@ -141,7 +146,7 @@ public final class ReferenceResolver {
             return local.type();
         }
         try {
-            return memberType(source, index);
+            return sourceType(local, source, index);
         } finally {
             index.resolving.remove(local);
         }

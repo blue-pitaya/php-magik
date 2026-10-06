@@ -45,14 +45,19 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpT
     }
 
     static @Nullable String classFqn(@Nullable PhpType type) {
-        return switch (type) {
-            case ClassType(String fqn) -> fqn;
-            case UnionType(List<PhpType> types) -> {
-                List<PhpType> present = types.stream().filter(member -> member != Builtin.Null).toList();
-                yield present.size() == 1 ? classFqn(present.getFirst()) : null;
-            }
-            case null, default -> null;
-        };
+        return withoutNull(type) instanceof ClassType(String fqn) ? fqn : null;
+    }
+
+    static @Nullable PhpType elementOf(@Nullable PhpType type) {
+        return withoutNull(type) instanceof ArrayType(PhpType element) ? element : null;
+    }
+
+    private static @Nullable PhpType withoutNull(@Nullable PhpType type) {
+        if (!(type instanceof UnionType(List<PhpType> types))) {
+            return type;
+        }
+        List<PhpType> present = types.stream().filter(member -> member != Builtin.Null).toList();
+        return present.size() == 1 ? present.getFirst() : type;
     }
 
     static PhpType orMixed(@Nullable PhpType type) {

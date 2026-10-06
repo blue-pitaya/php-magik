@@ -14,6 +14,7 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
     private @Nullable String name;
     private @Nullable PhpType type;
     private @Nullable PhpMemberReference source;
+    private boolean elementOfSource;
     private @Nullable Range range;
 
     public PhpMethodLocalVarDeclaration(PhpFile file) {
@@ -55,8 +56,13 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
         return source;
     }
 
-    public void source(PhpMemberReference source) {
+    public boolean elementOfSource() {
+        return elementOfSource;
+    }
+
+    public void source(PhpMemberReference source, boolean elementOfSource) {
         this.source = source;
+        this.elementOfSource = elementOfSource;
     }
 
     @Override
