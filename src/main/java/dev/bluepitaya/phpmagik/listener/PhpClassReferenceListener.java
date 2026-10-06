@@ -3,9 +3,8 @@ package dev.bluepitaya.phpmagik.listener;
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -48,14 +47,7 @@ public final class PhpClassReferenceListener implements Listener {
             return;
         }
 
-        var reference = new PhpReference(file, PhpReference.Kind.CLASS);
-        reference.name(fqn);
-        reference.range(node.getRange());
-        PhpSymbolOwner owner = collection.ownerOf(file, node.getRange());
-        if (owner != null) {
-            reference.owner(owner);
-        }
-        collection.add(reference);
+        collection.add(new PhpClassReference(file, fqn, node.getRange()));
     }
 
     private @Nullable String fqnOf(Node node, Node parent) {

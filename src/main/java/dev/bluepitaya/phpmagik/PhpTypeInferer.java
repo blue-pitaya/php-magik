@@ -5,6 +5,7 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
@@ -112,10 +113,9 @@ public final class PhpTypeInferer {
                 case "name", "qualified_name", "relative_name" -> {
                     Range range = child.getRange();
                     for (PhpReference reference : symbols.references()) {
-                        String fqn = reference.name();
-                        if (reference.kind() == PhpReference.Kind.CLASS && range.equals(reference.range())
-                                && fqn != null) {
-                            return PhpType.named(fqn);
+                        if (reference instanceof PhpClassReference classReference
+                                && range.equals(classReference.range())) {
+                            return PhpType.named(classReference.name());
                         }
                     }
                     return null;

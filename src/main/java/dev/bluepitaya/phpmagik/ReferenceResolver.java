@@ -1,13 +1,18 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionCall;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMemberReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodCall;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyAccess;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbol;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpStaticCall;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
@@ -29,25 +34,14 @@ public final class ReferenceResolver {
     public void resolve() {
         Index index = new Index(symbols);
         for (PhpReference reference : symbols.references()) {
-            PhpSymbol definition = definitionOf(reference, index);
-            if (definition != null) {
-                reference.definition(definition);
+            switch (reference) {
+                case PhpClassReference r -> r.definition(index.classes.get(r.name()));
+                case PhpFunctionCall r -> r.definition(index.functions.get(r.name()));
+                case PhpPropertyAccess r -> r.definition(propertyOf(receiverClass(r, index), r.name(), index));
+                case PhpMethodCall r -> r.definition(methodOf(receiverClass(r, index), r.name(), index));
+                case PhpStaticCall r -> r.definition(methodOf(scopeClass(r.owner(), r.scope()), r.name(), index));
             }
         }
-    }
-
-    private @Nullable PhpSymbol definitionOf(PhpReference reference, Index index) {
-        String name = reference.name();
-        if (name == null) {
-            return null;
-        }
-
-        return switch (reference.kind()) {
-            case FUNCTION -> index.functions.get(name);
-            case PROPERTY -> propertyOf(receiverClass(reference, index), name, index);
-            case METHOD -> methodOf(receiverClass(reference, index), name, index);
-            case CLASS -> index.classes.get(name);
-        };
     }
 
     private @Nullable PhpPropertyDeclaration propertyOf(
@@ -70,23 +64,33 @@ public final class ReferenceResolver {
         return byName == null ? null : byName.get(name);
     }
 
-    private @Nullable PhpClassDeclaration receiverClass(PhpReference reference, Index index) {
-        PhpClassDeclaration current = baseClass(reference, index);
-        for (PhpReference.Step step : reference.receiverPath()) {
+    private @Nullable PhpClassDeclaration receiverClass(PhpMemberReference member, Index index) {
+        PhpMemberReference receiver = member.receiver();
+        if (receiver != null) {
+            PhpClassDeclaration current = receiverClass(receiver, index);
             if (current == null) {
                 return null;
             }
-            PhpType type;
-            if (step.call()) {
-                PhpMethodDeclaration method = methodOf(current, step.name(), index);
-                type = method == null ? null : method.returnType();
-            } else {
-                PhpPropertyDeclaration property = propertyOf(current, step.name(), index);
-                type = property == null ? null : property.type();
-            }
-            current = classOf(type, current, index);
+            PhpType type = switch (receiver) {
+                case PhpPropertyAccess access -> {
+                    PhpPropertyDeclaration property = propertyOf(current, access.name(), index);
+                    yield property == null ? null : property.type();
+                }
+                case PhpMethodCall call -> {
+                    PhpMethodDeclaration method = methodOf(current, call.name(), index);
+                    yield method == null ? null : method.returnType();
+                }
+            };
+            return classOf(type, current, index);
         }
-        return current;
+
+        String variable = member.variable();
+        if (variable == null) {
+            return null;
+        }
+        return "$this".equals(variable)
+                ? enclosingClass(member.owner())
+                : variableClass(variable, member.owner(), index);
     }
 
     private @Nullable PhpClassDeclaration classOf(
@@ -102,34 +106,29 @@ public final class ReferenceResolver {
         return index.classes.get(fqn);
     }
 
-    private @Nullable PhpClassDeclaration baseClass(PhpReference reference, Index index) {
-        PhpSymbolOwner owner = reference.owner();
-        String scope = reference.receiverScope();
-        if ("self".equalsIgnoreCase(scope) || "static".equalsIgnoreCase(scope)) {
-            return owner instanceof PhpMethodDeclaration method ? method.owner() : null;
-        }
+    private static @Nullable PhpClassDeclaration scopeClass(@Nullable PhpSymbolOwner owner, String scope) {
+        return "self".equalsIgnoreCase(scope) || "static".equalsIgnoreCase(scope) ? enclosingClass(owner) : null;
+    }
 
-        String receiver = reference.receiverVar();
-        if (receiver == null) {
-            return null;
-        }
+    private static @Nullable PhpClassDeclaration enclosingClass(@Nullable PhpSymbolOwner owner) {
+        return owner instanceof PhpMethodDeclaration method ? method.owner() : null;
+    }
 
-        if ("$this".equals(receiver)) {
-            return owner instanceof PhpMethodDeclaration method ? method.owner() : null;
-        }
-
-        String typeName = receiverTypeName(receiver, owner, index);
+    private @Nullable PhpClassDeclaration variableClass(
+            String variable, @Nullable PhpSymbolOwner owner, Index index
+    ) {
+        String typeName = variableTypeName(variable, owner, index);
         return typeName == null ? null : index.classes.get(typeName);
     }
 
-    private @Nullable String receiverTypeName(
-            String receiver, @Nullable PhpSymbolOwner owner, Index index
+    private @Nullable String variableTypeName(
+            String variable, @Nullable PhpSymbolOwner owner, Index index
     ) {
-        PhpParameterDeclaration parameter = index.parameters.get(new Scoped(owner, receiver));
+        PhpParameterDeclaration parameter = index.parameters.get(new Scoped(owner, variable));
         if (parameter != null) {
             return classTypeName(parameter.type());
         }
-        PhpMethodLocalVarDeclaration local = index.locals.get(new Scoped(owner, receiver));
+        PhpMethodLocalVarDeclaration local = index.locals.get(new Scoped(owner, variable));
         if (local != null) {
             return classTypeName(local.type());
         }

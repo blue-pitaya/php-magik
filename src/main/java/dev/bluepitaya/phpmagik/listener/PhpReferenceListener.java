@@ -2,21 +2,27 @@ package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionCall;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMemberReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodCall;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyAccess;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpStaticCall;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.ts.Node;
+import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @NullMarked
 public final class PhpReferenceListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
+    private final Map<Node, PhpMemberReference> members = new HashMap<>();
 
     public PhpReferenceListener(
             PhpSymbolCollection collection, PhpFile file
@@ -26,73 +32,58 @@ public final class PhpReferenceListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if (!node.isType("name")) {
-            return;
-        }
-
         Node parent = ctx.parent();
-        if (parent == null) {
-            return;
-        }
-        
-        PhpReference.Kind kind = kindOf(node, parent);
-        if (kind == null) {
+        if (!node.isType("name") || parent == null) {
             return;
         }
 
-        var reference = new PhpReference(file, kind);
-        reference.name(node.getContent());
-        reference.range(node.getRange());
-        PhpSymbolOwner owner = collection.ownerOf(file, node.getRange());
-        if (owner != null) {
-            reference.owner(owner);
-        }
-        if (kind != PhpReference.Kind.FUNCTION) {
-            receive(reference, parent.getChildByFieldName("object"));
-            Node scope = parent.getChildByFieldName("scope");
-            if (scope != null) {
-                reference.receiverScope(scope.getContent());
+        String name = node.getContent();
+        Range range = node.getRange();
+        switch (parent.getType()) {
+            case "function_call_expression" -> collection.add(new PhpFunctionCall(file, name, range));
+            case "member_access_expression", "nullsafe_member_access_expression" -> {
+                var access = propertyAccess(node, parent);
+                members.put(parent, access);
+                collection.add(access);
             }
-        }
-        collection.add(reference);
-    }
-
-    private static PhpReference.@Nullable Kind kindOf(Node node, Node parent) {
-        return switch (parent.getType()) {
-            case "function_call_expression" -> PhpReference.Kind.FUNCTION;
-            case "member_access_expression", "nullsafe_member_access_expression" -> PhpReference.Kind.PROPERTY;
-            case "member_call_expression", "nullsafe_member_call_expression" -> PhpReference.Kind.METHOD;
-            case "scoped_call_expression" -> node.equals(parent.getChildByFieldName("name"))
-                    ? PhpReference.Kind.METHOD
-                    : null;
-            default -> null;
-        };
-    }
-
-    private static void receive(PhpReference reference, @Nullable Node object) {
-        List<PhpReference.Step> path = new ArrayList<>();
-        @Nullable Node current = object;
-        while (current != null) {
-            switch (current.getType()) {
-                case "variable_name" -> {
-                    reference.receiverVar(current.getContent());
-                    reference.receiverPath(List.copyOf(path.reversed()));
-                    return;
-                }
-                case "member_access_expression", "nullsafe_member_access_expression",
-                     "member_call_expression", "nullsafe_member_call_expression" -> {
-                    Node name = current.getChildByFieldName("name");
-                    if (name == null) {
-                        return;
-                    }
-                    path.add(new PhpReference.Step(name.getContent(), current.getType().endsWith("call_expression")));
-                    current = current.getChildByFieldName("object");
-                }
-                case null, default -> {
-                    return;
+            case "member_call_expression", "nullsafe_member_call_expression" -> {
+                var call = methodCall(node, parent);
+                members.put(parent, call);
+                collection.add(call);
+            }
+            case "scoped_call_expression" -> {
+                Node scope = parent.getChildByFieldName("scope");
+                if (scope != null && node.equals(parent.getChildByFieldName("name"))) {
+                    collection.add(new PhpStaticCall(file, ownerOf(node), name, range, scope.getContent()));
                 }
             }
+            default -> {
+            }
         }
+    }
+
+    private PhpPropertyAccess propertyAccess(Node name, Node expression) {
+        Node object = expression.getChildByFieldName("object");
+        return new PhpPropertyAccess(
+                file, ownerOf(name), name.getContent(), name.getRange(), variableOf(object), receiverOf(object));
+    }
+
+    private PhpMethodCall methodCall(Node name, Node expression) {
+        Node object = expression.getChildByFieldName("object");
+        return new PhpMethodCall(
+                file, ownerOf(name), name.getContent(), name.getRange(), variableOf(object), receiverOf(object));
+    }
+
+    private @Nullable PhpSymbolOwner ownerOf(Node node) {
+        return collection.ownerOf(file, node.getRange());
+    }
+
+    private static @Nullable String variableOf(@Nullable Node object) {
+        return object != null && object.isType("variable_name") ? object.getContent() : null;
+    }
+
+    private @Nullable PhpMemberReference receiverOf(@Nullable Node object) {
+        return object == null ? null : members.remove(object);
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {

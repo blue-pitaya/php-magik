@@ -6,7 +6,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentIdentifier;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpStaticCall;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -23,18 +23,19 @@ class PhpStaticCallTest {
     void recordsAStaticMethodCalledOnSelfAsAMethodReference() throws IOException {
         try (Fixture fixture = Fixture.index("php_static_call")) {
             PhpFile file = fixture.file("Foo.php");
-            var methodReferences = fixture.symbols().references().stream()
-                    .filter(reference -> reference.kind() == PhpReference.Kind.METHOD)
+            var staticCalls = fixture.symbols().references().stream()
                     .filter(reference -> reference.file() == file)
+                    .filter(PhpStaticCall.class::isInstance)
+                    .map(PhpStaticCall.class::cast)
                     .toList();
 
-            assertEquals(List.of("baz"), methodReferences.stream().map(PhpReference::name).toList());
-            assertEquals(List.of(range(12, 21, 24)), methodReferences.stream().map(PhpReference::range).toList());
+            assertEquals(List.of("baz"), staticCalls.stream().map(PhpStaticCall::name).toList());
+            assertEquals(List.of(range(12, 21, 24)), staticCalls.stream().map(PhpStaticCall::range).toList());
             assertEquals(
                     List.of(range(8, 27, 30)),
-                    methodReferences.stream()
-                            .map(PhpReference::definition)
-                            .map(definition -> ((PhpMethodDeclaration) definition).range())
+                    staticCalls.stream()
+                            .map(PhpStaticCall::definition)
+                            .map(PhpMethodDeclaration::range)
                             .toList()
             );
         }

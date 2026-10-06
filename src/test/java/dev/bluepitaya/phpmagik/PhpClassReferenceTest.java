@@ -10,8 +10,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.lsp.handler.ReferencesHandler;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpClassReference;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
@@ -35,22 +34,20 @@ class PhpClassReferenceTest {
             assertEquals(
                     List.of("App\\Models\\User", "App\\Models\\User", "App\\Missing", "App\\Models\\User"),
                     classReferences.stream()
-                            .map(PhpReference::name)
+                            .map(PhpClassReference::name)
                             .toList()
             );
             assertEquals(
                     List.of(range(4, 4, 19), range(10, 16, 20), range(11, 8, 15), range(13, 15, 31)),
                     classReferences.stream()
-                            .map(PhpReference::range)
+                            .map(PhpClassReference::range)
                             .toList()
             );
             assertEquals(
                     Arrays.asList("User", "User", null, "User"),
                     classReferences.stream()
-                            .map(PhpReference::definition)
-                            .map(definition -> definition instanceof PhpClassDeclaration declaration
-                                    ? declaration.name()
-                                    : null)
+                            .map(PhpClassReference::definition)
+                            .map(definition -> definition == null ? null : definition.name())
                             .toList()
             );
         }
@@ -99,14 +96,14 @@ class PhpClassReferenceTest {
             assertEquals(
                     Collections.nCopies(7, "App\\Models\\Engine"),
                     classReferences.stream()
-                            .map(PhpReference::name)
+                            .map(PhpClassReference::name)
                             .toList()
             );
             assertEquals(
                     List.of(range(4, 4, 21), range(5, 4, 21), range(9, 11, 17), range(11, 13, 19),
                             range(13, 15, 21), range(15, 40, 46), range(15, 58, 64)),
                     classReferences.stream()
-                            .map(PhpReference::range)
+                            .map(PhpClassReference::range)
                             .toList()
             );
         }
@@ -140,23 +137,21 @@ class PhpClassReferenceTest {
                     List.of("App\\Base", "App\\Drivable", "App\\Base", "App\\Car", "App\\Car", "App\\Car", "App\\Car",
                             "App\\Car"),
                     classReferences.stream()
-                            .map(PhpReference::name)
+                            .map(PhpClassReference::name)
                             .toList()
             );
             assertEquals(
                     List.of(range(4, 18, 22), range(4, 34, 42), range(6, 32, 36), range(6, 45, 48),
                             range(8, 29, 32), range(9, 19, 23), range(12, 15, 21), range(12, 33, 36)),
                     classReferences.stream()
-                            .map(PhpReference::range)
+                            .map(PhpClassReference::range)
                             .toList()
             );
             assertEquals(
                     Arrays.asList("Base", null, "Base", "Car", "Car", "Car", "Car", "Car"),
                     classReferences.stream()
-                            .map(PhpReference::definition)
-                            .map(definition -> definition instanceof PhpClassDeclaration declaration
-                                    ? declaration.name()
-                                    : null)
+                            .map(PhpClassReference::definition)
+                            .map(definition -> definition == null ? null : definition.name())
                             .toList()
             );
         }
@@ -203,11 +198,12 @@ class PhpClassReferenceTest {
         }
     }
 
-    private static List<PhpReference> classReferences(Fixture fixture, String file) {
+    private static List<PhpClassReference> classReferences(Fixture fixture, String file) {
         PhpFile phpFile = fixture.file(file);
         return fixture.symbols().references().stream()
-                .filter(reference -> reference.kind() == PhpReference.Kind.CLASS)
                 .filter(reference -> reference.file() == phpFile)
+                .filter(PhpClassReference.class::isInstance)
+                .map(PhpClassReference.class::cast)
                 .toList();
     }
 
