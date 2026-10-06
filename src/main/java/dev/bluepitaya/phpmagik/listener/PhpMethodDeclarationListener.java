@@ -50,7 +50,8 @@ public final class PhpMethodDeclarationListener implements Listener {
 
     private void open(CompleteIndexer.Ctx ctx, Node node) {
         PhpMethodDeclaration declaration = new PhpMethodDeclaration(file, ctx.depth());
-        if (ctx.peek() instanceof PhpClassDeclaration owner) {
+        PhpClassDeclaration owner = collection.classOf(file, node.getRange());
+        if (owner != null) {
             declaration.owner(owner);
         }
         PhpSignatureReader.read(declaration, node, names);

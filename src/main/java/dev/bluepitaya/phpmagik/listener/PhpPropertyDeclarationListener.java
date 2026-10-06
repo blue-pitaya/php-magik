@@ -3,10 +3,8 @@ package dev.bluepitaya.phpmagik.listener;
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
-import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
@@ -46,12 +44,8 @@ public final class PhpPropertyDeclarationListener implements Listener {
 
     private void open(CompleteIndexer.Ctx ctx, Node node) {
         PhpPropertyDeclaration declaration = new PhpPropertyDeclaration(file, ctx.depth());
-        PhpSymbolOwner enclosing = ctx.peek();
-        /* a promoted parameter sits in the constructor, which sits in the class */
-        if (enclosing instanceof PhpMethodDeclaration method) {
-            enclosing = method.owner();
-        }
-        if (enclosing instanceof PhpClassDeclaration owner) {
+        PhpClassDeclaration owner = collection.classOf(file, node.getRange());
+        if (owner != null) {
             declaration.owner(owner);
         }
 

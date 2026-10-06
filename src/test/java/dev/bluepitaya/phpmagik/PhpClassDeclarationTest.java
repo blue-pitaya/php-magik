@@ -22,6 +22,7 @@ class PhpClassDeclarationTest {
                     List.of("InnerClass", "Service1"),
                     classDeclarations.stream()
                             .map(PhpClassDeclaration::name)
+                            .sorted()
                             .toList()
             );
         }

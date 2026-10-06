@@ -30,6 +30,7 @@ public final class PhpClassDeclarationListener implements Listener {
             if (namespace != null) {
                 declaration.namespace(namespace);
             }
+            declaration.scope(node.getRange());
             declarations.push(declaration);
             ctx.push(declaration);
         }
@@ -37,15 +38,8 @@ public final class PhpClassDeclarationListener implements Listener {
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
         if (node.isType("class_declaration")) {
-            PhpClassDeclaration declaration = declarations.poll();
+            declarations.poll();
             ctx.pop();
-            if (declaration == null || declaration.name() == null
-                    || declaration.range() == null) {
-                return;
-            }
-
-            declaration.scope(node.getRange());
-            collection.add(declaration);
         }
     }
 
@@ -63,8 +57,11 @@ public final class PhpClassDeclarationListener implements Listener {
                         modifier.isEmpty() ? text : modifier + " " + text);
             }
             case "name" -> {
-                declaration.name(node.getContent());
-                declaration.range(node.getRange());
+                if (declaration.name() == null) {
+                    declaration.name(node.getContent());
+                    declaration.range(node.getRange());
+                    collection.add(declaration);
+                }
             }
         }
     }

@@ -73,6 +73,20 @@ public final class PhpSymbolCollection {
         return null;
     }
 
+    public @Nullable PhpClassDeclaration classOf(PhpFile file, Range range) {
+        PhpClassDeclaration innermost = null;
+        Range innermostScope = null;
+        for (PhpClassDeclaration declaration : classDeclarations) {
+            Range scope = declaration.scope();
+            if (declaration.file() == file && scope != null && range.isWithin(scope)
+                    && (innermostScope == null || scope.isWithin(innermostScope))) {
+                innermost = declaration;
+                innermostScope = scope;
+            }
+        }
+        return innermost;
+    }
+
     public List<PhpClassDeclaration> classDeclarations() {
         return classDeclarations;
     }

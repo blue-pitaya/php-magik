@@ -31,4 +31,18 @@ class PhpPropertyDeclarationTest {
             );
         }
     }
+
+    @Test
+    void ownerIsInnermostClassWhoseScopeContainsIt() throws IOException {
+        try (Fixture fixture = Fixture.index("php_property_owner")) {
+            assertEquals(
+                    List.of("$outer Outer", "$inner Inner"),
+                    fixture.symbols()
+                            .propertyDeclarations()
+                            .stream()
+                            .map(property -> property.name() + " " + property.owner().name())
+                            .toList()
+            );
+        }
+    }
 }
