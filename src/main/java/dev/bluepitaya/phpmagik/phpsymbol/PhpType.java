@@ -3,8 +3,11 @@ package dev.bluepitaya.phpmagik.phpsymbol;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @NullMarked
-public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpType.ArrayType {
+public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpType.ArrayType, PhpType.UnionType {
 
     String php();
 
@@ -36,8 +39,28 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpT
         return new ArrayType(element);
     }
 
+    static PhpType union(List<PhpType> types) {
+        List<PhpType> distinct = types.stream().distinct().toList();
+        return distinct.size() == 1 ? distinct.getFirst() : new UnionType(distinct);
+    }
+
+    static @Nullable String classFqn(@Nullable PhpType type) {
+        return switch (type) {
+            case ClassType(String fqn) -> fqn;
+            case UnionType(List<PhpType> types) -> {
+                List<PhpType> present = types.stream().filter(member -> member != Builtin.Null).toList();
+                yield present.size() == 1 ? classFqn(present.getFirst()) : null;
+            }
+            case null, default -> null;
+        };
+    }
+
+    static PhpType orMixed(@Nullable PhpType type) {
+        return type == null ? Builtin.Mixed : type;
+    }
+
     static String declared(@Nullable PhpType type, String name) {
-        return type == null ? name : type.qualified() + " " + name;
+        return orMixed(type).qualified() + " " + name;
     }
 
     enum Builtin implements PhpType {
@@ -50,7 +73,8 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpT
         Callable("callable"),
         Iterable("iterable"),
         Object("object"),
-        Mixed("mixed");
+        Mixed("mixed"),
+        Void("void");
 
         private final String php;
 
@@ -87,6 +111,19 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpT
         @Override
         public String qualified() {
             return "array<" + element.qualified() + ">";
+        }
+    }
+
+    record UnionType(List<PhpType> types) implements PhpType {
+
+        @Override
+        public String php() {
+            return types.stream().map(PhpType::php).collect(Collectors.joining("|"));
+        }
+
+        @Override
+        public String qualified() {
+            return types.stream().map(PhpType::qualified).collect(Collectors.joining("|"));
         }
     }
 }

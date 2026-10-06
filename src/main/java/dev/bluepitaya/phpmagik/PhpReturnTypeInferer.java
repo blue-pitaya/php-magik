@@ -33,7 +33,14 @@ public final class PhpReturnTypeInferer {
 
             Node declaration = root.getDescendant(scope.start(), scope.end());
             Node body = declaration == null ? null : declaration.getChildByFieldName("body");
-            Node statement = body == null ? null : lastReturn(body);
+            if (body == null) {
+                continue;
+            }
+            if (returnsNothing(body)) {
+                function.returnType(PhpType.Builtin.Void);
+                continue;
+            }
+            Node statement = lastReturn(body);
             if (statement == null) {
                 continue;
             }
@@ -48,6 +55,22 @@ public final class PhpReturnTypeInferer {
     private static boolean hasDeclaredReturn(PhpFunctionLike function) {
         PhpDoc doc = function.doc();
         return function.declaredReturnType() != null || (doc != null && doc.returns() != null);
+    }
+
+    private static boolean returnsNothing(Node node) {
+        for (Node child : node.getNamedChildren()) {
+            boolean nothing = switch (child.getType()) {
+                case "return_statement" -> child.getNamedChildCount() == 0;
+                case "yield_expression" -> false;
+                case "anonymous_function", "arrow_function", "function_definition", "class_declaration",
+                     "anonymous_class" -> true;
+                case null, default -> returnsNothing(child);
+            };
+            if (!nothing) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static @Nullable Node lastReturn(Node node) {

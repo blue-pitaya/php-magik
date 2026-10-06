@@ -24,7 +24,7 @@ class PhpMemberChainTest {
             var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
             Hover hover = handler.handle(at(fixture, 12, 21));
 
-            assertEquals("```php\n<?php\nfunction App\\Models\\Bar::baz($value)\n```", hover.contents().value());
+            assertEquals("```php\n<?php\nfunction App\\Models\\Bar::baz(mixed $value): void\n```", hover.contents().value());
         }
     }
 
@@ -56,7 +56,7 @@ class PhpMemberChainTest {
             var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
             Hover hover = handler.handle(at(fixture, 12, 16));
 
-            assertEquals("```php\n<?php\nprivate App\\Models\\Bar $bar\n```", hover.contents().value());
+            assertEquals("```php\n<?php\nprivate App\\Models\\Bar|null $bar\n```", hover.contents().value());
         }
     }
 

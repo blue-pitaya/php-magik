@@ -25,6 +25,13 @@ class PhpPromotedParameterTest {
     }
 
     @Test
+    void hoversALocalAssignedFromAPromotedParameterWithItsTypeAndName() throws IOException {
+        try (Fixture fixture = Fixture.index("php_promoted_parameter")) {
+            assertEquals(php("App\\Models\\Bar $baz"), hover(fixture, 11, 9));
+        }
+    }
+
+    @Test
     void hoversThePromotedDeclarationAsAProperty() throws IOException {
         try (Fixture fixture = Fixture.index("php_promoted_parameter")) {
             assertEquals(php("private App\\Models\\Bar $bar"), hover(fixture, 9, 21));

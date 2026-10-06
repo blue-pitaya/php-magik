@@ -20,7 +20,9 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 @NullMarked
 public final class ReferenceResolver {
@@ -39,7 +41,13 @@ public final class ReferenceResolver {
                 case PhpFunctionCall r -> r.definition(index.functions.get(r.name()));
                 case PhpPropertyAccess r -> r.definition(propertyOf(receiverClass(r, index), r.name(), index));
                 case PhpMethodCall r -> r.definition(methodOf(receiverClass(r, index), r.name(), index));
-                case PhpStaticCall r -> r.definition(methodOf(scopeClass(r.owner(), r.scope()), r.name(), index));
+                case PhpStaticCall r -> r.definition(methodOf(scopeClass(r.owner(), r.scope(), index), r.name(), index));
+            }
+        }
+        for (PhpMethodLocalVarDeclaration local : symbols.localVarDeclarations()) {
+            PhpMemberReference source = local.source();
+            if (source != null) {
+                local.type(memberType(source, index));
             }
         }
     }
@@ -67,21 +75,7 @@ public final class ReferenceResolver {
     private @Nullable PhpClassDeclaration receiverClass(PhpMemberReference member, Index index) {
         PhpMemberReference receiver = member.receiver();
         if (receiver != null) {
-            PhpClassDeclaration current = receiverClass(receiver, index);
-            if (current == null) {
-                return null;
-            }
-            PhpType type = switch (receiver) {
-                case PhpPropertyAccess access -> {
-                    PhpPropertyDeclaration property = propertyOf(current, access.name(), index);
-                    yield property == null ? null : property.type();
-                }
-                case PhpMethodCall call -> {
-                    PhpMethodDeclaration method = methodOf(current, call.name(), index);
-                    yield method == null ? null : method.returnType();
-                }
-            };
-            return classOf(type, current, index);
+            return classOf(memberType(receiver, index), index);
         }
 
         String variable = member.variable();
@@ -90,53 +84,71 @@ public final class ReferenceResolver {
         }
         return "$this".equals(variable)
                 ? enclosingClass(member.owner())
-                : variableClass(variable, member.owner(), index);
+                : classOf(variableType(variable, member.owner(), index), index);
     }
 
-    private @Nullable PhpClassDeclaration classOf(
-            @Nullable PhpType type, PhpClassDeclaration current, Index index
-    ) {
-        String fqn = classTypeName(type);
-        if (fqn == null) {
+    private @Nullable PhpType memberType(PhpMemberReference member, Index index) {
+        PhpClassDeclaration owner = receiverClass(member, index);
+        if (owner == null) {
             return null;
         }
-        if ("self".equalsIgnoreCase(fqn) || "static".equalsIgnoreCase(fqn)) {
-            return current;
-        }
-        return index.classes.get(fqn);
+
+        PhpType type = switch (member) {
+            case PhpPropertyAccess access -> {
+                PhpPropertyDeclaration property = propertyOf(owner, access.name(), index);
+                yield property == null ? null : property.type();
+            }
+            case PhpMethodCall call -> {
+                PhpMethodDeclaration method = methodOf(owner, call.name(), index);
+                yield method == null ? null : method.returnType();
+            }
+        };
+        String fqn = owner.fqn();
+        String typeName = classTypeName(type);
+        boolean self = "self".equalsIgnoreCase(typeName) || "static".equalsIgnoreCase(typeName);
+        return self && fqn != null ? PhpType.named(fqn) : type;
     }
 
-    private static @Nullable PhpClassDeclaration scopeClass(@Nullable PhpSymbolOwner owner, String scope) {
-        return "self".equalsIgnoreCase(scope) || "static".equalsIgnoreCase(scope) ? enclosingClass(owner) : null;
+    private @Nullable PhpClassDeclaration classOf(@Nullable PhpType type, Index index) {
+        String fqn = classTypeName(type);
+        return fqn == null ? null : index.classes.get(fqn);
+    }
+
+    private static @Nullable PhpClassDeclaration scopeClass(@Nullable PhpSymbolOwner owner, String scope, Index index) {
+        if ("self".equalsIgnoreCase(scope) || "static".equalsIgnoreCase(scope)) {
+            return enclosingClass(owner);
+        }
+        return index.classes.get(scope);
     }
 
     private static @Nullable PhpClassDeclaration enclosingClass(@Nullable PhpSymbolOwner owner) {
         return owner instanceof PhpMethodDeclaration method ? method.owner() : null;
     }
 
-    private @Nullable PhpClassDeclaration variableClass(
-            String variable, @Nullable PhpSymbolOwner owner, Index index
-    ) {
-        String typeName = variableTypeName(variable, owner, index);
-        return typeName == null ? null : index.classes.get(typeName);
-    }
-
-    private @Nullable String variableTypeName(
+    private @Nullable PhpType variableType(
             String variable, @Nullable PhpSymbolOwner owner, Index index
     ) {
         PhpParameterDeclaration parameter = index.parameters.get(new Scoped(owner, variable));
         if (parameter != null) {
-            return classTypeName(parameter.type());
+            return parameter.type();
         }
         PhpMethodLocalVarDeclaration local = index.locals.get(new Scoped(owner, variable));
-        if (local != null) {
-            return classTypeName(local.type());
+        if (local == null) {
+            return null;
         }
-        return null;
+        PhpMemberReference source = local.source();
+        if (source == null || !index.resolving.add(local)) {
+            return local.type();
+        }
+        try {
+            return memberType(source, index);
+        } finally {
+            index.resolving.remove(local);
+        }
     }
 
     private @Nullable String classTypeName(@Nullable PhpType type) {
-        return type instanceof PhpType.ClassType(String fqn) ? fqn : null;
+        return PhpType.classFqn(type);
     }
 
     private static @Nullable String withoutDollar(@Nullable String name) {
@@ -157,6 +169,7 @@ public final class ReferenceResolver {
         final Map<PhpClassDeclaration, Map<String, PhpPropertyDeclaration>> properties = new HashMap<>();
         final Map<Scoped, PhpParameterDeclaration> parameters = new HashMap<>();
         final Map<Scoped, PhpMethodLocalVarDeclaration> locals = new HashMap<>();
+        final Set<PhpMethodLocalVarDeclaration> resolving = new HashSet<>();
 
         Index(PhpSymbolCollection symbols) {
             for (PhpFunctionDefinition declared : symbols.functionDefinitions()) {

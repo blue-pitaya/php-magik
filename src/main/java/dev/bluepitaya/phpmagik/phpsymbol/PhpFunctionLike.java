@@ -30,11 +30,10 @@ public sealed interface PhpFunctionLike extends PhpSymbolOwner permits PhpMethod
 
     default String signature(String name) {
         String signature = name + "(" + parameters() + ")";
-        String returns = declaredReturnType();
-        PhpType inferred = returnType();
-        if (returns == null && inferred != null) {
-            returns = inferred.qualified();
+        if ("__construct".equalsIgnoreCase(name())) {
+            return signature;
         }
-        return returns == null ? signature : signature + ": " + returns;
+        String returns = declaredReturnType();
+        return signature + ": " + (returns != null ? returns : PhpType.orMixed(returnType()).qualified());
     }
 }

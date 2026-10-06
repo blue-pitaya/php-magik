@@ -13,6 +13,7 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
     private @Nullable PhpSymbolOwner owner;
     private @Nullable String name;
     private @Nullable PhpType type;
+    private @Nullable PhpMemberReference source;
     private @Nullable Range range;
 
     public PhpMethodLocalVarDeclaration(PhpFile file) {
@@ -23,13 +24,7 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String ownerName = ownerName();
-
-        return PhpSymbol.code(ownerName == null ? name : ownerName + "(): " + name);
-    }
-
-    private @Nullable String ownerName() {
-        return owner instanceof PhpFunctionLike function ? function.name() : null;
+        return PhpSymbol.code(PhpType.declared(type, name));
     }
 
     public @Nullable PhpSymbolOwner owner() {
@@ -52,8 +47,16 @@ public final class PhpMethodLocalVarDeclaration implements PhpSymbol {
         return type;
     }
 
-    public void type(PhpType type) {
+    public void type(@Nullable PhpType type) {
         this.type = type;
+    }
+
+    public @Nullable PhpMemberReference source() {
+        return source;
+    }
+
+    public void source(PhpMemberReference source) {
+        this.source = source;
     }
 
     @Override

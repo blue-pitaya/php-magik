@@ -22,8 +22,8 @@ class PhpReturnTypeInfererTest {
         try (Fixture fixture = Fixture.index("php_return_type")) {
             assertEquals(
                     List.of(
-                            PhpType.named("App\\Foo"),
-                            PhpType.named("App\\Models\\Bar"),
+                            PhpType.union(List.of(PhpType.named("App\\Foo"), PhpType.Builtin.Null)),
+                            PhpType.union(List.of(PhpType.named("App\\Models\\Bar"), PhpType.Builtin.Null)),
                             PhpType.named("App\\Models\\Bar"),
                             PhpType.named("static")
                     ),
@@ -47,9 +47,21 @@ class PhpReturnTypeInfererTest {
     }
 
     @Test
+    void infersVoidWhenNoReturnCarriesAValue() throws IOException {
+        try (Fixture fixture = Fixture.index("php_void_return")) {
+            assertEquals(
+                    List.of(PhpType.Builtin.Void, PhpType.Builtin.Void, PhpType.Builtin.Void),
+                    fixture.symbols().functionDefinitions().stream()
+                            .map(PhpFunctionDefinition::returnType)
+                            .toList()
+            );
+        }
+    }
+
+    @Test
     void hoversTheInferredReturnTypeWhenThereIsNoHint() throws IOException {
         try (Fixture fixture = Fixture.index("php_return_type")) {
-            assertEquals("```php\n<?php\nfunction App\\Foo::documented(): App\\Models\\Bar\n```", hover(fixture, 19, 21));
+            assertEquals("```php\n<?php\nfunction App\\Foo::documented(): App\\Models\\Bar|null\n```", hover(fixture, 19, 21));
             assertEquals("```php\n<?php\nfunction App\\Foo::returned(): App\\Models\\Bar\n```", hover(fixture, 24, 21));
             assertEquals("```php\n<?php\nfunction made(): App\\Models\\Bar\n```", hover(fixture, 46, 10));
         }

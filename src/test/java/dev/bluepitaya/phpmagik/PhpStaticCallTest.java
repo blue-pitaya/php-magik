@@ -5,6 +5,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.Position;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentIdentifier;
 import dev.bluepitaya.phpmagik.lsp.dto.TextDocumentPosition;
 import dev.bluepitaya.phpmagik.lsp.handler.DefinitionHandler;
+import dev.bluepitaya.phpmagik.lsp.handler.HoverHandler;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpStaticCall;
 import dev.bluepitaya.phpmagik.testing.Fixture;
@@ -50,6 +51,34 @@ class PhpStaticCallTest {
             assertEquals(
                     Json.location(uri, range(8, 27, 30)),
                     handler.handle(new TextDocumentPosition(new TextDocumentIdentifier(uri), new Position(12, 22)))
+            );
+        }
+    }
+
+    @Test
+    void hoversAStaticMethodCalledOnAnImportedClass() throws IOException {
+        try (Fixture fixture = Fixture.index("php_static_call")) {
+            var handler = new HoverHandler(fixture.workspace(), fixture.finder(), fixture.log());
+            String uri = fixture.file("Baz.php").uri();
+
+            assertEquals(
+                    "```php\n<?php\nfunction App\\Models\\Bar::get(): void\n```",
+                    handler.handle(new TextDocumentPosition(new TextDocumentIdentifier(uri), new Position(10, 30)))
+                            .contents()
+                            .value()
+            );
+        }
+    }
+
+    @Test
+    void jumpsFromAStaticMethodCalledOnAnImportedClassToItsDeclaration() throws IOException {
+        try (Fixture fixture = Fixture.index("php_static_call")) {
+            var handler = new DefinitionHandler(fixture.workspace(), fixture.finder(), fixture.log());
+            String uri = fixture.file("Baz.php").uri();
+
+            assertEquals(
+                    Json.location(fixture.file("Bar.php").uri(), range(7, 27, 30)),
+                    handler.handle(new TextDocumentPosition(new TextDocumentIdentifier(uri), new Position(10, 30)))
             );
         }
     }

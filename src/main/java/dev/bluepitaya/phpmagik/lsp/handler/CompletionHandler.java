@@ -129,11 +129,12 @@ public final class CompletionHandler {
     }
 
     private @Nullable PhpClassDeclaration classNamed(@Nullable PhpType type) {
-        if (!(type instanceof PhpType.ClassType classType)) {
+        String fqn = PhpType.classFqn(type);
+        if (fqn == null) {
             return null;
         }
         for (PhpClassDeclaration declared : workspace.symbols().classDeclarations()) {
-            if (classType.fqn().equals(declared.fqn())) {
+            if (fqn.equals(declared.fqn())) {
                 return declared;
             }
         }

@@ -33,7 +33,6 @@ public final class PhpParameterDeclarationListener implements Listener {
         switch (node.getType()) {
             case "simple_parameter", "property_promotion_parameter" -> open(ctx, node);
             case "variable_name" -> fill(ctx, node);
-            case "named_type" -> fillNamedType(ctx, node);
         }
     }
 
@@ -48,6 +47,11 @@ public final class PhpParameterDeclarationListener implements Listener {
         PhpSymbolOwner owner = collection.ownerOf(file, node.getRange());
         if (owner != null) {
             declaration.owner(owner);
+        }
+        Node typeNode = node.getChildByFieldName("type");
+        PhpType type = typeNode == null ? null : names.type(typeNode.getContent());
+        if (type != null) {
+            declaration.type(type);
         }
 
         declarations.push(declaration);
@@ -66,15 +70,6 @@ public final class PhpParameterDeclarationListener implements Listener {
         }
     }
 
-    private void fillNamedType(CompleteIndexer.Ctx ctx, Node node) {
-        PhpParameterDeclaration declaration = declarations.peek();
-        if (declaration == null || ctx.depth() != declaration.depth() + 1) {
-            return;
-        }
-
-        declaration.type(PhpType.named(names.resolve(node.getContent())));
-    }
-
     private void commit(@Nullable PhpParameterDeclaration declaration) {
         if (declaration == null || declaration.name() == null
                 || declaration.range() == null) {
@@ -85,21 +80,6 @@ public final class PhpParameterDeclarationListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        if (node.isType("primitive_type")) {
-            fillType(ctx, node);
-        }
-    }
-
-    private void fillType(CompleteIndexer.Ctx ctx, Node node) {
-        PhpParameterDeclaration declaration = declarations.peek();
-        if (declaration == null || ctx.depth() != declaration.depth() + 1) {
-            return;
-        }
-
-        PhpType phpType = PhpType.of(node.getContent());
-        if (phpType != null) {
-            declaration.type(phpType);
-        }
     }
 
     public void token(CompleteIndexer.Ctx ctx, Node node, String field) {

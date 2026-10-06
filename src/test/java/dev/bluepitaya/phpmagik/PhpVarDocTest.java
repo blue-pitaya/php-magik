@@ -24,7 +24,7 @@ class PhpVarDocTest {
                             PhpType.arrayOf(BAR),
                             PhpType.arrayOf(PhpType.Builtin.String),
                             BAR,
-                            BAR
+                            PhpType.union(List.of(BAR, PhpType.Builtin.Null))
                     ),
                     fixture.symbols()
                             .propertyDeclarations()

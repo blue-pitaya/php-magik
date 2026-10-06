@@ -66,6 +66,7 @@ public final class Workspace {
         }
 
         new ReferenceResolver(symbols).resolve();
+        new VarUsageTypePropagator().propagate(symbols);
         log.log("indexed " + files.size() + " file(s)");
     }
 
@@ -76,6 +77,7 @@ public final class Workspace {
         symbols.addAll(indexInto(file));
 
         new ReferenceResolver(symbols).resolve();
+        new VarUsageTypePropagator().propagate(symbols);
         log.log("reparsed: " + file.path().getFileName());
     }
 

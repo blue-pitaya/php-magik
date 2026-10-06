@@ -1,6 +1,7 @@
 package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassDeclaration;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpMemberReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodLocalVarDeclaration;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
@@ -32,11 +33,36 @@ public final class PhpTypeInferer {
             if (assignment == null || !assignment.isType("assignment_expression")) {
                 continue;
             }
-            PhpType type = typeOf(assignment.getChildByFieldName("right"), local.owner(), symbols);
+            Node right = assignment.getChildByFieldName("right");
+            PhpType type = typeOf(right, local.owner(), symbols);
             if (type != null) {
                 local.type(type);
+                continue;
+            }
+            PhpMemberReference source = memberReferenceOf(right, symbols);
+            if (source != null) {
+                local.source(source);
             }
         }
+    }
+
+    private static @Nullable PhpMemberReference memberReferenceOf(@Nullable Node expr, PhpSymbolCollection symbols) {
+        boolean member = expr != null && switch (expr.getType()) {
+            case "member_access_expression", "nullsafe_member_access_expression",
+                 "member_call_expression", "nullsafe_member_call_expression" -> true;
+            case null, default -> false;
+        };
+        Node name = member ? expr.getChildByFieldName("name") : null;
+        if (name == null) {
+            return null;
+        }
+        Range range = name.getRange();
+        for (PhpReference reference : symbols.references()) {
+            if (reference instanceof PhpMemberReference access && range.equals(access.range())) {
+                return access;
+            }
+        }
+        return null;
     }
 
     @Nullable PhpType typeOf(
@@ -128,11 +154,12 @@ public final class PhpTypeInferer {
     }
 
     private static @Nullable PhpClassDeclaration classNamed(PhpType type, PhpSymbolCollection symbols) {
-        if (!(type instanceof PhpType.ClassType classType)) {
+        String fqn = PhpType.classFqn(type);
+        if (fqn == null) {
             return null;
         }
         for (PhpClassDeclaration declared : symbols.classDeclarations()) {
-            if (classType.fqn().equals(declared.fqn())) {
+            if (fqn.equals(declared.fqn())) {
                 return declared;
             }
         }

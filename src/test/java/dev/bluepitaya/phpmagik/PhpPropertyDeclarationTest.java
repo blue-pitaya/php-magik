@@ -39,7 +39,7 @@ class PhpPropertyDeclarationTest {
                     List.of(
                             php("public static int $count"),
                             php("protected readonly string $label"),
-                            php("var $legacy"),
+                            php("var mixed $legacy"),
                             php("private int $x"),
                             php("private int $y"),
                             php("private readonly Engine $engine")

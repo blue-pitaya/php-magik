@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 class PhpClassReferenceTest {
 
@@ -69,10 +68,12 @@ class PhpClassReferenceTest {
     }
 
     @Test
-    void doesNotHoverTheMemberOrAnUnknownClass() throws IOException {
+    void hoversTheStaticMethodCalledOnAnImportedClass() throws IOException {
         try (Fixture fixture = Fixture.index("php_class_reference")) {
-            assertNull(hover(fixture, 10, 24));
-            assertNull(hover(fixture, 11, 9));
+            assertEquals(
+                    php("function App\\Models\\User::getAuthOnThrow(): App\\Models\\User"),
+                    hover(fixture, 10, 24)
+            );
         }
     }
 

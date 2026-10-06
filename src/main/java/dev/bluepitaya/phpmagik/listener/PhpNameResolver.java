@@ -32,8 +32,37 @@ public final class PhpNameResolver implements Listener {
     }
 
     public @Nullable PhpType type(@Nullable String text, List<PhpDoc.Template> templates) {
-        String member = text == null ? null : onlyMember(text);
-        if (member == null) {
+        if (text == null) {
+            return null;
+        }
+
+        List<PhpType> types = new ArrayList<>();
+        for (String member : members(text)) {
+            PhpType type = memberType(member, templates);
+            if (type == null) {
+                return null;
+            }
+            types.add(type);
+        }
+        return types.isEmpty() ? null : PhpType.union(types);
+    }
+
+    private static List<String> members(String text) {
+        List<String> members = new ArrayList<>();
+        for (String member : PhpDocTypes.split(text, '|')) {
+            String stripped = member.strip();
+            if (stripped.startsWith("?")) {
+                members.add(stripped.substring(1).strip());
+                members.add("null");
+            } else {
+                members.add(stripped);
+            }
+        }
+        return members;
+    }
+
+    private @Nullable PhpType memberType(String member, List<PhpDoc.Template> templates) {
+        if (PhpDocTypes.split(member, '&').size() != 1) {
             return null;
         }
         if (member.endsWith("[]")) {
@@ -47,6 +76,9 @@ public final class PhpNameResolver implements Listener {
         }
         if ("$this".equals(name)) {
             return PhpType.named("static");
+        }
+        if ("null".equalsIgnoreCase(name)) {
+            return PhpType.Builtin.Null;
         }
         if ("array".equals(name) || "list".equals(name)) {
             return arrayOf(elementOf(member.substring(name.length()).strip(), templates));
@@ -66,21 +98,6 @@ public final class PhpNameResolver implements Listener {
 
     private static PhpType arrayOf(@Nullable PhpType element) {
         return element == null ? PhpType.Builtin.Array : PhpType.arrayOf(element);
-    }
-
-    private static @Nullable String onlyMember(String text) {
-        List<String> members = new ArrayList<>();
-        for (String member : PhpDocTypes.split(text, '|')) {
-            String stripped = member.strip();
-            members.add(stripped.startsWith("?") ? stripped.substring(1) : stripped);
-        }
-        if (members.size() > 1) {
-            members.removeIf("null"::equalsIgnoreCase);
-        }
-        if (members.size() != 1 || PhpDocTypes.split(members.getFirst(), '&').size() != 1) {
-            return null;
-        }
-        return members.getFirst();
     }
 
     public String resolve(String name) {
@@ -121,7 +138,7 @@ public final class PhpNameResolver implements Listener {
                         name = "..." + name;
                     }
                     Node type = parameter.getChildByFieldName("type");
-                    parts.add(type == null ? name : typeText(type) + " " + name);
+                    parts.add((type == null ? PhpType.Builtin.Mixed.php() : typeText(type)) + " " + name);
                 }
                 case null, default -> {
                 }

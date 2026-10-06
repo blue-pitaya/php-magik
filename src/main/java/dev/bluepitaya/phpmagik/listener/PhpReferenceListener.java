@@ -22,13 +22,15 @@ public final class PhpReferenceListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
+    private final PhpNameResolver names;
     private final Map<Node, PhpMemberReference> members = new HashMap<>();
 
     public PhpReferenceListener(
-            PhpSymbolCollection collection, PhpFile file
+            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
     ) {
         this.collection = collection;
         this.file = file;
+        this.names = names;
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
@@ -54,7 +56,7 @@ public final class PhpReferenceListener implements Listener {
             case "scoped_call_expression" -> {
                 Node scope = parent.getChildByFieldName("scope");
                 if (scope != null && node.equals(parent.getChildByFieldName("name"))) {
-                    collection.add(new PhpStaticCall(file, ownerOf(node), name, range, scope.getContent()));
+                    collection.add(new PhpStaticCall(file, ownerOf(node), name, range, names.resolve(scope.getContent())));
                 }
             }
             default -> {

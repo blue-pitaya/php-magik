@@ -29,8 +29,7 @@ public final class PhpParameterDeclaration implements PhpSymbol {
     public @Nullable String hover() {
         if (name == null) return null;
 
-        String typeStr = type != null ? type.php() : null;
-        String declared = typeStr == null ? name : typeStr + " " + name;
+        String declared = PhpType.orMixed(type).php() + " " + name;
         String ownerName = ownerName();
 
         return PhpSymbol.code(ownerName == null ? declared : ownerName + "(" + declared + ")");
