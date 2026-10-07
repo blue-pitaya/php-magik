@@ -1,7 +1,7 @@
 package dev.bluepitaya.phpmagik.listener;
 
-import dev.bluepitaya.phpmagik.PhpDoc;
 import dev.bluepitaya.phpmagik.PhpReturnTypeInferer;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;

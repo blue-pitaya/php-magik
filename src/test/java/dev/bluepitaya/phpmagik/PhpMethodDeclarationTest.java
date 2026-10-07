@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpMethodDeclaration;
 import dev.bluepitaya.phpmagik.testing.Fixture;
 import org.junit.jupiter.api.Test;

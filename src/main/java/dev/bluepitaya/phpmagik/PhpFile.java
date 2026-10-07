@@ -1,8 +1,10 @@
 package dev.bluepitaya.phpmagik;
 
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 
@@ -40,6 +42,14 @@ public final class PhpFile {
 
     public byte[] content() {
         return content;
+    }
+
+    public @Nullable String contentLine(int line) {
+        var lines = new String(content(), StandardCharsets.UTF_8).split("\n", -1);
+        if (line >= 0 && line < lines.length) {
+            return lines[line];
+        }
+        return  null;
     }
 
     void replace(byte[] content) {

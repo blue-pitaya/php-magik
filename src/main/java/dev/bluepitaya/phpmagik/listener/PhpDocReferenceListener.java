@@ -1,9 +1,9 @@
 package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
-import dev.bluepitaya.phpmagik.PhpDoc;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassReference;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;

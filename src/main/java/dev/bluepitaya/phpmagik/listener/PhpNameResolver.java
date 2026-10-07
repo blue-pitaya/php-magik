@@ -1,7 +1,7 @@
 package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
-import dev.bluepitaya.phpmagik.PhpDoc;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;

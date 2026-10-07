@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionDefinition;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpParameterDeclaration;
 import dev.bluepitaya.phpmagik.testing.Fixture;

@@ -16,12 +16,13 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.nio.charset.StandardCharsets;
 
 @NullMarked
 public final class CompletionHandler {
@@ -29,6 +30,9 @@ public final class CompletionHandler {
     private static final int KIND_METHOD = 2;
     private static final int KIND_FIELD = 5;
     private static final int KIND_VARIABLE = 6;
+
+    private static final Pattern MEMBER_ACCESS =
+            Pattern.compile("([$\\w]*)(->|::)\\w*$", Pattern.UNICODE_CHARACTER_CLASS);
 
     private final Workspace workspace;
     private final Logger log;
@@ -52,23 +56,23 @@ public final class CompletionHandler {
             throw new AppException("file not found: " + uri);
         }
 
-        String[] lines = new String(file.content(), StandardCharsets.UTF_8).split("\n", -1);
-        String text = line >= 0 && line < lines.length ? lines[line] : "";
-        String prefix = text.substring(0, Math.min(Math.max(col, 0), text.length()));
-        int end = prefix.length();
-        while (end > 0 && isNameChar(prefix.charAt(end - 1))) {
-            end--;
+        String text = file.contentLine(line);
+        if (text == null) {
+            return items;
         }
-        String trigger = prefix.substring(0, end);
 
-        if (trigger.endsWith("::")) {
+        String prefix = text.substring(0, Math.clamp(col, 0, text.length()));
+        Matcher access = MEMBER_ACCESS.matcher(prefix);
+        boolean isAccess = access.find();
+
+        if (isAccess && access.group(2).equals("::")) {
             return items;
         }
 
         PhpSymbolOwner owner = enclosingOwner(file, new Point(line, col));
 
-        if (trigger.endsWith("->")) {
-            members(items, receiver(trigger), owner);
+        if (isAccess) {
+            members(items, access.group(1), owner);
         } else {
             locals(items, owner);
         }
@@ -154,19 +158,6 @@ public final class CompletionHandler {
             }
         }
         return found;
-    }
-
-    private static String receiver(String trigger) {
-        String beforeArrow = trigger.substring(0, trigger.length() - 2);
-        int start = beforeArrow.length();
-        while (start > 0 && (isNameChar(beforeArrow.charAt(start - 1)) || beforeArrow.charAt(start - 1) == '$')) {
-            start--;
-        }
-        return beforeArrow.substring(start);
-    }
-
-    private static boolean isNameChar(char c) {
-        return Character.isLetterOrDigit(c) || c == '_';
     }
 
     private static @Nullable String detail(@Nullable PhpType type) {

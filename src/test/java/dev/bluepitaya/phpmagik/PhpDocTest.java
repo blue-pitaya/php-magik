@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
+import dev.bluepitaya.phpmagik.phpsymbol.PhpDoc;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

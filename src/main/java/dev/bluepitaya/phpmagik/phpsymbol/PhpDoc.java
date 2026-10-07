@@ -1,4 +1,4 @@
-package dev.bluepitaya.phpmagik;
+package dev.bluepitaya.phpmagik.phpsymbol;
 
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
@@ -33,6 +33,27 @@ public record PhpDoc(
     public record Var(String type, @Nullable String name, String description) {
     }
 
+    private record Sections(List<String> text, List<String> tags) {
+
+        static Sections of(List<String> lines) {
+            List<String> text = new ArrayList<>();
+            List<String> tags = new ArrayList<>();
+            for (String line : lines) {
+                if (line.startsWith("@")) {
+                    tags.add(line);
+                } else if (!tags.isEmpty()) {
+                    tags.set(tags.size() - 1, tags.getLast() + "\n" + line);
+                } else {
+                    text.add(line);
+                }
+            }
+            return new Sections(text, tags);
+        }
+    }
+
+    private record Typed(String type, String rest) {
+    }
+
     public static @Nullable PhpDoc of(Node declaration) {
         Node previous = declaration.getPrevSibling();
         return previous != null && previous.isType("comment") ? parse(previous.getContent()) : null;
@@ -43,23 +64,13 @@ public record PhpDoc(
             return null;
         }
 
-        List<String> text = new ArrayList<>();
-        List<String> tags = new ArrayList<>();
-        for (String line : lines(comment.substring(3, comment.length() - 2))) {
-            if (line.startsWith("@")) {
-                tags.add(line);
-            } else if (!tags.isEmpty()) {
-                tags.set(tags.size() - 1, tags.getLast() + "\n" + line);
-            } else {
-                text.add(line);
-            }
-        }
+        Sections sections = Sections.of(lines(comment.substring(3, comment.length() - 2)));
 
         List<Template> templates = new ArrayList<>();
         List<Param> params = new ArrayList<>();
         @Nullable Return returns = null;
         List<Var> vars = new ArrayList<>();
-        for (String tag : tags) {
+        for (String tag : sections.tags()) {
             int nameEnd = wordEnd(tag);
             String body = tag.substring(nameEnd).strip();
             switch (tag.substring(1, nameEnd)) {
@@ -85,7 +96,7 @@ public record PhpDoc(
             }
         }
 
-        List<List<String>> paragraphs = paragraphs(text);
+        List<List<String>> paragraphs = paragraphs(sections.text());
         String summary = paragraphs.isEmpty() ? "" : String.join(" ", paragraphs.getFirst());
         String description = paragraphs.stream()
                 .skip(1)
@@ -166,9 +177,6 @@ public record PhpDoc(
         String[] parts = WHITESPACE.split(body, 3);
         boolean bounded = parts.length == 3 && ("of".equals(parts[1]) || "as".equals(parts[1]));
         return new Template(parts[0], bounded ? typed(parts[2]).type() : null);
-    }
-
-    private record Typed(String type, String rest) {
     }
 
     private static Typed typed(String body) {

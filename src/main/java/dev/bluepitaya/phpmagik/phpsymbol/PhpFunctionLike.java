@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik.phpsymbol;
 
-import dev.bluepitaya.phpmagik.PhpDoc;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
