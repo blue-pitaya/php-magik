@@ -15,29 +15,18 @@ public final class DefinitionFiller {
 
     public void fill(PhpSymbolCollection symbols) {
         for (PhpMethodVarUsage usage : symbols.varUsages()) {
-            PhpSymbol definition = definitionOf(usage, symbols);
+            PhpMethodLocalVarDeclaration assigned = assignedAbove(usage, symbols);
+            PhpSymbol definition = assigned != null ? assigned : parameterOf(usage, symbols);
             if (definition != null) {
                 usage.definition(definition);
             }
         }
     }
 
-    private static @Nullable PhpSymbol definitionOf(
-            PhpMethodVarUsage usage, PhpSymbolCollection symbols
-    ) {
-        PhpMethodLocalVarDeclaration assigned = assignedAbove(usage, symbols);
-
-        return assigned != null ? assigned : parameterOf(usage, symbols);
-    }
-
     private static @Nullable PhpParameterDeclaration parameterOf(
             PhpMethodVarUsage usage, PhpSymbolCollection symbols
     ) {
         String name = usage.name();
-        if (name == null || usage.owner() == null) {
-            return null;
-        }
-
         for (PhpParameterDeclaration declared : symbols.parameterDeclarations()) {
             if (declared.owner() == usage.owner() && name.equals(declared.name())) {
                 return declared;
@@ -52,10 +41,6 @@ public final class DefinitionFiller {
     ) {
         Range range = usage.range();
         String name = usage.name();
-        if (range == null || name == null || usage.owner() == null) {
-            return null;
-        }
-
         PhpMethodLocalVarDeclaration found = null;
         Point at = null;
         for (PhpMethodLocalVarDeclaration declared : symbols.localVarDeclarations()) {

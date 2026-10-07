@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.phpdoc.PhpDocTypes;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -122,12 +121,12 @@ public record PhpDoc(
     private static @Nullable Param param(String body) {
         @Nullable String type = null;
         String rest = body;
-        if (!PhpDocTypes.isVariableAt(rest, 0)) {
+        if (!isVariableAt(rest, 0)) {
             Typed typed = typed(rest);
             type = typed.type();
             rest = typed.rest();
         }
-        if (!PhpDocTypes.isVariableAt(rest, 0)) {
+        if (!isVariableAt(rest, 0)) {
             return null;
         }
 
@@ -173,7 +172,7 @@ public record PhpDoc(
     }
 
     private static Typed typed(String body) {
-        int end = PhpDocTypes.end(body);
+        int end = end(body);
         String type = WHITESPACE.matcher(body.substring(0, end).strip()).replaceAll(" ");
         return new Typed(type, body.substring(end).strip());
     }
@@ -184,5 +183,85 @@ public record PhpDoc(
             end++;
         }
         return end;
+    }
+
+    public static List<String> split(String type, char separator) {
+        List<String> parts = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < type.length(); i++) {
+            char c = type.charAt(i);
+            if (c == separator && depth == 0) {
+                parts.add(type.substring(start, i));
+                start = i + 1;
+            }
+            depth += nesting(c);
+        }
+        parts.add(type.substring(start));
+        return parts;
+    }
+
+    public static String withoutArguments(String type) {
+        for (int i = 0; i < type.length(); i++) {
+            if (nesting(type.charAt(i)) > 0) {
+                return type.substring(0, i).strip();
+            }
+        }
+        return type;
+    }
+
+    public static int end(String text) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (depth == 0 && Character.isWhitespace(c)) {
+                int next = whitespaceEnd(text, i);
+                if (!joins(text, i - 1, next)) {
+                    return i;
+                }
+                i = next - 1;
+            } else {
+                depth += nesting(c);
+            }
+        }
+        return text.length();
+    }
+
+    public static boolean isVariableAt(String text, int index) {
+        return text.startsWith("$", index) || text.startsWith("&", index) || text.startsWith("...", index);
+    }
+
+    private static boolean joins(String text, int previous, int next) {
+        if (next >= text.length()) {
+            return false;
+        }
+
+        char before = previous < 0 ? ' ' : text.charAt(previous);
+        char after = text.charAt(next);
+        return before == '|' || before == '&' || before == ':'
+                || after == '|' || after == '&' && !isVariableAt(text, next + 1);
+    }
+
+    private static int whitespaceEnd(String text, int from) {
+        int end = from;
+        while (end < text.length() && Character.isWhitespace(text.charAt(end))) {
+            end++;
+        }
+        return end;
+    }
+
+    private static int nesting(char c) {
+        return switch (c) {
+            case '(', '<', '{', '[' -> 1;
+            case ')', '>', '}', ']' -> -1;
+            default -> 0;
+        };
     }
 }

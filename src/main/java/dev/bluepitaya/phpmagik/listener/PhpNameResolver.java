@@ -2,7 +2,6 @@ package dev.bluepitaya.phpmagik.listener;
 
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpDoc;
-import dev.bluepitaya.phpmagik.phpdoc.PhpDocTypes;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import org.jspecify.annotations.NullMarked;
@@ -49,7 +48,7 @@ public final class PhpNameResolver implements Listener {
 
     private static List<String> members(String text) {
         List<String> members = new ArrayList<>();
-        for (String member : PhpDocTypes.split(text, '|')) {
+        for (String member : PhpDoc.split(text, '|')) {
             String stripped = member.strip();
             if (stripped.startsWith("?")) {
                 members.add(stripped.substring(1).strip());
@@ -62,14 +61,14 @@ public final class PhpNameResolver implements Listener {
     }
 
     private @Nullable PhpType memberType(String member, List<PhpDoc.Template> templates) {
-        if (PhpDocTypes.split(member, '&').size() != 1) {
+        if (PhpDoc.split(member, '&').size() != 1) {
             return null;
         }
         if (member.endsWith("[]")) {
             return arrayOf(type(member.substring(0, member.length() - 2), templates));
         }
 
-        String name = PhpDocTypes.withoutArguments(member);
+        String name = PhpDoc.withoutArguments(member);
         if (name.isEmpty() || name.contains("-") || UNMAPPED.contains(name)
                 || templates.stream().anyMatch(template -> template.name().equals(name))) {
             return null;
@@ -92,7 +91,7 @@ public final class PhpNameResolver implements Listener {
             return null;
         }
 
-        List<String> parts = PhpDocTypes.split(arguments.substring(1, arguments.length() - 1), ',');
+        List<String> parts = PhpDoc.split(arguments.substring(1, arguments.length() - 1), ',');
         return type(parts.getLast(), templates);
     }
 

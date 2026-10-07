@@ -9,30 +9,27 @@ import org.jspecify.annotations.Nullable;
 public final class PhpMethodVarUsage implements PhpSymbol {
 
     private final PhpFile file;
+    private final PhpSymbolOwner owner;
+    private final String name;
+    private final Range range;
 
-    private @Nullable PhpSymbolOwner owner;
     private @Nullable PhpSymbol definition;
     private @Nullable PhpType type;
-    private @Nullable String name;
-    private @Nullable Range range;
 
-    public PhpMethodVarUsage(PhpFile file) {
+    public PhpMethodVarUsage(PhpFile file, PhpSymbolOwner owner, String name, Range range) {
         this.file = file;
+        this.owner = owner;
+        this.name = name;
+        this.range = range;
     }
 
     @Override
-    public @Nullable String hover() {
-        if (name == null) return null;
-
+    public String hover() {
         return PhpSymbol.code(PhpType.declared(type, name));
     }
 
-    public @Nullable PhpSymbolOwner owner() {
+    public PhpSymbolOwner owner() {
         return owner;
-    }
-
-    public void owner(PhpSymbolOwner owner) {
-        this.owner = owner;
     }
 
     public @Nullable PhpSymbol definition() {
@@ -51,21 +48,13 @@ public final class PhpMethodVarUsage implements PhpSymbol {
         this.type = type;
     }
 
-    public @Nullable String name() {
+    public String name() {
         return name;
     }
 
-    public void name(String name) {
-        this.name = name;
-    }
-
     @Override
-    public @Nullable Range range() {
+    public Range range() {
         return range;
-    }
-
-    public void range(Range range) {
-        this.range = range;
     }
 
     @Override

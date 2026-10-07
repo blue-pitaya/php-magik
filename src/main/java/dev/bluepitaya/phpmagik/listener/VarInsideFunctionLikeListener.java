@@ -12,13 +12,13 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public final class PhpMethodVarListener implements Listener {
+public final class VarInsideFunctionLikeListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final PhpNameResolver names;
 
-    public PhpMethodVarListener(
+    public VarInsideFunctionLikeListener(
             PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
     ) {
         this.collection = collection;
@@ -27,12 +27,10 @@ public final class PhpMethodVarListener implements Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
-        if (node.isType("variable_name")) {
-            collect(ctx, node);
+        if (!node.isType("variable_name")) {
+            return;
         }
-    }
 
-    private void collect(CompleteIndexer.Ctx ctx, Node node) {
         if (!(collection.ownerOf(file, node.getRange()) instanceof PhpFunctionLike owner)) {
             return;
         }
@@ -54,14 +52,10 @@ public final class PhpMethodVarListener implements Listener {
                 declaration.type(PhpType.named(names.resolve(createdType)));
             }
             collection.add(declaration);
-            return;
+        } else {
+            collection.add(new PhpMethodVarUsage(file, owner, text, node.getRange()));
         }
 
-        var usage = new PhpMethodVarUsage(file);
-        usage.owner(owner);
-        usage.name(text);
-        usage.range(node.getRange());
-        collection.add(usage);
     }
 
     private static @Nullable String createdTypeOf(@Nullable Node parent) {
@@ -113,7 +107,7 @@ public final class PhpMethodVarListener implements Listener {
 
         return switch (parent.getType()) {
             case "simple_parameter", "variadic_parameter", "property_promotion_parameter" -> true;
-            case null, default -> false;
+            default -> false;
         };
     }
 

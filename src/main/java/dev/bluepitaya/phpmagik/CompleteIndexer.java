@@ -105,13 +105,8 @@ public final class CompleteIndexer {
         visit(new Ctx(listener), root);
     }
 
-    private String type(Node node) {
-        String type = node.getType();
-        return type == null ? "" : type;
-    }
-
     private void visit(Ctx ctx, Node node) {
-        switch (type(node)) {
+        switch (node.getType()) {
             case "abstract_modifier" -> visitAbstractModifier(ctx, node);
             case "anonymous_class" -> visitAnonymousClass(ctx, node);
             case "anonymous_function" -> visitAnonymousFunction(ctx, node);
@@ -272,7 +267,7 @@ public final class CompleteIndexer {
     }
 
     private void visitExpression(Ctx ctx, Node node) {
-        switch (type(node)) {
+        switch (node.getType()) {
             case "assignment_expression" -> visitAssignmentExpression(ctx, node);
             case "augmented_assignment_expression" -> visitAugmentedAssignmentExpression(ctx, node);
             case "binary_expression" -> visitBinaryExpression(ctx, node);
@@ -293,7 +288,7 @@ public final class CompleteIndexer {
     }
 
     private void visitPrimaryExpression(Ctx ctx, Node node) {
-        switch (type(node)) {
+        switch (node.getType()) {
             case "anonymous_function" -> visitAnonymousFunction(ctx, node);
             case "array_creation_expression" -> visitArrayCreationExpression(ctx, node);
             case "arrow_function" -> visitArrowFunction(ctx, node);
@@ -323,7 +318,7 @@ public final class CompleteIndexer {
     }
 
     private void visitLiteral(Ctx ctx, Node node) {
-        switch (type(node)) {
+        switch (node.getType()) {
             case "boolean" -> visitBoolean(ctx, node);
             case "encapsed_string" -> visitEncapsedString(ctx, node);
             case "float" -> visitFloat(ctx, node);
@@ -337,7 +332,7 @@ public final class CompleteIndexer {
     }
 
     private void visitStatement(Ctx ctx, Node node) {
-        switch (type(node)) {
+        switch (node.getType()) {
             case "break_statement" -> visitBreakStatement(ctx, node);
             case "class_declaration" -> visitClassDeclaration(ctx, node);
             case "compound_statement" -> visitCompoundStatement(ctx, node);
@@ -372,7 +367,7 @@ public final class CompleteIndexer {
     }
 
     private void visitType(Ctx ctx, Node node) {
-        switch (type(node)) {
+        switch (node.getType()) {
             case "disjunctive_normal_form_type" -> visitDisjunctiveNormalFormType(ctx, node);
             case "intersection_type" -> visitIntersectionType(ctx, node);
             case "named_type" -> visitNamedType(ctx, node);
@@ -394,7 +389,7 @@ public final class CompleteIndexer {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitDeclarationList(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "abstract_modifier" -> visitAbstractModifier(ctx, slot.node());
                         case "arguments" -> visitArguments(ctx, slot.node());
                         case "base_clause" -> visitBaseClause(ctx, slot.node());
@@ -424,7 +419,7 @@ public final class CompleteIndexer {
                 case "return_type" -> visitReturnType(ctx, slot);
                 case "static_modifier" -> visitStaticModifier(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "anonymous_function_use_clause" -> visitAnonymousFunctionUseClause(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
                     }
@@ -442,7 +437,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "by_ref" -> visitByRef(ctx, slot.node());
                 case "variable_name" -> visitVariableName(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -458,7 +453,7 @@ public final class CompleteIndexer {
                 case "name" -> visitName(ctx, slot.node());
                 case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "argument_placeholder" -> visitArgumentPlaceholder(ctx, slot.node());
                         case "name" -> visitName(ctx, slot.node());
                         case "variadic_unpacking" -> visitVariadicUnpacking(ctx, slot.node());
@@ -482,7 +477,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "argument" -> visitArgument(ctx, slot.node());
                 case "variadic_placeholder" -> visitVariadicPlaceholder(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -498,7 +493,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "array_element_initializer" -> visitArrayElementInitializer(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -513,7 +508,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "by_ref" -> visitByRef(ctx, slot.node());
                 case "variadic_unpacking" -> visitVariadicUnpacking(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
@@ -569,7 +564,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "attribute" -> visitAttribute(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -584,7 +579,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "attribute_group" -> visitAttributeGroup(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -624,7 +619,7 @@ public final class CompleteIndexer {
                 case "left" -> visitExpression(ctx, slot.node());
                 case "operator" -> ctx.token(slot);
                 case "right" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
                         case "member_access_expression" -> visitMemberAccessExpression(ctx, slot.node());
                         case "name" -> visitName(ctx, slot.node());
@@ -696,7 +691,7 @@ public final class CompleteIndexer {
             switch (slot.field()) {
                 case "type" -> visitCastType(ctx, slot.node());
                 case "value" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "clone_expression" -> visitCloneExpression(ctx, slot.node());
                         case "error_suppression_expression" -> visitErrorSuppressionExpression(ctx, slot.node());
                         case "include_expression" -> visitIncludeExpression(ctx, slot.node());
@@ -735,7 +730,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "class_constant_access_expression" -> visitClassConstantAccessExpression(ctx, slot.node());
                 case "relative_scope" -> visitRelativeScope(ctx, slot.node());
                 default -> visitPrimaryExpression(ctx, slot.node());
@@ -752,7 +747,7 @@ public final class CompleteIndexer {
                 case "body" -> visitDeclarationList(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "abstract_modifier" -> visitAbstractModifier(ctx, slot.node());
                         case "base_clause" -> visitBaseClause(ctx, slot.node());
                         case "class_interface_clause" -> visitClassInterfaceClause(ctx, slot.node());
@@ -840,7 +835,7 @@ public final class CompleteIndexer {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "type" -> visitType(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "abstract_modifier" -> visitAbstractModifier(ctx, slot.node());
                         case "const_element" -> visitConstElement(ctx, slot.node());
                         case "final_modifier" -> visitFinalModifier(ctx, slot.node());
@@ -864,7 +859,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "name" -> visitName(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
             }
@@ -891,7 +886,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "const_declaration" -> visitConstDeclaration(ctx, slot.node());
                 case "method_declaration" -> visitMethodDeclaration(ctx, slot.node());
                 case "property_declaration" -> visitPropertyDeclaration(ctx, slot.node());
@@ -921,7 +916,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "declare_directive" -> visitDeclareDirective(ctx, slot.node());
                 default -> visitStatement(ctx, slot.node());
             }
@@ -948,7 +943,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "intersection_type" -> visitIntersectionType(ctx, slot.node());
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "optional_type" -> visitOptionalType(ctx, slot.node());
@@ -978,7 +973,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
                 case "variable_name" -> visitVariableName(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
@@ -994,7 +989,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "sequence_expression" -> visitSequenceExpression(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
             }
@@ -1062,7 +1057,7 @@ public final class CompleteIndexer {
                 case "body" -> visitEnumDeclarationList(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "class_interface_clause" -> visitClassInterfaceClause(ctx, slot.node());
                         case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
@@ -1081,7 +1076,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "const_declaration" -> visitConstDeclaration(ctx, slot.node());
                 case "enum_case" -> visitEnumCase(ctx, slot.node());
                 case "method_declaration" -> visitMethodDeclaration(ctx, slot.node());
@@ -1157,7 +1152,7 @@ public final class CompleteIndexer {
             switch (slot.field()) {
                 case "body" -> visitStatement(ctx, slot.node());
                 case "condition", "initialize", "update" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "sequence_expression" -> visitSequenceExpression(ctx, slot.node());
                         default -> visitExpression(ctx, slot.node());
                     }
@@ -1174,7 +1169,7 @@ public final class CompleteIndexer {
             switch (slot.field()) {
                 case "body" -> visitBlockOrStatement(ctx, slot);
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "by_ref" -> visitByRef(ctx, slot.node());
                         case "list_literal" -> visitListLiteral(ctx, slot.node());
                         case "pair" -> visitPair(ctx, slot.node());
@@ -1194,7 +1189,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "property_promotion_parameter" -> visitPropertyPromotionParameter(ctx, slot.node());
                 case "simple_parameter" -> visitSimpleParameter(ctx, slot.node());
                 case "variadic_parameter" -> visitVariadicParameter(ctx, slot.node());
@@ -1226,7 +1221,7 @@ public final class CompleteIndexer {
                 case "parameters" -> visitFormalParameters(ctx, slot.node());
                 case "return_type" -> visitReturnType(ctx, slot);
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
                     }
@@ -1244,7 +1239,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "static_variable_declaration" -> visitStaticVariableDeclaration(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -1259,7 +1254,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
                 case "variable_name" -> visitVariableName(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -1318,7 +1313,7 @@ public final class CompleteIndexer {
         for (Slot slot : ctx.slots(node)) {
             switch (slot.field()) {
                 case "alternative" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "else_clause" -> visitElseClause(ctx, slot.node());
                         case "else_if_clause" -> visitElseIfClause(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
@@ -1368,7 +1363,7 @@ public final class CompleteIndexer {
                 case "body" -> visitDeclarationList(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "base_clause" -> visitBaseClause(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
                     }
@@ -1386,7 +1381,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "optional_type" -> visitOptionalType(ctx, slot.node());
                 case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
@@ -1403,7 +1398,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "by_ref" -> visitByRef(ctx, slot.node());
                 case "list_literal" -> visitListLiteral(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
@@ -1419,7 +1414,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "match_conditional_expression" -> visitMatchConditionalExpression(ctx, slot.node());
                 case "match_default_expression" -> visitMatchDefaultExpression(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -1510,7 +1505,7 @@ public final class CompleteIndexer {
                 case "parameters" -> visitFormalParameters(ctx, slot.node());
                 case "return_type" -> visitReturnType(ctx, slot);
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "abstract_modifier" -> visitAbstractModifier(ctx, slot.node());
                         case "final_modifier" -> visitFinalModifier(ctx, slot.node());
                         case "readonly_modifier" -> visitReadonlyModifier(ctx, slot.node());
@@ -1586,7 +1581,7 @@ public final class CompleteIndexer {
                 case "alias" -> visitName(ctx, slot.node());
                 case "type" -> ctx.token(slot);
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "name" -> visitName(ctx, slot.node());
                         case "qualified_name" -> visitQualifiedName(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
@@ -1605,7 +1600,7 @@ public final class CompleteIndexer {
                 case "body" -> visitNamespaceUseGroup(ctx, slot.node());
                 case "type" -> ctx.token(slot);
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "namespace_name" -> visitNamespaceName(ctx, slot.node());
                         case "namespace_use_clause" -> visitNamespaceUseClause(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
@@ -1624,7 +1619,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "namespace_use_clause" -> visitNamespaceUseClause(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -1652,7 +1647,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "nowdoc_string" -> visitNowdocString(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -1700,7 +1695,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "anonymous_class" -> visitAnonymousClass(ctx, slot.node());
                 case "arguments" -> visitArguments(ctx, slot.node());
                 default -> visitPrimaryExpression(ctx, slot.node());
@@ -1720,7 +1715,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -1736,7 +1731,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "by_ref" -> visitByRef(ctx, slot.node());
                 case "list_literal" -> visitListLiteral(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
@@ -1788,7 +1783,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "php_end_tag" -> visitPhpEndTag(ctx, slot.node());
                 case "php_tag" -> visitPhpTag(ctx, slot.node());
                 default -> visitStatement(ctx, slot.node());
@@ -1804,7 +1799,7 @@ public final class CompleteIndexer {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "type" -> visitType(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "abstract_modifier" -> visitAbstractModifier(ctx, slot.node());
                         case "final_modifier" -> visitFinalModifier(ctx, slot.node());
                         case "property_element" -> visitPropertyElement(ctx, slot.node());
@@ -1840,7 +1835,7 @@ public final class CompleteIndexer {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "compound_statement" -> visitCompoundStatement(ctx, slot.node());
                         default -> visitExpression(ctx, slot.node());
                     }
@@ -1862,7 +1857,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "property_hook" -> visitPropertyHook(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -1877,7 +1872,7 @@ public final class CompleteIndexer {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "default_value" -> visitExpression(ctx, slot.node());
                 case "name" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "by_ref" -> visitByRef(ctx, slot.node());
                         case "variable_name" -> visitVariableName(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
@@ -1887,7 +1882,7 @@ public final class CompleteIndexer {
                 case "type" -> visitType(ctx, slot.node());
                 case "visibility" -> visitVisibilityModifier(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "property_hook_list" -> visitPropertyHookList(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
                     }
@@ -1903,7 +1898,7 @@ public final class CompleteIndexer {
         for (Slot slot : ctx.slots(node)) {
             switch (slot.field()) {
                 case "prefix" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "namespace_name" -> visitNamespaceName(ctx, slot.node());
                         default -> ctx.token(slot);
                     }
@@ -1940,7 +1935,7 @@ public final class CompleteIndexer {
         for (Slot slot : ctx.slots(node)) {
             switch (slot.field()) {
                 case "prefix" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "namespace_name" -> visitNamespaceName(ctx, slot.node());
                         default -> ctx.token(slot);
                     }
@@ -2010,7 +2005,7 @@ public final class CompleteIndexer {
         for (Slot slot : ctx.slots(node)) {
             switch (slot.field()) {
                 case "name" -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
                         case "variable_name" -> visitVariableName(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
@@ -2030,7 +2025,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "sequence_expression" -> visitSequenceExpression(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
             }
@@ -2088,7 +2083,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "escape_sequence" -> visitEscapeSequence(ctx, slot.node());
                 case "string_content" -> visitStringContent(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -2120,7 +2115,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "case_statement" -> visitCaseStatement(ctx, slot.node());
                 case "default_statement" -> visitDefaultStatement(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -2172,7 +2167,7 @@ public final class CompleteIndexer {
             switch (slot.field()) {
                 case "body" -> visitCompoundStatement(ctx, slot.node());
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "catch_clause" -> visitCatchClause(ctx, slot.node());
                         case "finally_clause" -> visitFinallyClause(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
@@ -2191,7 +2186,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -2206,7 +2201,7 @@ public final class CompleteIndexer {
                 case "argument" -> visitExpression(ctx, slot.node());
                 case "operator" -> ctx.token(slot);
                 case NONE -> {
-                    switch (type(slot.node())) {
+                    switch (slot.node().getType()) {
                         case "integer" -> visitInteger(ctx, slot.node());
                         default -> ctx.unexpected(node, slot);
                     }
@@ -2224,7 +2219,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "optional_type" -> visitOptionalType(ctx, slot.node());
                 case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
@@ -2265,7 +2260,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "class_constant_access_expression" -> visitClassConstantAccessExpression(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
                 case "visibility_modifier" -> visitVisibilityModifier(ctx, slot.node());
@@ -2282,7 +2277,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "use_list" -> visitUseList(ctx, slot.node());
                 default -> visitClassName(ctx, node, slot);
             }
@@ -2297,7 +2292,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "class_constant_access_expression" -> visitClassConstantAccessExpression(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -2313,7 +2308,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "use_as_clause" -> visitUseAsClause(ctx, slot.node());
                 case "use_instead_of_clause" -> visitUseInsteadOfClause(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
@@ -2375,7 +2370,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "operation" -> visitOperation(ctx, slot.node());
                 default -> ctx.unexpected(node, slot);
             }
@@ -2402,7 +2397,7 @@ public final class CompleteIndexer {
                 ctx.unexpected(node, slot);
                 continue;
             }
-            switch (type(slot.node())) {
+            switch (slot.node().getType()) {
                 case "array_element_initializer" -> visitArrayElementInitializer(ctx, slot.node());
                 default -> visitExpression(ctx, slot.node());
             }
@@ -2411,14 +2406,14 @@ public final class CompleteIndexer {
     }
 
     private void visitBlockOrStatement(Ctx ctx, Slot slot) {
-        switch (type(slot.node())) {
+        switch (slot.node().getType()) {
             case "colon_block" -> visitColonBlock(ctx, slot.node());
             default -> visitStatement(ctx, slot.node());
         }
     }
 
     private void visitClassName(Ctx ctx, Node parent, Slot slot) {
-        switch (type(slot.node())) {
+        switch (slot.node().getType()) {
             case "name" -> visitName(ctx, slot.node());
             case "qualified_name" -> visitQualifiedName(ctx, slot.node());
             case "relative_name" -> visitRelativeName(ctx, slot.node());
@@ -2427,14 +2422,14 @@ public final class CompleteIndexer {
     }
 
     private void visitReturnType(Ctx ctx, Slot slot) {
-        switch (type(slot.node())) {
+        switch (slot.node().getType()) {
             case "bottom_type" -> visitBottomType(ctx, slot.node());
             default -> visitType(ctx, slot.node());
         }
     }
 
     private void visitMemberName(Ctx ctx, Slot slot) {
-        switch (type(slot.node())) {
+        switch (slot.node().getType()) {
             case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
             case "name" -> visitName(ctx, slot.node());
             case "variable_name" -> visitVariableName(ctx, slot.node());
@@ -2443,14 +2438,14 @@ public final class CompleteIndexer {
     }
 
     private void visitScope(Ctx ctx, Slot slot) {
-        switch (type(slot.node())) {
+        switch (slot.node().getType()) {
             case "relative_scope" -> visitRelativeScope(ctx, slot.node());
             default -> visitPrimaryExpression(ctx, slot.node());
         }
     }
 
     private void visitAssignmentTarget(Ctx ctx, Slot slot) {
-        switch (type(slot.node())) {
+        switch (slot.node().getType()) {
             case "list_literal" -> visitListLiteral(ctx, slot.node());
             default -> visitPrimaryExpression(ctx, slot.node());
         }
@@ -2461,7 +2456,7 @@ public final class CompleteIndexer {
     }
 
     private void visitInterpolated(Ctx ctx, Slot slot) {
-        switch (type(slot.node())) {
+        switch (slot.node().getType()) {
             case "escape_sequence" -> visitEscapeSequence(ctx, slot.node());
             case "string_content" -> visitStringContent(ctx, slot.node());
             default -> visitExpression(ctx, slot.node());

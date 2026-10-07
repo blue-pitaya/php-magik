@@ -3,7 +3,6 @@ package dev.bluepitaya.phpmagik.listener;
 import dev.bluepitaya.phpmagik.CompleteIndexer;
 import dev.bluepitaya.phpmagik.PhpDoc;
 import dev.bluepitaya.phpmagik.PhpFile;
-import dev.bluepitaya.phpmagik.phpdoc.PhpDocTypes;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpClassReference;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
@@ -45,7 +44,7 @@ public final class PhpDocReferenceListener implements Listener {
         Matcher tag = TYPE_TAG.matcher(comment);
         while (tag.find()) {
             int start = blanksEnd(comment, tag.end());
-            int end = start + PhpDocTypes.end(comment.substring(start));
+            int end = start + PhpDoc.end(comment.substring(start));
             addClassNames(node.getStartPoint(), comment, start, end, templates);
         }
     }
