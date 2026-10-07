@@ -6,9 +6,6 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-import static dev.bluepitaya.phpmagik.ts.Tree.ERROR;
-import static dev.bluepitaya.phpmagik.ts.Tree.EXTRA;
-import static dev.bluepitaya.phpmagik.ts.Tree.MISSING;
 import static dev.bluepitaya.phpmagik.ts.Tree.NAMED;
 import static dev.bluepitaya.phpmagik.ts.Tree.NEXT;
 import static dev.bluepitaya.phpmagik.ts.Tree.NONE;
@@ -16,6 +13,19 @@ import static dev.bluepitaya.phpmagik.ts.Tree.PARENT;
 
 @NullMarked
 public final class Node {
+
+    public enum Flag {
+        NAMED(Tree.NAMED),
+        EXTRA(Tree.EXTRA),
+        MISSING(Tree.MISSING),
+        ERROR(Tree.ERROR);
+
+        private final int bit;
+
+        Flag(int bit) {
+            this.bit = bit;
+        }
+    }
 
     private final Tree tree;
     private final int index;
@@ -112,20 +122,8 @@ public final class Node {
         return tree.content(index);
     }
 
-    public boolean isError() {
-        return tree.is(index, ERROR);
-    }
-
-    public boolean isExtra() {
-        return tree.is(index, EXTRA);
-    }
-
-    public boolean isMissing() {
-        return tree.is(index, MISSING);
-    }
-
-    public boolean isNamed() {
-        return tree.is(index, NAMED);
+    public boolean is(Flag flag) {
+        return tree.is(index, flag.bit);
     }
 
     @Override
@@ -150,7 +148,9 @@ public final class Node {
     private List<Node> children(boolean named) {
         List<Node> children = new ArrayList<>();
         for (int child = tree.firstChild(index); child != NONE; child = tree.get(child, NEXT)) {
-            if (!named || tree.is(child, NAMED)) children.add(new Node(tree, child));
+            if (!named || tree.is(child, NAMED)) {
+                children.add(new Node(tree, child));
+            }
         }
         return children;
     }

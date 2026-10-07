@@ -38,8 +38,8 @@ public final class Json {
         Point start = range.start();
         Point end = range.end();
         ObjectNode out = object();
-        out.set("start", object().put("line", start.getRow()).put("character", start.getColumn()));
-        out.set("end", object().put("line", end.getRow()).put("character", end.getColumn()));
+        out.set("start", object().put("line", start.row()).put("character", start.column()));
+        out.set("end", object().put("line", end.row()).put("character", end.column()));
         return out;
     }
 }

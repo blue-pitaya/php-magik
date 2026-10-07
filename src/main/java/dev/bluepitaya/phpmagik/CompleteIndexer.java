@@ -8,6 +8,11 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+import static dev.bluepitaya.phpmagik.ts.Node.Flag.ERROR;
+import static dev.bluepitaya.phpmagik.ts.Node.Flag.EXTRA;
+import static dev.bluepitaya.phpmagik.ts.Node.Flag.MISSING;
+import static dev.bluepitaya.phpmagik.ts.Node.Flag.NAMED;
+
 /**
  * A walk of the whole PHP grammar, transcribed from {@code tree-sitter-php/php_only/src/node-types.json}.
  * Always performed per single PhpFile.
@@ -50,14 +55,14 @@ public final class CompleteIndexer {
             for (Node child : children) {
                 String field = child.getFieldName();
 
-                if (child.isError() || child.isMissing()) {
+                if (child.is(ERROR) || child.is(MISSING)) {
                     listener.error(this, child);
-                } else if (child.isExtra()) {
+                } else if (child.is(EXTRA)) {
                     /* comments: the node types file lists them under no parent */
                     listener.extra(this, child);
                 } else if (field != null) {
                     slots.add(new Slot(child, field));
-                } else if (child.isNamed()) {
+                } else if (child.is(NAMED)) {
                     slots.add(new Slot(child, NONE));
                 } else {
                     /* bare punctuation and keywords, in no field and named nowhere */

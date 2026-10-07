@@ -32,6 +32,6 @@ class DefinitionFillerTest {
 
         Point start = definition.range().start();
 
-        return start.getRow() + ":" + start.getColumn();
+        return start.row() + ":" + start.column();
     }
 }

@@ -88,8 +88,8 @@ public final class PhpDocReferenceListener implements Listener {
     }
 
     private static Point pointAt(Point origin, String text, int offset) {
-        int row = origin.getRow();
-        int column = origin.getColumn();
+        int row = origin.row();
+        int column = origin.column();
         for (int i = 0; i < offset; ) {
             int codePoint = text.codePointAt(i);
             if (codePoint == '\n') {
