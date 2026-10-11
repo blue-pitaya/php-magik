@@ -22,15 +22,65 @@ public record PhpDoc(
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     public record Template(String name, @Nullable String bound) {
+
+        static @Nullable Template of(String body) {
+            if (body.isEmpty()) {
+                return null;
+            }
+
+            String[] parts = WHITESPACE.split(body, 3);
+            boolean bounded = parts.length == 3 && ("of".equals(parts[1]) || "as".equals(parts[1]));
+            return new Template(parts[0], bounded ? typed(parts[2]).type() : null);
+        }
     }
 
     public record Param(@Nullable String type, String name, String description) {
+
+        static @Nullable Param of(String body) {
+            @Nullable String type = null;
+            String rest = body;
+            if (!isVariableAt(rest, 0)) {
+                Typed typed = typed(rest);
+                type = typed.type();
+                rest = typed.rest();
+            }
+            if (!isVariableAt(rest, 0)) {
+                return null;
+            }
+
+            int nameEnd = wordEnd(rest);
+            return new Param(type, rest.substring(0, nameEnd), rest.substring(nameEnd).strip());
+        }
     }
 
     public record Return(String type, String description) {
+
+        static @Nullable Return of(String body) {
+            if (body.isEmpty()) {
+                return null;
+            }
+
+            Typed typed = typed(body);
+            return new Return(typed.type(), typed.rest());
+        }
     }
 
     public record Var(String type, @Nullable String name, String description) {
+
+        static @Nullable Var of(String body) {
+            if (body.isEmpty() || body.startsWith("$")) {
+                return null;
+            }
+
+            Typed typed = typed(body);
+            String rest = typed.rest();
+            if (!rest.startsWith("$")) {
+                return new Var(typed.type(), null, rest);
+            }
+
+            int nameEnd = wordEnd(rest);
+            return new Var(typed.type(), rest.substring(0, nameEnd), rest.substring(nameEnd).strip());
+        }
     }
 
     private record Sections(List<String> text, List<String> tags) {
@@ -51,6 +101,55 @@ public record PhpDoc(
         }
     }
 
+    private record Text(String summary, String description) {
+
+        static Text of(List<String> lines) {
+            List<List<String>> paragraphs = paragraphs(lines);
+            String summary = paragraphs.isEmpty() ? "" : String.join(" ", paragraphs.getFirst());
+            String description = paragraphs.stream()
+                    .skip(1)
+                    .map(paragraph -> String.join("\n", paragraph))
+                    .collect(Collectors.joining("\n\n"));
+            return new Text(summary, description);
+        }
+    }
+
+    private record Tags(List<Template> templates, List<Param> params, @Nullable Return returns, List<Var> vars) {
+
+        static Tags of(List<String> tags) {
+            List<Template> templates = new ArrayList<>();
+            List<Param> params = new ArrayList<>();
+            @Nullable Return returns = null;
+            List<Var> vars = new ArrayList<>();
+            for (String tag : tags) {
+                int nameEnd = wordEnd(tag);
+                String body = tag.substring(nameEnd).strip();
+                switch (tag.substring(1, nameEnd)) {
+                    case "param" -> {
+                        Param param = Param.of(body);
+                        if (param != null) {
+                            params.add(param);
+                        }
+                    }
+                    case "return" -> returns = Return.of(body);
+                    case "var" -> {
+                        Var var = Var.of(body);
+                        if (var != null) {
+                            vars.add(var);
+                        }
+                    }
+                    case "template", "template-covariant", "template-contravariant" -> {
+                        Template template = Template.of(body);
+                        if (template != null) {
+                            templates.add(template);
+                        }
+                    }
+                }
+            }
+            return new Tags(List.copyOf(templates), List.copyOf(params), returns, List.copyOf(vars));
+        }
+    }
+
     private record Typed(String type, String rest) {
     }
 
@@ -65,132 +164,9 @@ public record PhpDoc(
         }
 
         Sections sections = Sections.of(lines(comment.substring(3, comment.length() - 2)));
-
-        List<Template> templates = new ArrayList<>();
-        List<Param> params = new ArrayList<>();
-        @Nullable Return returns = null;
-        List<Var> vars = new ArrayList<>();
-        for (String tag : sections.tags()) {
-            int nameEnd = wordEnd(tag);
-            String body = tag.substring(nameEnd).strip();
-            switch (tag.substring(1, nameEnd)) {
-                case "param" -> {
-                    Param param = param(body);
-                    if (param != null) {
-                        params.add(param);
-                    }
-                }
-                case "return" -> returns = returns(body);
-                case "var" -> {
-                    Var var = var(body);
-                    if (var != null) {
-                        vars.add(var);
-                    }
-                }
-                case "template", "template-covariant", "template-contravariant" -> {
-                    Template template = template(body);
-                    if (template != null) {
-                        templates.add(template);
-                    }
-                }
-            }
-        }
-
-        List<List<String>> paragraphs = paragraphs(sections.text());
-        String summary = paragraphs.isEmpty() ? "" : String.join(" ", paragraphs.getFirst());
-        String description = paragraphs.stream()
-                .skip(1)
-                .map(paragraph -> String.join("\n", paragraph))
-                .collect(Collectors.joining("\n\n"));
-        return new PhpDoc(summary, description, List.copyOf(templates), List.copyOf(params), returns, List.copyOf(vars));
-    }
-
-    private static List<String> lines(String body) {
-        return body.lines()
-                .map(String::strip)
-                .map(line -> line.startsWith("*") ? line.substring(1).strip() : line)
-                .toList();
-    }
-
-    private static List<List<String>> paragraphs(List<String> text) {
-        List<List<String>> paragraphs = new ArrayList<>();
-        List<String> current = new ArrayList<>();
-        for (String line : text) {
-            if (!line.isEmpty()) {
-                current.add(line);
-            } else if (!current.isEmpty()) {
-                paragraphs.add(current);
-                current = new ArrayList<>();
-            }
-        }
-        if (!current.isEmpty()) {
-            paragraphs.add(current);
-        }
-        return paragraphs;
-    }
-
-    private static @Nullable Param param(String body) {
-        @Nullable String type = null;
-        String rest = body;
-        if (!isVariableAt(rest, 0)) {
-            Typed typed = typed(rest);
-            type = typed.type();
-            rest = typed.rest();
-        }
-        if (!isVariableAt(rest, 0)) {
-            return null;
-        }
-
-        int nameEnd = wordEnd(rest);
-        return new Param(type, rest.substring(0, nameEnd), rest.substring(nameEnd).strip());
-    }
-
-    private static @Nullable Return returns(String body) {
-        if (body.isEmpty()) {
-            return null;
-        }
-
-        Typed typed = typed(body);
-        return new Return(typed.type(), typed.rest());
-    }
-
-    private static @Nullable Var var(String body) {
-        if (body.isEmpty() || body.startsWith("$")) {
-            return null;
-        }
-
-        Typed typed = typed(body);
-        String rest = typed.rest();
-        if (!rest.startsWith("$")) {
-            return new Var(typed.type(), null, rest);
-        }
-
-        int nameEnd = wordEnd(rest);
-        return new Var(typed.type(), rest.substring(0, nameEnd), rest.substring(nameEnd).strip());
-    }
-
-    private static @Nullable Template template(String body) {
-        if (body.isEmpty()) {
-            return null;
-        }
-
-        String[] parts = WHITESPACE.split(body, 3);
-        boolean bounded = parts.length == 3 && ("of".equals(parts[1]) || "as".equals(parts[1]));
-        return new Template(parts[0], bounded ? typed(parts[2]).type() : null);
-    }
-
-    private static Typed typed(String body) {
-        int end = end(body);
-        String type = WHITESPACE.matcher(body.substring(0, end).strip()).replaceAll(" ");
-        return new Typed(type, body.substring(end).strip());
-    }
-
-    private static int wordEnd(String text) {
-        int end = 0;
-        while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
-            end++;
-        }
-        return end;
+        Text text = Text.of(sections.text());
+        Tags tags = Tags.of(sections.tags());
+        return new PhpDoc(text.summary(), text.description(), tags.templates(), tags.params(), tags.returns(), tags.vars());
     }
 
     public static List<String> split(String type, char separator) {
@@ -244,6 +220,44 @@ public record PhpDoc(
 
     public static boolean isVariableAt(String text, int index) {
         return text.startsWith("$", index) || text.startsWith("&", index) || text.startsWith("...", index);
+    }
+
+    private static List<String> lines(String body) {
+        return body.lines()
+                .map(String::strip)
+                .map(line -> line.startsWith("*") ? line.substring(1).strip() : line)
+                .toList();
+    }
+
+    private static List<List<String>> paragraphs(List<String> text) {
+        List<List<String>> paragraphs = new ArrayList<>();
+        List<String> current = new ArrayList<>();
+        for (String line : text) {
+            if (!line.isEmpty()) {
+                current.add(line);
+            } else if (!current.isEmpty()) {
+                paragraphs.add(current);
+                current = new ArrayList<>();
+            }
+        }
+        if (!current.isEmpty()) {
+            paragraphs.add(current);
+        }
+        return paragraphs;
+    }
+
+    private static Typed typed(String body) {
+        int end = end(body);
+        String type = WHITESPACE.matcher(body.substring(0, end).strip()).replaceAll(" ");
+        return new Typed(type, body.substring(end).strip());
+    }
+
+    private static int wordEnd(String text) {
+        int end = 0;
+        while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+            end++;
+        }
+        return end;
     }
 
     private static boolean joins(String text, int previous, int next) {
