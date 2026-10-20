@@ -13,3 +13,12 @@ Needs JDK 21 (with JAVA_HOME set), maven and c compiler. See `build.py` code for
 ```
 
 The `ts/` binding parses in a single JNI call that copies the whole syntax tree into a Java `int[]`; a `Node` is an index into it.
+
+# Neovim
+
+Source `editors/nvim/php-magik.lua` from your config after building. It starts the server for PHP buffers and adds `:PhpMagikLog` and
+`:PhpMagikRestart`. Set `PHP_MAGIK_HOME` if the repo is not at `/var/www`.
+
+```lua
+dofile("/path/to/php-magik/editors/nvim/php-magik.lua")
+```
