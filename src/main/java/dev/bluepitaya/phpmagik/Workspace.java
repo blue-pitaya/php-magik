@@ -5,32 +5,25 @@ import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Tree;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
-@NullMarked
 public final class Workspace {
 
-    record Indexed(PhpFile file, PhpSymbolCollection collection) {
-    }
-
     private final Logger log;
+    private final List<PathMatcher> excludes;
     private final List<PhpFile> files = new ArrayList<>();
     private final PhpSymbolCollection symbols = new PhpSymbolCollection();
 
-    public Workspace(Logger log) {
+    public Workspace(Logger log, Config config) {
         this.log = log;
+        this.excludes = config.excludeMatchers();
     }
 
     public List<PhpFile> files() {
@@ -41,7 +34,8 @@ public final class Workspace {
         return symbols;
     }
 
-    public @Nullable PhpFile findFile(String uri) {
+    //TODO: null
+    public PhpFile findFile(String uri) {
         return files.stream()
                 .filter(x -> x.uri().equals(uri))
                 .findFirst()
@@ -51,19 +45,8 @@ public final class Workspace {
     public void index(Path root) throws IOException {
         log.log("index root: " + root);
 
-        List<Path> sources;
-        if (Files.isRegularFile(root)) {
-            sources = List.of(root);
-        } else {
-            try (Stream<Path> paths = Files.walk(root)) {
-                sources = paths.filter(path -> isPhpSource(root, path)).sorted().toList();
-            }
-        }
-
-        for (Indexed indexed : indexAll(sources)) {
-            files.add(indexed.file());
-            symbols.addAll(indexed.collection());
-        }
+        List<Path> sources = phpFilePaths(root);
+        indexAll(sources);
 
         new ReferenceResolver(symbols).resolve();
         new VarUsageTypePropagator().propagate(symbols);
@@ -81,86 +64,50 @@ public final class Workspace {
         log.log("reparsed: " + file.path().getFileName());
     }
 
-    PhpSymbolCollection indexInto(PhpFile file) {
+    private PhpSymbolCollection indexInto(PhpFile file) {
         var collection = new PhpSymbolCollection();
         Node root = Tree.parse(file.content()).getRootNode();
-        new CompleteIndexer().walk(root, AggregatedListener.create(collection, file));
 
+        new CompleteIndexer().walk(root, AggregatedListener.create(collection, file));
         new DefinitionFiller().fill(collection);
         new PhpTypeInferer().infer(collection, root);
         new PhpReturnTypeInferer().infer(collection, root);
         new VarUsageTypePropagator().propagate(collection);
+
         return collection;
     }
 
-    private List<Indexed> indexAll(List<Path> sources) throws IOException {
-        int cores = Runtime.getRuntime().availableProcessors();
-        if (sources.size() <= 1 || cores <= 1) {
-            List<Indexed> indexed = new ArrayList<>(sources.size());
-            for (int i = 0; i < sources.size(); i++) {
-                var one = indexOne(i, sources.get(i));
-                if (one != null) {
-                    indexed.add(one);
-                }
+    private void indexAll(List<Path> sources) throws IOException {
+        List<PhpFile> read = new ArrayList<>(sources.size());
+        for (int i = 0; i < sources.size(); i++) {
+            Path path = sources.get(i);
+            byte[] content = Files.readAllBytes(path);
+            if (content.length == 0) {
+                log.log("index: " + path + " (empty, skipped)");
+                continue;
             }
-            return indexed;
-        }
-        return indexConcurrently(sources, Math.min(sources.size(), cores));
-    }
-
-    private List<Indexed> indexConcurrently(List<Path> sources, int workers) throws IOException {
-        ExecutorService pool = Executors.newFixedThreadPool(workers);
-        List<Future<@Nullable Indexed>> futures = new ArrayList<>(sources.size());
-        List<Indexed> indexed = new ArrayList<>(sources.size());
-        try {
-            for (int i = 0; i < sources.size(); i++) {
-                int fileId = i;
-                Path path = sources.get(i);
-                futures.add(pool.submit(() -> indexOne(fileId, path)));
-            }
-            for (Future<@Nullable Indexed> future : futures) {
-                @Nullable Indexed one = future.get();
-                if (one != null) {
-                    indexed.add(one);
-                }
-            }
-        } catch (InterruptedException cause) {
-            Thread.currentThread().interrupt();
-            throw new AppException("indexing interrupted");
-        } catch (ExecutionException cause) {
-            Throwable actual = cause.getCause();
-            switch (actual) {
-                case IOException io -> throw io;
-                case RuntimeException re -> throw re;
-                case Error err -> throw err;
-                case null, default -> throw new AppException("indexing failed");
-            }
-        } finally {
-            pool.shutdownNow();
+            log.log("index: " + path);
+            read.add(new PhpFile(i, path, content));
         }
 
-        return indexed;
+        List<PhpSymbolCollection> collections = read.parallelStream().map(this::indexInto).toList();
+        files.addAll(read);
+        collections.forEach(symbols::addAll);
     }
 
-    private @Nullable Indexed indexOne(int fileId, Path path) throws IOException {
-        byte[] content = Files.readAllBytes(path);
-        if (content.length == 0) {
-            log.log("index: " + path + " (empty, skipped)");
-            return null;
-        }
-        log.log("index: " + path);
-
-        PhpFile file = new PhpFile(fileId, path, content);
-        return new Indexed(file, indexInto(file));
-    }
-
-    private boolean isPhpSource(Path root, Path path) {
-        if (!path.getFileName().toString().endsWith(".php")) return false;
-        for (Path part : root.relativize(path)) {
-            if (part.toString().startsWith(".")) return false;
+    private List<Path> phpFilePaths(Path root) throws IOException {
+        // user want specific file, so dont even check if .php or exluded
+        if (Files.isRegularFile(root)) {
+            return List.of(root);
         }
 
-        return Files.isRegularFile(path);
+        try (Stream<Path> paths = Files.walk(root)) {
+            return paths
+                    .filter(path -> path.getFileName().toString().endsWith(".php"))
+                    .filter(path -> excludes.stream().noneMatch(exclude -> exclude.matches(path.toAbsolutePath())))
+                    .filter(Files::isRegularFile)
+                    .sorted()
+                    .toList();
+        }
     }
-
 }

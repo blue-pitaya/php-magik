@@ -21,10 +21,11 @@ public final class Main {
             return;
         }
 
+        Config config = Config.create();
         try (var log = new Logger(LOG_PATH)) {
             log.log("=== php-magik started, pid " + ProcessHandle.current().pid());
 
-            var workspace = new Workspace(log);
+            var workspace = new Workspace(log, config);
             try {
                 workspace.index(programParams.rootPath());
             } catch (IOException cause) {

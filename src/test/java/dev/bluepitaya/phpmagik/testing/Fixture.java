@@ -1,5 +1,6 @@
 package dev.bluepitaya.phpmagik.testing;
 
+import dev.bluepitaya.phpmagik.Config;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.SymbolFinder;
 import dev.bluepitaya.phpmagik.Workspace;
@@ -25,7 +26,7 @@ public final class Fixture implements AutoCloseable {
         logPath.toFile().deleteOnExit();
         this.log = new Logger(logPath);
 
-        this.workspace = new Workspace(log);
+        this.workspace = new Workspace(log, Config.create());
         this.workspace.index(root);
 
         this.finder = new SymbolFinder(workspace);
