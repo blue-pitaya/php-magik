@@ -37,10 +37,6 @@ public final class CompleteIndexer {
             this.listener = listener;
         }
 
-        public List<Node> path() {
-            return List.copyOf(path);
-        }
-
         public int depth() {
             return path.size();
         }

@@ -2,34 +2,31 @@ package dev.bluepitaya.phpmagik.phpsymbol;
 
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.ts.Range;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public final class PhpNamespaceDefinition implements PhpSymbol, PhpSymbolOwner {
 
     private final PhpFile file;
     private final int depth;
 
-    private @Nullable String name;
-    private @Nullable Range range;
-    private @Nullable Range scope;
+    private String name;
+    private Range range;
+    private Range scope;
 
     public PhpNamespaceDefinition(PhpFile file, int depth) {
         this.file = file;
         this.depth = depth;
     }
 
+    @Override
+    public PhpFile file() {
+        return file;
+    }
+
     public int depth() {
         return depth;
     }
 
-    @Override
-    public @Nullable String hover() {
-        return name == null ? null : PhpSymbol.code("namespace " + name);
-    }
-
-    public @Nullable String name() {
+    public String name() {
         return name;
     }
 
@@ -38,7 +35,7 @@ public final class PhpNamespaceDefinition implements PhpSymbol, PhpSymbolOwner {
     }
 
     @Override
-    public @Nullable Range range() {
+    public Range range() {
         return range;
     }
 
@@ -46,7 +43,7 @@ public final class PhpNamespaceDefinition implements PhpSymbol, PhpSymbolOwner {
         this.range = range;
     }
 
-    public @Nullable Range scope() {
+    public Range scope() {
         return scope;
     }
 
@@ -55,7 +52,7 @@ public final class PhpNamespaceDefinition implements PhpSymbol, PhpSymbolOwner {
     }
 
     @Override
-    public PhpFile file() {
-        return file;
+    public String hover() {
+        return name == null ? null : PhpSymbol.code("namespace " + name);
     }
 }

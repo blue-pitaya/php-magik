@@ -7,19 +7,27 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public interface Listener {
 
-    void enter(CompleteIndexer.Ctx ctx, Node node);
+    default void enter(CompleteIndexer.Ctx ctx, Node node) {
+    }
 
-    void exit(CompleteIndexer.Ctx ctx, Node node);
+    default void exit(CompleteIndexer.Ctx ctx, Node node) {
+    }
 
-    void leaf(CompleteIndexer.Ctx ctx, Node node);
+    default void leaf(CompleteIndexer.Ctx ctx, Node node) {
+    }
 
-    void token(CompleteIndexer.Ctx ctx, Node node, String field);
+    default void token(CompleteIndexer.Ctx ctx, Node node, String field) {
+    }
 
-    void extra(CompleteIndexer.Ctx ctx, Node node);
+    default void extra(CompleteIndexer.Ctx ctx, Node node) {
+    }
 
-    void error(CompleteIndexer.Ctx ctx, Node node);
+    default void error(CompleteIndexer.Ctx ctx, Node node) {
+    }
 
-    void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field);
+    default void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field) {
+    }
 
-    void unknown(CompleteIndexer.Ctx ctx, Node node);
+    default void unknown(CompleteIndexer.Ctx ctx, Node node) {
+    }
 }

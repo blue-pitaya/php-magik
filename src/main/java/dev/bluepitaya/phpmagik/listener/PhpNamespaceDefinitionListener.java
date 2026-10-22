@@ -7,21 +7,17 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Point;
 import dev.bluepitaya.phpmagik.ts.Range;
-import org.jspecify.annotations.NullMarked;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 
-@NullMarked
 public final class PhpNamespaceDefinitionListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpNamespaceDefinition> definitions = new ArrayDeque<>();
 
-    public PhpNamespaceDefinitionListener(
-            PhpSymbolCollection collection, PhpFile file
-    ) {
+    public PhpNamespaceDefinitionListener(PhpSymbolCollection collection, PhpFile file) {
         this.collection = collection;
         this.file = file;
     }
@@ -55,39 +51,27 @@ public final class PhpNamespaceDefinitionListener implements Listener {
         }
     }
 
-    private Range scope(Node definition) {
-        Node parent = definition.getParent();
-        if (definition.getChildByFieldName("body") != null || parent == null) {
-            return definition.getRange();
+    private Range scope(Node node) {
+        // example: namespace App { ... }
+        if (node.getChildByFieldName("body") != null) {
+            return node.getRange();
         }
 
+        // example: namespace App;
+        Node parent = node.getParentOrThrow();
         Point end = parent.getEndPoint();
-        boolean after = false;
+        boolean pastNode = false;
         for (Node sibling : parent.getNamedChildren()) {
-            if (after && sibling.isType("namespace_definition")) {
-                end = sibling.getStartPoint();
-                break;
+            if (pastNode) {
+                if (sibling.isType("namespace_definition")) {
+                    end = sibling.getStartPoint();
+                    break;
+                }
+            } else {
+                pastNode = sibling.equals(node);
             }
-            after = after || sibling.equals(definition);
         }
-        return new Range(definition.getStartPoint(), end);
-    }
 
-    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void token(CompleteIndexer.Ctx ctx, Node node, String field) {
-    }
-
-    public void extra(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void error(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field) {
-    }
-
-    public void unknown(CompleteIndexer.Ctx ctx, Node node) {
+        return new Range(node.getStartPoint(), end);
     }
 }

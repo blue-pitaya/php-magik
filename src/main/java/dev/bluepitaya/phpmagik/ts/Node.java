@@ -5,6 +5,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import static dev.bluepitaya.phpmagik.ts.Tree.NAMED;
 import static dev.bluepitaya.phpmagik.ts.Tree.NEXT;
@@ -69,6 +70,14 @@ public final class Node {
 
     public @Nullable Node getParent() {
         return node(tree.get(index, PARENT));
+    }
+
+    public Node getParentOrThrow() {
+        Node parent = node(tree.get(index, PARENT));
+        if (parent == null) {
+            throw new NoSuchElementException(getType() + " has no parent");
+        }
+        return parent;
     }
 
     public @Nullable Node getPrevSibling() {
