@@ -16,14 +16,12 @@ public final class VarInsideFunctionLikeListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private final PhpNameResolver names;
 
     public VarInsideFunctionLikeListener(
-            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
+            PhpSymbolCollection collection, PhpFile file
     ) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
@@ -49,7 +47,7 @@ public final class VarInsideFunctionLikeListener implements Listener {
             declaration.range(node.getRange());
             String createdType = createdTypeOf(parent);
             if (createdType != null) {
-                declaration.type(PhpType.named(names.resolve(createdType)));
+                declaration.type(new PhpType.ClassType(createdType, collection.nameScopeOf(file, node.getRange())));
             }
             collection.add(declaration);
         } else {

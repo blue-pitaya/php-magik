@@ -5,7 +5,9 @@ import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class PhpSymbolCollection {
 
@@ -18,6 +20,11 @@ public final class PhpSymbolCollection {
     private final List<PhpMethodLocalVarDeclaration> localVarDeclarations = new ArrayList<>();
     private final List<PhpMethodVarUsage> varUsages = new ArrayList<>();
     private final List<PhpReference> references = new ArrayList<>();
+    private final Map<Object, PhpNameScope> nameScopes = new HashMap<>();
+
+    public void add(PhpImport phpImport) {
+        nameScopeOf(phpImport.file(), phpImport.range()).imports().add(phpImport);
+    }
 
     public void add(PhpSymbol symbol) {
         switch (symbol) {
@@ -65,6 +72,12 @@ public final class PhpSymbolCollection {
 
     public @Nullable PhpNamespaceDefinition namespaceOf(PhpFile file, Range range) {
         return innermost(file, range, nsDefinitions, null);
+    }
+
+    public PhpNameScope nameScopeOf(PhpFile file, Range range) {
+        PhpNamespaceDefinition namespace = namespaceOf(file, range);
+        return nameScopes.computeIfAbsent(
+                namespace != null ? namespace : file, key -> new PhpNameScope(namespace, new ArrayList<>()));
     }
 
     public @Nullable PhpClassDeclaration classOf(PhpFile file, Range range) {

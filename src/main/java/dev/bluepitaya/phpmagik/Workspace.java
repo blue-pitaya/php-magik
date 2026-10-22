@@ -1,6 +1,6 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.listener.AggregatedListener;
+import dev.bluepitaya.phpmagik.listener.*;
 import dev.bluepitaya.phpmagik.lsp.Logger;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
@@ -68,7 +68,25 @@ public final class Workspace {
         var collection = new PhpSymbolCollection();
         Node root = Tree.parse(file.content()).getRootNode();
 
-        new CompleteIndexer().walk(root, AggregatedListener.create(collection, file));
+        List<Listener> listeners = List.of(
+                new PhpNamespaceDefinitionListener(collection, file),
+                new PhpImportListener(collection, file),
+                new PhpClassDeclarationListener(collection, file),
+                new PhpPropertyDeclarationListener(collection, file),
+                new PhpVarDocListener(collection, file),
+                new PhpDocReferenceListener(collection, file),
+                new PhpMethodDeclarationListener(collection, file),
+                new PhpFunctionDefinitionListener(collection, file),
+                new PhpParameterDeclarationListener(collection, file),
+                new VarInsideFunctionLikeListener(collection, file),
+                new PhpReferenceListener(collection, file),
+                new PhpClassReferenceListener(collection, file)
+        );
+        for (Listener listener : listeners) {
+            CompleteIndexer indexer = new CompleteIndexer();
+            indexer.walk(root, listener);
+        }
+
         new DefinitionFiller().fill(collection);
         new PhpTypeInferer().infer(collection, root);
         new PhpReturnTypeInferer().infer(collection, root);

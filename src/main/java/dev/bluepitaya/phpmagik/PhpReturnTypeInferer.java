@@ -1,8 +1,8 @@
 package dev.bluepitaya.phpmagik;
 
-import dev.bluepitaya.phpmagik.listener.PhpNameResolver;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpDoc;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpFunctionLike;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpNameScope;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
@@ -15,14 +15,14 @@ public final class PhpReturnTypeInferer {
 
     private final PhpTypeInferer expressions = new PhpTypeInferer();
 
-    public static @Nullable PhpType declared(@Nullable Node hint, @Nullable PhpDoc doc, PhpNameResolver names) {
+    public static @Nullable PhpType declared(@Nullable Node hint, @Nullable PhpDoc doc, PhpNameScope scope) {
         if (hint != null) {
-            return names.type(hint.getContent());
+            return PhpType.parse(hint.getContent(), scope);
         }
         if (doc == null || doc.returns() == null) {
             return null;
         }
-        return names.type(doc.returns().type(), doc.templates());
+        return PhpType.parse(doc.returns().type(), scope, doc.templates());
     }
 
     public void infer(PhpSymbolCollection symbols, Node root) {

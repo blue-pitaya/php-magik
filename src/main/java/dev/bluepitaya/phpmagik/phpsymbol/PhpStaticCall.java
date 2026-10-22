@@ -12,11 +12,11 @@ public final class PhpStaticCall implements PhpReference {
     private final @Nullable PhpSymbolOwner owner;
     private final String name;
     private final Range range;
-    private final String scope;
+    private final PhpType.ClassType scope;
 
     private @Nullable PhpMethodDeclaration definition;
 
-    public PhpStaticCall(PhpFile file, @Nullable PhpSymbolOwner owner, String name, Range range, String scope) {
+    public PhpStaticCall(PhpFile file, @Nullable PhpSymbolOwner owner, String name, Range range, PhpType.ClassType scope) {
         this.file = file;
         this.owner = owner;
         this.name = name;
@@ -34,7 +34,7 @@ public final class PhpStaticCall implements PhpReference {
     }
 
     public String scope() {
-        return scope;
+        return scope.fqn();
     }
 
     @Override

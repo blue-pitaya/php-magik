@@ -9,6 +9,7 @@ import dev.bluepitaya.phpmagik.phpsymbol.PhpPropertyAccess;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpStaticCall;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolOwner;
+import dev.bluepitaya.phpmagik.phpsymbol.PhpType;
 import dev.bluepitaya.phpmagik.ts.Node;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
@@ -22,15 +23,13 @@ public final class PhpReferenceListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private final PhpNameResolver names;
     private final Map<Node, PhpMemberReference> members = new HashMap<>();
 
     public PhpReferenceListener(
-            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
+            PhpSymbolCollection collection, PhpFile file
     ) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
@@ -56,7 +55,7 @@ public final class PhpReferenceListener implements Listener {
             case "scoped_call_expression" -> {
                 Node scope = parent.getChildByFieldName("scope");
                 if (scope != null && node.equals(parent.getChildByFieldName("name"))) {
-                    collection.add(new PhpStaticCall(file, ownerOf(node), name, range, names.resolve(scope.getContent())));
+                    collection.add(new PhpStaticCall(file, ownerOf(node), name, range, new PhpType.ClassType(scope.getContent(), collection.nameScopeOf(file, scope.getRange()))));
                 }
             }
             default -> {

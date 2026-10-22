@@ -17,14 +17,12 @@ public final class PhpMethodDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpMethodDeclaration> declarations = new ArrayDeque<>();
-    private final PhpNameResolver names;
 
     public PhpMethodDeclarationListener(
-            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
+            PhpSymbolCollection collection, PhpFile file
     ) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
@@ -51,7 +49,7 @@ public final class PhpMethodDeclarationListener implements Listener {
         if (owner != null) {
             declaration.owner(owner);
         }
-        PhpSignatureReader.read(declaration, node, names);
+        PhpSignatureReader.read(declaration, node, collection.nameScopeOf(file, node.getRange()));
 
         declarations.push(declaration);
     }

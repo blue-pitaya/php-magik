@@ -3,6 +3,7 @@ package dev.bluepitaya.phpmagik.phpsymbol;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,8 +32,88 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpT
         };
     }
 
+    static @Nullable PhpType parse(@Nullable String text, PhpNameScope scope) {
+        return parse(text, scope, List.of());
+    }
+
+    static @Nullable PhpType parse(@Nullable String text, PhpNameScope scope, List<PhpDoc.Template> templates) {
+        if (text == null) {
+            return null;
+        }
+
+        List<PhpType> types = new ArrayList<>();
+        for (String member : members(text)) {
+            PhpType type = parseMember(member, scope, templates);
+            if (type == null) {
+                return null;
+            }
+            types.add(type);
+        }
+        return types.isEmpty() ? null : union(types);
+    }
+
+    private static List<String> members(String text) {
+        List<String> members = new ArrayList<>();
+        for (String member : PhpDoc.split(text, '|')) {
+            String stripped = member.strip();
+            if (stripped.startsWith("?")) {
+                members.add(stripped.substring(1).strip());
+                members.add("null");
+            } else {
+                members.add(stripped);
+            }
+        }
+        return members;
+    }
+
+    private static @Nullable PhpType parseMember(String member, PhpNameScope scope, List<PhpDoc.Template> templates) {
+        if (PhpDoc.split(member, '&').size() != 1) {
+            return null;
+        }
+        if (member.endsWith("[]")) {
+            return arrayOrPlain(parse(member.substring(0, member.length() - 2), scope, templates));
+        }
+
+        String name = PhpDoc.withoutArguments(member);
+        if (name.isEmpty() || name.contains("-") || isUnmapped(name)
+                || templates.stream().anyMatch(template -> template.name().equals(name))) {
+            return null;
+        }
+        if ("$this".equals(name)) {
+            return named("static");
+        }
+        if ("null".equalsIgnoreCase(name)) {
+            return Builtin.Null;
+        }
+        if ("array".equals(name) || "list".equals(name)) {
+            return arrayOrPlain(parseElement(member.substring(name.length()).strip(), scope, templates));
+        }
+        PhpType builtin = of(name);
+        return builtin != null ? builtin : new ClassType(name, scope);
+    }
+
+    private static boolean isUnmapped(String name) {
+        return switch (name) {
+            case "void", "never", "false", "true", "resource", "scalar", "numeric", "number" -> true;
+            default -> false;
+        };
+    }
+
+    private static @Nullable PhpType parseElement(String arguments, PhpNameScope scope, List<PhpDoc.Template> templates) {
+        if (!arguments.startsWith("<") || !arguments.endsWith(">")) {
+            return null;
+        }
+
+        List<String> parts = PhpDoc.split(arguments.substring(1, arguments.length() - 1), ',');
+        return parse(parts.getLast(), scope, templates);
+    }
+
+    private static PhpType arrayOrPlain(@Nullable PhpType element) {
+        return element == null ? Builtin.Array : arrayOf(element);
+    }
+
     static PhpType named(String fqn) {
-        return new ClassType(fqn);
+        return new ClassType(fqn, PhpNameScope.GLOBAL);
     }
 
     static PhpType arrayOf(PhpType element) {
@@ -45,7 +126,7 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpT
     }
 
     static @Nullable String classFqn(@Nullable PhpType type) {
-        return withoutNull(type) instanceof ClassType(String fqn) ? fqn : null;
+        return withoutNull(type) instanceof ClassType classType ? classType.fqn() : null;
     }
 
     static @Nullable PhpType elementOf(@Nullable PhpType type) {
@@ -93,16 +174,31 @@ public sealed interface PhpType permits PhpType.Builtin, PhpType.ClassType, PhpT
         }
     }
 
-    record ClassType(String fqn) implements PhpType {
+    record ClassType(String name, PhpNameScope scope) implements PhpType {
+
+        public String fqn() {
+            return scope.fqn(name);
+        }
 
         @Override
         public String php() {
+            String fqn = fqn();
             return fqn.substring(fqn.lastIndexOf('\\') + 1);
         }
 
         @Override
         public String qualified() {
-            return fqn;
+            return fqn();
+        }
+
+        @Override
+        public boolean equals(@Nullable Object other) {
+            return other instanceof ClassType classType && fqn().equals(classType.fqn());
+        }
+
+        @Override
+        public int hashCode() {
+            return fqn().hashCode();
         }
     }
 

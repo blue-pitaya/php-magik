@@ -16,20 +16,18 @@ public final class PhpFunctionDefinitionListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpFunctionDefinition> stack = new ArrayDeque<>();
-    private final PhpNameResolver names;
 
     public PhpFunctionDefinitionListener(
-            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
+            PhpSymbolCollection collection, PhpFile file
     ) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
         if (node.isType("function_definition")) {
             PhpFunctionDefinition definition = new PhpFunctionDefinition(file, ctx.depth());
-            PhpSignatureReader.read(definition, node, names);
+            PhpSignatureReader.read(definition, node, collection.nameScopeOf(file, node.getRange()));
             stack.push(definition);
         }
     }

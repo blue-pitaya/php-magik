@@ -19,14 +19,12 @@ public final class PhpParameterDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpParameterDeclaration> declarations = new ArrayDeque<>();
-    private final PhpNameResolver names;
 
     public PhpParameterDeclarationListener(
-            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
+            PhpSymbolCollection collection, PhpFile file
     ) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
@@ -49,7 +47,7 @@ public final class PhpParameterDeclarationListener implements Listener {
             declaration.owner(owner);
         }
         Node typeNode = node.getChildByFieldName("type");
-        PhpType type = typeNode == null ? null : names.type(typeNode.getContent());
+        PhpType type = typeNode == null ? null : PhpType.parse(typeNode.getContent(), collection.nameScopeOf(file, typeNode.getRange()));
         if (type != null) {
             declaration.type(type);
         }

@@ -9,20 +9,20 @@ import org.jspecify.annotations.Nullable;
 public final class PhpClassReference implements PhpReference {
 
     private final PhpFile file;
-    private final String name;
+    private final PhpType.ClassType type;
     private final Range range;
 
     private @Nullable PhpClassDeclaration definition;
 
-    public PhpClassReference(PhpFile file, String name, Range range) {
+    public PhpClassReference(PhpFile file, PhpType.ClassType type, Range range) {
         this.file = file;
-        this.name = name;
+        this.type = type;
         this.range = range;
     }
 
     @Override
     public String name() {
-        return name;
+        return type.fqn();
     }
 
     @Override

@@ -25,12 +25,10 @@ public final class PhpDocReferenceListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private final PhpNameResolver names;
 
-    public PhpDocReferenceListener(PhpSymbolCollection collection, PhpFile file, PhpNameResolver names) {
+    public PhpDocReferenceListener(PhpSymbolCollection collection, PhpFile file) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void extra(CompleteIndexer.Ctx ctx, Node node) {
@@ -55,9 +53,10 @@ public final class PhpDocReferenceListener implements Listener {
             if (!isTypeName(comment, name.start(), name.end())) {
                 continue;
             }
-            if (names.type(name.group(), templates) instanceof PhpType.ClassType(String fqn) && !isRelative(fqn)) {
-                Range range = new Range(pointAt(origin, comment, name.start()), pointAt(origin, comment, name.end()));
-                collection.add(new PhpClassReference(file, fqn, range));
+            Range range = new Range(pointAt(origin, comment, name.start()), pointAt(origin, comment, name.end()));
+            if (PhpType.parse(name.group(), collection.nameScopeOf(file, range), templates) instanceof PhpType.ClassType type
+                    && !isRelative(type.fqn())) {
+                collection.add(new PhpClassReference(file, type, range));
             }
         }
     }

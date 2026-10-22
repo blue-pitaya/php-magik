@@ -15,12 +15,10 @@ public final class PhpVarDocListener implements Listener {
 
     private final PhpSymbolCollection collection;
     private final PhpFile file;
-    private final PhpNameResolver names;
 
-    public PhpVarDocListener(PhpSymbolCollection collection, PhpFile file, PhpNameResolver names) {
+    public PhpVarDocListener(PhpSymbolCollection collection, PhpFile file) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void exit(CompleteIndexer.Ctx ctx, Node node) {
@@ -35,7 +33,7 @@ public final class PhpVarDocListener implements Listener {
 
         for (PhpPropertyDeclaration property : collection.propertiesIn(file, node.getRange())) {
             PhpDoc.Var var = varOf(doc, property.name());
-            PhpType type = var == null ? null : names.type(var.type());
+            PhpType type = var == null ? null : PhpType.parse(var.type(), collection.nameScopeOf(file, node.getRange()));
             if (type != null) {
                 // TODO: report a diagnostic when the @var type contradicts the declared type instead of silently shadowing it
                 property.type(type);

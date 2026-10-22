@@ -20,14 +20,12 @@ public final class PhpPropertyDeclarationListener implements Listener {
     private final PhpSymbolCollection collection;
     private final PhpFile file;
     private final Deque<PhpPropertyDeclaration> declarations = new ArrayDeque<>();
-    private final PhpNameResolver names;
 
     public PhpPropertyDeclarationListener(
-            PhpSymbolCollection collection, PhpFile file, PhpNameResolver names
+            PhpSymbolCollection collection, PhpFile file
     ) {
         this.collection = collection;
         this.file = file;
-        this.names = names;
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
@@ -55,7 +53,7 @@ public final class PhpPropertyDeclarationListener implements Listener {
             declaration.$modifier(modifiersOf(declared));
             Node typeNode = declared.getChildByFieldName("type");
             if (typeNode != null) {
-                PhpType type = names.type(typeNode.getContent());
+                PhpType type = PhpType.parse(typeNode.getContent(), collection.nameScopeOf(file, typeNode.getRange()));
                 if (type != null) {
                     declaration.type(type);
                 }
