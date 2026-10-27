@@ -63,19 +63,4 @@ public final class PhpClassDeclarationListener implements Listener {
             }
         }
     }
-
-    public void token(CompleteIndexer.Ctx ctx, Node node, String field) {
-    }
-
-    public void extra(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void error(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field) {
-    }
-
-    public void unknown(CompleteIndexer.Ctx ctx, Node node) {
-    }
 }

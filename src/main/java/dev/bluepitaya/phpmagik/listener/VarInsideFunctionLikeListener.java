@@ -108,25 +108,4 @@ public final class VarInsideFunctionLikeListener implements Listener {
             default -> false;
         };
     }
-
-    public void exit(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void token(CompleteIndexer.Ctx ctx, Node node, String field) {
-    }
-
-    public void extra(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field) {
-    }
-
-    public void error(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void unknown(CompleteIndexer.Ctx ctx, Node node) {
-    }
 }

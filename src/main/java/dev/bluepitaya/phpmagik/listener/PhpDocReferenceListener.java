@@ -110,25 +110,4 @@ public final class PhpDocReferenceListener implements Listener {
         }
         return codePoint < 0x10000 ? 3 : 4;
     }
-
-    public void enter(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void exit(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void token(CompleteIndexer.Ctx ctx, Node node, String field) {
-    }
-
-    public void error(CompleteIndexer.Ctx ctx, Node node) {
-    }
-
-    public void unexpected(CompleteIndexer.Ctx ctx, Node parent, Node child, String field) {
-    }
-
-    public void unknown(CompleteIndexer.Ctx ctx, Node node) {
-    }
 }
