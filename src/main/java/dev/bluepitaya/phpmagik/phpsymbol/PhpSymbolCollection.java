@@ -4,10 +4,7 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public final class PhpSymbolCollection {
 
@@ -70,8 +67,13 @@ public final class PhpSymbolCollection {
         return nsDefinitions;
     }
 
+    @Deprecated
     public @Nullable PhpNamespaceDefinition namespaceOf(PhpFile file, Range range) {
         return innermost(file, range, nsDefinitions, null);
+    }
+
+    public Optional<PhpNamespaceDefinition> namespaceOfOpt(PhpFile file, Range range) {
+        return Optional.ofNullable(innermost(file, range, nsDefinitions, null));
     }
 
     public PhpNameScope nameScopeOf(PhpFile file, Range range) {

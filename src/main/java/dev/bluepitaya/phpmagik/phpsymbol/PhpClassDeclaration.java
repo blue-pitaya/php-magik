@@ -3,88 +3,52 @@ package dev.bluepitaya.phpmagik.phpsymbol;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.ts.Range;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 @NullMarked
 public final class PhpClassDeclaration implements PhpSymbol, PhpSymbolOwner {
 
     private final PhpFile file;
-    private final int depth;
+    private final String namespace;
+    private final String $modifier;
+    private final String name;
+    private final Range range;
+    private final Range scope;
 
-    private String $modifier = "";
-    private @Nullable PhpNamespaceDefinition namespace;
-    private @Nullable String name;
-    private @Nullable Range range;
-    private @Nullable Range scope;
-
-    public PhpClassDeclaration(PhpFile file, int depth) {
+    public PhpClassDeclaration(PhpFile file, String namespace, String $modifier,
+                               String name, Range range, Range scope) {
         this.file = file;
-        this.depth = depth;
-    }
-
-    public int depth() {
-        return depth;
+        this.namespace = namespace;
+        this.$modifier = $modifier;
+        this.name = name;
+        this.range = range;
+        this.scope = scope;
     }
 
     @Override
-    public @Nullable String hover() {
-        if (name == null) return null;
-
+    public String hover() {
         String declaration = $modifier.isEmpty() ? "class " + name : $modifier + " class " + name;
-        String namespaceName = namespaceName();
-        return PhpSymbol.code(namespaceName == null ? declaration : "namespace " + namespaceName + ";\n" + declaration);
+        return PhpSymbol.code(namespace.isEmpty() ? declaration : "namespace " + namespace + ";\n" + declaration);
     }
 
-    public @Nullable String fqn() {
-        if (name == null) return null;
-
-        String namespaceName = namespaceName();
-        return namespaceName == null ? name : namespaceName + "\\" + name;
-    }
-
-    private @Nullable String namespaceName() {
-        return namespace == null ? null : namespace.name();
-    }
-
-    public @Nullable PhpNamespaceDefinition namespace() {
-        return namespace;
-    }
-
-    public void namespace(PhpNamespaceDefinition namespace) {
-        this.namespace = namespace;
+    public String fqn() {
+        return namespace.isEmpty() ? name : namespace + "\\" + name;
     }
 
     public String $modifier() {
         return $modifier;
     }
 
-    public void $modifier(String $modifier) {
-        this.$modifier = $modifier;
-    }
-
-    public @Nullable String name() {
+    public String name() {
         return name;
     }
 
-    public void name(String name) {
-        this.name = name;
-    }
-
     @Override
-    public @Nullable Range range() {
+    public Range range() {
         return range;
     }
 
-    public void range(Range range) {
-        this.range = range;
-    }
-
-    public @Nullable Range scope() {
+    public Range scope() {
         return scope;
-    }
-
-    public void scope(Range scope) {
-        this.scope = scope;
     }
 
     @Override
