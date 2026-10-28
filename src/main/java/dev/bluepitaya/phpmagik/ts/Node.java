@@ -3,14 +3,9 @@ package dev.bluepitaya.phpmagik.ts;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
-import static dev.bluepitaya.phpmagik.ts.Tree.NAMED;
-import static dev.bluepitaya.phpmagik.ts.Tree.NEXT;
-import static dev.bluepitaya.phpmagik.ts.Tree.NONE;
-import static dev.bluepitaya.phpmagik.ts.Tree.PARENT;
+import static dev.bluepitaya.phpmagik.ts.Tree.*;
 
 @NullMarked
 public final class Node {
@@ -42,11 +37,17 @@ public final class Node {
     }
 
     public List<Node> getChildren() {
-        return children(false);
+        List<Node> children = new ArrayList<>();
+        childNodes().forEach(children::add);
+
+        return children;
     }
 
     public List<Node> getNamedChildren() {
-        return children(true);
+        List<Node> children = getChildren();
+        children.removeIf(ch -> !tree.is(ch.index, NAMED));
+
+        return children;
     }
 
     public int getNamedChildCount() {
@@ -57,19 +58,35 @@ public final class Node {
         return getNamedChildren().get(child);
     }
 
+    @Deprecated
     public @Nullable Node getChildByFieldName(String name) {
-        for (int child = tree.firstChild(index); child != NONE; child = tree.get(child, NEXT)) {
-            if (name.equals(tree.field(child))) return new Node(tree, child);
+        for (Node child : childNodes()) {
+            if (name.equals(tree.field(child.index))) return child;
         }
         return null;
+    }
+
+    public Optional<Node> getChildByFieldNameOpt(String name) {
+        for (Node child : childNodes()) {
+            if (name.equals(tree.field(child.index))) {
+                return Optional.of(child);
+            }
+        }
+
+        return Optional.empty();
     }
 
     public @Nullable String getFieldName() {
         return tree.field(index);
     }
 
+    @Deprecated
     public @Nullable Node getParent() {
         return node(tree.get(index, PARENT));
+    }
+
+    public Optional<Node> getParentOpt() {
+        return Optional.ofNullable(node(tree.get(index, PARENT)));
     }
 
     public Node getParentOrThrow() {
@@ -80,12 +97,40 @@ public final class Node {
         return parent;
     }
 
+    private Iterable<Node> childNodes() {
+        return () -> new Iterator<>() {
+            private int child = tree.firstChild(index);
+
+            @Override
+            public boolean hasNext() {
+                return child != NONE;
+            }
+
+            @Override
+            public Node next() {
+                if (child == NONE) {
+                    throw new NoSuchElementException();
+                }
+                Node node = new Node(tree, child);
+                child = tree.get(child, NEXT);
+                return node;
+            }
+        };
+    }
+
     public @Nullable Node getPrevSibling() {
-        int previous = NONE;
-        for (int child = tree.get(index, PARENT) + 1; child != index; child = tree.get(child, NEXT)) {
+        Node parent = node(tree.get(index, PARENT));
+        if (parent == null) {
+            return null;
+        }
+        Node previous = null;
+        for (Node child : parent.childNodes()) {
+            if (child.index == index) {
+                break;
+            }
             previous = child;
         }
-        return node(previous);
+        return previous;
     }
 
     public Node getDescendant(Point start, Point end) {
@@ -152,15 +197,5 @@ public final class Node {
 
     private @Nullable Node node(int node) {
         return node == NONE ? null : new Node(tree, node);
-    }
-
-    private List<Node> children(boolean named) {
-        List<Node> children = new ArrayList<>();
-        for (int child = tree.firstChild(index); child != NONE; child = tree.get(child, NEXT)) {
-            if (!named || tree.is(child, NAMED)) {
-                children.add(new Node(tree, child));
-            }
-        }
-        return children;
     }
 }

@@ -5,10 +5,9 @@ import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpImport;
 import dev.bluepitaya.phpmagik.phpsymbol.PhpSymbolCollection;
 import dev.bluepitaya.phpmagik.ts.Node;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
-@NullMarked
+import java.util.Optional;
+
 public final class PhpImportListener implements Listener {
 
     private final PhpSymbolCollection collection;
@@ -20,59 +19,73 @@ public final class PhpImportListener implements Listener {
     }
 
     public void enter(CompleteIndexer.Ctx ctx, Node node) {
+        // use App\Foo;
         if (!node.isType("namespace_use_clause")) {
             return;
         }
 
-        String imported = importedName(node);
-        if (imported == null || !importsClass(node)) {
+        Optional<String> importedOpt = importedName(node);
+        if (importedOpt.isEmpty() || !importsClass(node)) {
             return;
         }
 
-        Node alias = node.getChildByFieldName("alias");
-        String key = alias != null ? alias.getContent() : imported.substring(imported.lastIndexOf('\\') + 1);
+        String imported = importedOpt.get();
+        // use App\Foo as Bar; use App\Foo;
+        Optional<Node> alias = node.getChildByFieldNameOpt("alias");
+        String key = alias.map(Node::getContent).orElse(imported.substring(imported.lastIndexOf('\\') + 1));
+
         collection.add(new PhpImport(file, key, imported, node.getRange()));
     }
 
-    private static @Nullable String importedName(Node clause) {
-        @Nullable Node imported = null;
-        for (int i = 0; i < clause.getNamedChildCount() && imported == null; i++) {
-            Node child = clause.getNamedChild(i);
-            if (child.isType("name") || child.isType("qualified_name")) {
-                imported = child;
-            }
-        }
+    private static Optional<String> importedName(Node node) {
+        // use Foo; use App\Foo;
+        Node imported = node.getNamedChildren().stream()
+                .filter(ch -> ch.isType("name") || ch.isType("qualified_name"))
+                .findFirst()
+                .orElse(null);
         if (imported == null) {
-            return null;
-        }
-        String text = imported.getContent();
-        if (text.startsWith("\\")) {
-            text = text.substring(1);
+            return Optional.empty();
         }
 
-        @Nullable Node group = clause.getParent();
-        @Nullable Node declaration = group == null ? null : group.getParent();
-        if (group == null || declaration == null || !group.isType("namespace_use_group")) {
-            return text;
+        String content = imported.getContent();
+        // use \App\Foo;
+        String text = content.startsWith("\\") ? content.substring(1) : content;
+
+        Optional<Node> group = node.getParentOpt();
+        // use App\Foo;
+        if (group.isEmpty() || !group.get().isType("namespace_use_group")) {
+            return Optional.of(text);
         }
-        for (int i = 0; i < declaration.getNamedChildCount(); i++) {
-            Node child = declaration.getNamedChild(i);
+
+        // use App\{Foo, Bar};
+        Optional<Node> declaration = group.get().getParentOpt();
+        if (declaration.isEmpty()) {
+            return Optional.of(text);
+        }
+
+        // use App\{Foo, Bar};
+        for (Node child : declaration.get().getNamedChildren()) {
             if (child.isType("namespace_name")) {
-                return child.getContent() + "\\" + text;
+                return Optional.of(child.getContent() + "\\" + text);
             }
         }
-        return text;
+
+        return Optional.of(text);
     }
 
-    private static boolean importsClass(Node clause) {
-        if (clause.getChildByFieldName("type") != null) {
+    private static boolean importsClass(Node node) {
+        // use App\{function foo, Bar};
+        if (node.getChildByFieldNameOpt("type").isPresent()) {
             return false;
         }
 
-        Node declaration = clause.getParent();
-        if (declaration != null && declaration.isType("namespace_use_group")) {
-            declaration = declaration.getParent();
+        Optional<Node> declaration = node.getParentOpt();
+        // use function App\{foo, bar};
+        if (declaration.isPresent() && declaration.get().isType("namespace_use_group")) {
+            declaration = declaration.get().getParentOpt();
         }
-        return declaration == null || declaration.getChildByFieldName("type") == null;
+
+        // use function App\foo;
+        return declaration.isEmpty() || declaration.get().getChildByFieldNameOpt("type").isEmpty();
     }
 }
