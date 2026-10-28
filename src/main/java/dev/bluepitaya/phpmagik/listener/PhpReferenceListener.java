@@ -33,7 +33,7 @@ public final class PhpReferenceListener implements Listener {
     }
 
     public void leaf(CompleteIndexer.Ctx ctx, Node node) {
-        Node parent = ctx.parent();
+        Node parent = ctx.parent().orElse(null);
         if (!node.isType("name") || parent == null) {
             return;
         }

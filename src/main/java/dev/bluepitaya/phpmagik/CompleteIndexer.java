@@ -2,11 +2,10 @@ package dev.bluepitaya.phpmagik;
 
 import dev.bluepitaya.phpmagik.listener.Listener;
 import dev.bluepitaya.phpmagik.ts.Node;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static dev.bluepitaya.phpmagik.ts.Node.Flag.ERROR;
 import static dev.bluepitaya.phpmagik.ts.Node.Flag.EXTRA;
@@ -20,7 +19,6 @@ import static dev.bluepitaya.phpmagik.ts.Node.Flag.NAMED;
  * - https://tree-sitter.github.io/tree-sitter/using-parsers
  * - https://tree-sitter.github.io/tree-sitter/creating-parsers
  */
-@NullMarked
 public final class CompleteIndexer {
 
     public static final String NONE = "";
@@ -41,64 +39,64 @@ public final class CompleteIndexer {
             return path.size();
         }
 
-        public @Nullable Node parent() {
-            return path.size() < 2 ? null : path.get(path.size() - 2);
-        }
-
-        public List<Slot> slots(Node node) {
-            List<Node> children = node.getChildren();
-            List<Slot> slots = new ArrayList<>(children.size());
-            for (Node child : children) {
-                String field = child.getFieldName();
-
-                if (child.is(ERROR) || child.is(MISSING)) {
-                    listener.error(this, child);
-                } else if (child.is(EXTRA)) {
-                    /* comments: the node types file lists them under no parent */
-                    listener.extra(this, child);
-                } else if (field != null) {
-                    slots.add(new Slot(child, field));
-                } else if (child.is(NAMED)) {
-                    slots.add(new Slot(child, NONE));
-                } else {
-                    /* bare punctuation and keywords, in no field and named nowhere */
-                    listener.token(this, child, NONE);
-                }
-            }
-            return slots;
-        }
-
-        void enter(Node node) {
-            path.add(node);
-            listener.enter(this, node);
-        }
-
-        void exit(Node node) {
-            listener.exit(this, node);
-            path.removeLast();
-        }
-
-        void leaf(Node node) {
-            path.add(node);
-            listener.leaf(this, node);
-            path.removeLast();
-        }
-
-        void token(Slot slot) {
-            listener.token(this, slot.node(), slot.field());
-        }
-
-        void unexpected(Node parent, Slot slot) {
-            listener.unexpected(this, parent, slot.node(), slot.field());
-        }
-
-        void unknown(Node node) {
-            listener.unknown(this, node);
+        public Optional<Node> parent() {
+            return path.size() < 2 ? Optional.empty() : Optional.of(path.get(path.size() - 2));
         }
     }
 
     public void walk(Node root, Listener listener) {
         visit(new Ctx(listener), root);
+    }
+
+    private void enter(Ctx ctx, Node node) {
+        ctx.path.add(node);
+        ctx.listener.enter(ctx, node);
+    }
+
+    private void exit(Ctx ctx, Node node) {
+        ctx.listener.exit(ctx, node);
+        ctx.path.removeLast();
+    }
+
+    private void leaf(Ctx ctx, Node node) {
+        ctx.path.add(node);
+        ctx.listener.leaf(ctx, node);
+        ctx.path.removeLast();
+    }
+
+    private void token(Ctx ctx, Slot slot) {
+        ctx.listener.token(ctx, slot.node(), slot.field());
+    }
+
+    private void unexpected(Ctx ctx, Node parent, Slot slot) {
+        ctx.listener.unexpected(ctx, parent, slot.node(), slot.field());
+    }
+
+    private void unknown(Ctx ctx, Node node) {
+        ctx.listener.unknown(ctx, node);
+    }
+
+    private List<Slot> slots(Ctx ctx, Node node) {
+        List<Node> children = node.getChildren();
+        List<Slot> slots = new ArrayList<>(children.size());
+        for (Node child : children) {
+            String field = child.getFieldName();
+
+            if (child.is(ERROR) || child.is(MISSING)) {
+                ctx.listener.error(ctx, child);
+            } else if (child.is(EXTRA)) {
+                /* comments: the node types file lists them under no parent */
+                ctx.listener.extra(ctx, child);
+            } else if (field != null) {
+                slots.add(new Slot(child, field));
+            } else if (child.is(NAMED)) {
+                slots.add(new Slot(child, NONE));
+            } else {
+                /* bare punctuation and keywords, in no field and named nowhere */
+                ctx.listener.token(ctx, child, NONE);
+            }
+        }
+        return slots;
     }
 
     private void visit(Ctx ctx, Node node) {
@@ -258,7 +256,7 @@ public final class CompleteIndexer {
             case "visibility_modifier" -> visitVisibilityModifier(ctx, node);
             case "while_statement" -> visitWhileStatement(ctx, node);
             case "yield_expression" -> visitYieldExpression(ctx, node);
-            default -> ctx.unknown(node);
+            default -> unknown(ctx, node);
         }
     }
 
@@ -323,7 +321,7 @@ public final class CompleteIndexer {
             case "nowdoc" -> visitNowdoc(ctx, node);
             case "null" -> visitNull(ctx, node);
             case "string" -> visitString(ctx, node);
-            default -> ctx.unknown(node);
+            default -> unknown(ctx, node);
         }
     }
 
@@ -358,7 +356,7 @@ public final class CompleteIndexer {
             case "try_statement" -> visitTryStatement(ctx, node);
             case "unset_statement" -> visitUnsetStatement(ctx, node);
             case "while_statement" -> visitWhileStatement(ctx, node);
-            default -> ctx.unknown(node);
+            default -> unknown(ctx, node);
         }
     }
 
@@ -370,17 +368,17 @@ public final class CompleteIndexer {
             case "optional_type" -> visitOptionalType(ctx, node);
             case "primitive_type" -> visitPrimitiveType(ctx, node);
             case "union_type" -> visitUnionType(ctx, node);
-            default -> ctx.unknown(node);
+            default -> unknown(ctx, node);
         }
     }
 
     private void visitAbstractModifier(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitAnonymousClass(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitDeclarationList(ctx, slot.node());
@@ -395,18 +393,18 @@ public final class CompleteIndexer {
                         case "static_modifier" -> visitStaticModifier(ctx, slot.node());
                         case "var_modifier" -> visitVarModifier(ctx, slot.node());
                         case "visibility_modifier" -> visitVisibilityModifier(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitAnonymousFunction(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitCompoundStatement(ctx, slot.node());
@@ -417,34 +415,34 @@ public final class CompleteIndexer {
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "anonymous_function_use_clause" -> visitAnonymousFunctionUseClause(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitAnonymousFunctionUseClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "by_ref" -> visitByRef(ctx, slot.node());
                 case "variable_name" -> visitVariableName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitArgument(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "name" -> visitName(ctx, slot.node());
                 case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
@@ -456,52 +454,52 @@ public final class CompleteIndexer {
                         default -> visitExpression(ctx, slot.node());
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitArgumentPlaceholder(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitArguments(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "argument" -> visitArgument(ctx, slot.node());
                 case "variadic_placeholder" -> visitVariadicPlaceholder(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitArrayCreationExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "array_element_initializer" -> visitArrayElementInitializer(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitArrayElementInitializer(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -510,12 +508,12 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitArrowFunction(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitExpression(ctx, slot.node());
@@ -523,97 +521,97 @@ public final class CompleteIndexer {
                 case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
                 case "return_type" -> visitReturnType(ctx, slot);
                 case "static_modifier" -> visitStaticModifier(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitAssignmentExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "left" -> visitAssignmentTarget(ctx, slot);
                 case "right" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitAttribute(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "parameters" -> visitArguments(ctx, slot.node());
                 case NONE -> visitClassName(ctx, node, slot);
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitAttributeGroup(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "attribute" -> visitAttribute(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitAttributeList(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "attribute_group" -> visitAttributeGroup(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitAugmentedAssignmentExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "left" -> visitAssignmentTarget(ctx, slot);
-                case "operator" -> ctx.token(slot);
+                case "operator" -> token(ctx, slot);
                 case "right" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitBaseClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitClassName(ctx, node, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitBinaryExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "left" -> visitExpression(ctx, slot.node());
-                case "operator" -> ctx.token(slot);
+                case "operator" -> token(ctx, slot);
                 case "right" -> {
                     switch (slot.node().getType()) {
                         case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
@@ -631,59 +629,59 @@ public final class CompleteIndexer {
                         default -> visitExpression(ctx, slot.node());
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitBoolean(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitBottomType(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitBreakStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitByRef(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitVariableTarget(ctx, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitCaseStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "value" -> visitExpression(ctx, slot.node());
                 case NONE -> visitStatement(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitCastExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "type" -> visitCastType(ctx, slot.node());
                 case "value" -> {
@@ -696,34 +694,34 @@ public final class CompleteIndexer {
                         default -> visitPrimaryExpression(ctx, slot.node());
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitCastType(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitCatchClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitCompoundStatement(ctx, slot.node());
                 case "name" -> visitVariableName(ctx, slot.node());
                 case "type" -> visitTypeList(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitClassConstantAccessExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -732,12 +730,12 @@ public final class CompleteIndexer {
                 default -> visitPrimaryExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitClassDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitDeclarationList(ctx, slot.node());
@@ -752,81 +750,81 @@ public final class CompleteIndexer {
                         case "static_modifier" -> visitStaticModifier(ctx, slot.node());
                         case "var_modifier" -> visitVarModifier(ctx, slot.node());
                         case "visibility_modifier" -> visitVisibilityModifier(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitClassInterfaceClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitClassName(ctx, node, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitCloneExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitPrimaryExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitColonBlock(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitStatement(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitComment(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitCompoundStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitStatement(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitConditionalExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "alternative", "body", "condition" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitConstDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "type" -> visitType(ctx, slot.node());
@@ -839,20 +837,20 @@ public final class CompleteIndexer {
                         case "static_modifier" -> visitStaticModifier(ctx, slot.node());
                         case "var_modifier" -> visitVarModifier(ctx, slot.node());
                         case "visibility_modifier" -> visitVisibilityModifier(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitConstElement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -860,26 +858,26 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitContinueStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitDeclarationList(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -887,29 +885,29 @@ public final class CompleteIndexer {
                 case "method_declaration" -> visitMethodDeclaration(ctx, slot.node());
                 case "property_declaration" -> visitPropertyDeclaration(ctx, slot.node());
                 case "use_declaration" -> visitUseDeclaration(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitDeclareDirective(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitLiteral(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitDeclareStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -917,26 +915,26 @@ public final class CompleteIndexer {
                 default -> visitStatement(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitDefaultStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitStatement(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitDisjunctiveNormalFormType(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -944,29 +942,29 @@ public final class CompleteIndexer {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "optional_type" -> visitOptionalType(ctx, slot.node());
                 case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitDoStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitStatement(ctx, slot.node());
                 case "condition" -> visitParenthesizedExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitDynamicVariableName(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -975,14 +973,14 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitEchoStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -990,64 +988,64 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitElseClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitBlockOrStatement(ctx, slot);
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitElseIfClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitBlockOrStatement(ctx, slot);
                 case "condition" -> visitParenthesizedExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitEmptyStatement(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitEncapsedString(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitInterpolated(ctx, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitEnumCase(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
                 case "value" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitEnumDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitEnumDeclarationList(ctx, slot.node());
@@ -1056,20 +1054,20 @@ public final class CompleteIndexer {
                     switch (slot.node().getType()) {
                         case "class_interface_clause" -> visitClassInterfaceClause(ctx, slot.node());
                         case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitEnumDeclarationList(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -1077,74 +1075,74 @@ public final class CompleteIndexer {
                 case "enum_case" -> visitEnumCase(ctx, slot.node());
                 case "method_declaration" -> visitMethodDeclaration(ctx, slot.node());
                 case "use_declaration" -> visitUseDeclaration(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitErrorSuppressionExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitEscapeSequence(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitExitStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitExpressionStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitFinalModifier(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitFinallyClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitCompoundStatement(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitFloat(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitForStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitStatement(ctx, slot.node());
                 case "condition", "initialize", "update" -> {
@@ -1153,15 +1151,15 @@ public final class CompleteIndexer {
                         default -> visitExpression(ctx, slot.node());
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitForeachStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitBlockOrStatement(ctx, slot);
                 case NONE -> {
@@ -1172,44 +1170,44 @@ public final class CompleteIndexer {
                         default -> visitExpression(ctx, slot.node());
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitFormalParameters(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "property_promotion_parameter" -> visitPropertyPromotionParameter(ctx, slot.node());
                 case "simple_parameter" -> visitSimpleParameter(ctx, slot.node());
                 case "variadic_parameter" -> visitVariadicParameter(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitFunctionCallExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "arguments" -> visitArguments(ctx, slot.node());
                 case "function" -> visitPrimaryExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitFunctionDefinition(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitCompoundStatement(ctx, slot.node());
@@ -1219,141 +1217,141 @@ public final class CompleteIndexer {
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitFunctionStaticDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "static_variable_declaration" -> visitStaticVariableDeclaration(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitGlobalDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
                 case "variable_name" -> visitVariableName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitGotoStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitName(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitHeredoc(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "end_tag" -> visitHeredocEnd(ctx, slot.node());
                 case "identifier" -> visitHeredocStart(ctx, slot.node());
                 case "value" -> visitHeredocBody(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitHeredocBody(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitInterpolated(ctx, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitHeredocEnd(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitHeredocStart(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitIfStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "alternative" -> {
                     switch (slot.node().getType()) {
                         case "else_clause" -> visitElseClause(ctx, slot.node());
                         case "else_if_clause" -> visitElseIfClause(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
                 case "body" -> visitBlockOrStatement(ctx, slot);
                 case "condition" -> visitParenthesizedExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitIncludeExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitIncludeOnceExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitInteger(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitInterfaceDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitDeclarationList(ctx, slot.node());
@@ -1361,37 +1359,37 @@ public final class CompleteIndexer {
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "base_clause" -> visitBaseClause(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitIntersectionType(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "optional_type" -> visitOptionalType(ctx, slot.node());
                 case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitListLiteral(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -1400,100 +1398,100 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMatchBlock(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "match_conditional_expression" -> visitMatchConditionalExpression(ctx, slot.node());
                 case "match_default_expression" -> visitMatchDefaultExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMatchConditionList(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMatchConditionalExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "conditional_expressions" -> visitMatchConditionList(ctx, slot.node());
                 case "return_expression" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMatchDefaultExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "return_expression" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMatchExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitMatchBlock(ctx, slot.node());
                 case "condition" -> visitParenthesizedExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMemberAccessExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "name" -> visitMemberName(ctx, slot);
                 case "object" -> visitPrimaryExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMemberCallExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "arguments" -> visitArguments(ctx, slot.node());
                 case "name" -> visitMemberName(ctx, slot);
                 case "object" -> visitPrimaryExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitMethodDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitCompoundStatement(ctx, slot.node());
@@ -1509,186 +1507,186 @@ public final class CompleteIndexer {
                         case "static_modifier" -> visitStaticModifier(ctx, slot.node());
                         case "var_modifier" -> visitVarModifier(ctx, slot.node());
                         case "visibility_modifier" -> visitVisibilityModifier(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitName(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitNamedLabelStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitName(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNamedType(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitClassName(ctx, node, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNamespaceDefinition(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitCompoundStatement(ctx, slot.node());
                 case "name" -> visitNamespaceName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNamespaceName(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitName(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNamespaceUseClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "alias" -> visitName(ctx, slot.node());
-                case "type" -> ctx.token(slot);
+                case "type" -> token(ctx, slot);
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "name" -> visitName(ctx, slot.node());
                         case "qualified_name" -> visitQualifiedName(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNamespaceUseDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitNamespaceUseGroup(ctx, slot.node());
-                case "type" -> ctx.token(slot);
+                case "type" -> token(ctx, slot);
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "namespace_name" -> visitNamespaceName(ctx, slot.node());
                         case "namespace_use_clause" -> visitNamespaceUseClause(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNamespaceUseGroup(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "namespace_use_clause" -> visitNamespaceUseClause(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNowdoc(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "end_tag" -> visitHeredocEnd(ctx, slot.node());
                 case "identifier" -> visitHeredocStart(ctx, slot.node());
                 case "value" -> visitNowdocBody(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNowdocBody(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "nowdoc_string" -> visitNowdocString(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNowdocString(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitNull(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitNullsafeMemberAccessExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "name" -> visitMemberName(ctx, slot);
                 case "object" -> visitPrimaryExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitNullsafeMemberCallExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "arguments" -> visitArguments(ctx, slot.node());
                 case "name" -> visitMemberName(ctx, slot);
                 case "object" -> visitPrimaryExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitObjectCreationExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -1697,34 +1695,34 @@ public final class CompleteIndexer {
                 default -> visitPrimaryExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitOperation(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitOptionalType(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitPair(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -1733,50 +1731,50 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitParenthesizedExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitPhpEndTag(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitPhpTag(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitPrimitiveType(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitPrintIntrinsic(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitProgram(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -1785,12 +1783,12 @@ public final class CompleteIndexer {
                 default -> visitStatement(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitPropertyDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "type" -> visitType(ctx, slot.node());
@@ -1804,30 +1802,30 @@ public final class CompleteIndexer {
                         case "static_modifier" -> visitStaticModifier(ctx, slot.node());
                         case "var_modifier" -> visitVarModifier(ctx, slot.node());
                         case "visibility_modifier" -> visitVisibilityModifier(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitPropertyElement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "default_value" -> visitExpression(ctx, slot.node());
                 case "name" -> visitVariableName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitPropertyHook(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> {
@@ -1840,30 +1838,30 @@ public final class CompleteIndexer {
                 case "parameters" -> visitFormalParameters(ctx, slot.node());
                 case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
                 case NONE -> visitName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitPropertyHookList(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "property_hook" -> visitPropertyHook(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitPropertyPromotionParameter(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "default_value" -> visitExpression(ctx, slot.node());
@@ -1871,7 +1869,7 @@ public final class CompleteIndexer {
                     switch (slot.node().getType()) {
                         case "by_ref" -> visitByRef(ctx, slot.node());
                         case "variable_name" -> visitVariableName(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
                 case "readonly" -> visitReadonlyModifier(ctx, slot.node());
@@ -1880,145 +1878,145 @@ public final class CompleteIndexer {
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "property_hook_list" -> visitPropertyHookList(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitQualifiedName(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "prefix" -> {
                     switch (slot.node().getType()) {
                         case "namespace_name" -> visitNamespaceName(ctx, slot.node());
-                        default -> ctx.token(slot);
+                        default -> token(ctx, slot);
                     }
                 }
                 case NONE -> visitName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitReadonlyModifier(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitReferenceAssignmentExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "left" -> visitAssignmentTarget(ctx, slot);
                 case "right" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitReferenceModifier(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitRelativeName(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "prefix" -> {
                     switch (slot.node().getType()) {
                         case "namespace_name" -> visitNamespaceName(ctx, slot.node());
-                        default -> ctx.token(slot);
+                        default -> token(ctx, slot);
                     }
                 }
                 case NONE -> visitName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitRelativeScope(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitRequireExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitRequireOnceExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitReturnStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitScopedCallExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "arguments" -> visitArguments(ctx, slot.node());
                 case "name" -> visitMemberName(ctx, slot);
                 case "scope" -> visitScope(ctx, slot);
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitScopedPropertyAccessExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "name" -> {
                     switch (slot.node().getType()) {
                         case "dynamic_variable_name" -> visitDynamicVariableName(ctx, slot.node());
                         case "variable_name" -> visitVariableName(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
                 case "scope" -> visitScope(ctx, slot);
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitSequenceExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -2026,251 +2024,251 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitShellCommandExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitInterpolated(ctx, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitSimpleParameter(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "default_value" -> visitExpression(ctx, slot.node());
                 case "name" -> visitVariableName(ctx, slot.node());
                 case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
                 case "type" -> visitType(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitStaticModifier(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitStaticVariableDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "name" -> visitVariableName(ctx, slot.node());
                 case "value" -> visitExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitString(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "escape_sequence" -> visitEscapeSequence(ctx, slot.node());
                 case "string_content" -> visitStringContent(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitStringContent(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitSubscriptExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitSwitchBlock(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "case_statement" -> visitCaseStatement(ctx, slot.node());
                 case "default_statement" -> visitDefaultStatement(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitSwitchStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitSwitchBlock(ctx, slot.node());
                 case "condition" -> visitParenthesizedExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitThrowExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitTraitDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "body" -> visitDeclarationList(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitTryStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitCompoundStatement(ctx, slot.node());
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "catch_clause" -> visitCatchClause(ctx, slot.node());
                         case "finally_clause" -> visitFinallyClause(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitTypeList(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUnaryOpExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "argument" -> visitExpression(ctx, slot.node());
-                case "operator" -> ctx.token(slot);
+                case "operator" -> token(ctx, slot);
                 case NONE -> {
                     switch (slot.node().getType()) {
                         case "integer" -> visitInteger(ctx, slot.node());
-                        default -> ctx.unexpected(node, slot);
+                        default -> unexpected(ctx, node, slot);
                     }
                 }
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUnionType(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "named_type" -> visitNamedType(ctx, slot.node());
                 case "optional_type" -> visitOptionalType(ctx, slot.node());
                 case "primitive_type" -> visitPrimitiveType(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUnsetStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitVariableTarget(ctx, slot);
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUpdateExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "argument" -> visitVariableTarget(ctx, slot);
-                case "operator" -> ctx.token(slot);
-                default -> ctx.unexpected(node, slot);
+                case "operator" -> token(ctx, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUseAsClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "class_constant_access_expression" -> visitClassConstantAccessExpression(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
                 case "visibility_modifier" -> visitVisibilityModifier(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUseDeclaration(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -2278,119 +2276,119 @@ public final class CompleteIndexer {
                 default -> visitClassName(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUseInsteadOfClause(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "class_constant_access_expression" -> visitClassConstantAccessExpression(ctx, slot.node());
                 case "name" -> visitName(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitUseList(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "use_as_clause" -> visitUseAsClause(ctx, slot.node());
                 case "use_instead_of_clause" -> visitUseInsteadOfClause(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitVarModifier(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitVariableName(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitName(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitVariadicParameter(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "attributes" -> visitAttributeList(ctx, slot.node());
                 case "name" -> visitVariableName(ctx, slot.node());
                 case "reference_modifier" -> visitReferenceModifier(ctx, slot.node());
                 case "type" -> visitType(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitVariadicPlaceholder(Ctx ctx, Node node) {
-        ctx.leaf(node);
+        leaf(ctx, node);
     }
 
     private void visitVariadicUnpacking(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             visitExpression(ctx, slot.node());
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitVisibilityModifier(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
                 case "operation" -> visitOperation(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitWhileStatement(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             switch (slot.field()) {
                 case "body" -> visitBlockOrStatement(ctx, slot);
                 case "condition" -> visitParenthesizedExpression(ctx, slot.node());
-                default -> ctx.unexpected(node, slot);
+                default -> unexpected(ctx, node, slot);
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitYieldExpression(Ctx ctx, Node node) {
-        ctx.enter(node);
-        for (Slot slot : ctx.slots(node)) {
+        enter(ctx, node);
+        for (Slot slot : slots(ctx, node)) {
             if (!NONE.equals(slot.field())) {
-                ctx.unexpected(node, slot);
+                unexpected(ctx, node, slot);
                 continue;
             }
             switch (slot.node().getType()) {
@@ -2398,7 +2396,7 @@ public final class CompleteIndexer {
                 default -> visitExpression(ctx, slot.node());
             }
         }
-        ctx.exit(node);
+        exit(ctx, node);
     }
 
     private void visitBlockOrStatement(Ctx ctx, Slot slot) {
@@ -2413,7 +2411,7 @@ public final class CompleteIndexer {
             case "name" -> visitName(ctx, slot.node());
             case "qualified_name" -> visitQualifiedName(ctx, slot.node());
             case "relative_name" -> visitRelativeName(ctx, slot.node());
-            default -> ctx.unexpected(parent, slot);
+            default -> unexpected(ctx, parent, slot);
         }
     }
 

@@ -33,7 +33,7 @@ public final class VarInsideFunctionLikeListener implements Listener {
             return;
         }
 
-        Node parent = ctx.parent();
+        Node parent = ctx.parent().orElse(null);
         if (isParameter(parent)) {
             return;
         }

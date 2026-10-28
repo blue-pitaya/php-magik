@@ -38,7 +38,7 @@ public final class PhpClassReferenceListener implements Listener {
     }
 
     private void add(CompleteIndexer.Ctx ctx, Node node) {
-        Node parent = ctx.parent();
+        Node parent = ctx.parent().orElse(null);
         if (parent == null || !isClassName(node, parent)) {
             return;
         }
