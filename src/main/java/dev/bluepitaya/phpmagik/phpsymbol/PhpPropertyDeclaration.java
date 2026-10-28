@@ -2,34 +2,29 @@ package dev.bluepitaya.phpmagik.phpsymbol;
 
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.ts.Range;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
+import java.util.Optional;
+
 public final class PhpPropertyDeclaration implements PhpSymbol {
 
     private final PhpFile file;
-    private final int depth;
+    private final String $modifier;
+    private final String name;
+    private final Range range;
 
-    private String $modifier = "";
     private @Nullable PhpClassDeclaration owner;
-    private @Nullable String name;
     private @Nullable PhpType type;
-    private @Nullable Range range;
 
-    public PhpPropertyDeclaration(PhpFile file, int depth) {
+    public PhpPropertyDeclaration(PhpFile file, String $modifier, String name, Range range) {
         this.file = file;
-        this.depth = depth;
-    }
-
-    public int depth() {
-        return depth;
+        this.$modifier = $modifier;
+        this.name = name;
+        this.range = range;
     }
 
     @Override
-    public @Nullable String hover() {
-        if (name == null) return null;
-
+    public String hover() {
         String declared = PhpType.declared(type, name);
         return PhpSymbol.code($modifier.isEmpty() ? declared : $modifier + " " + declared);
     }
@@ -38,28 +33,20 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
         return $modifier;
     }
 
-    public void $modifier(String $modifier) {
-        this.$modifier = $modifier;
-    }
-
-    public @Nullable PhpClassDeclaration owner() {
-        return owner;
+    public Optional<PhpClassDeclaration> owner() {
+        return Optional.ofNullable(owner);
     }
 
     public void owner(PhpClassDeclaration owner) {
         this.owner = owner;
     }
 
-    public @Nullable String name() {
+    public String name() {
         return name;
     }
 
-    public void name(String name) {
-        this.name = name;
-    }
-
-    public @Nullable PhpType type() {
-        return type;
+    public Optional<PhpType> type() {
+        return Optional.ofNullable(type);
     }
 
     public void type(PhpType type) {
@@ -67,12 +54,8 @@ public final class PhpPropertyDeclaration implements PhpSymbol {
     }
 
     @Override
-    public @Nullable Range range() {
+    public Range range() {
         return range;
-    }
-
-    public void range(Range range) {
-        this.range = range;
     }
 
     @Override

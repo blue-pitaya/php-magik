@@ -29,7 +29,7 @@ class PhpVarDocTest {
                     fixture.symbols()
                             .propertyDeclarations()
                             .stream()
-                            .map(PhpPropertyDeclaration::type)
+                            .map(property -> property.type().orElse(null))
                             .toList()
             );
         }

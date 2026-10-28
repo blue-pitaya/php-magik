@@ -101,7 +101,7 @@ public final class ReferenceResolver {
         PhpType type = switch (member) {
             case PhpPropertyAccess access -> {
                 PhpPropertyDeclaration property = propertyOf(owner, access.name(), index);
-                yield property == null ? null : property.type();
+                yield property == null ? null : property.type().orElse(null);
             }
             case PhpMethodCall call -> {
                 PhpMethodDeclaration method = methodOf(owner, call.name(), index);
@@ -197,7 +197,7 @@ public final class ReferenceResolver {
                 }
             }
             for (PhpPropertyDeclaration declared : symbols.propertyDeclarations()) {
-                PhpClassDeclaration owner = declared.owner();
+                PhpClassDeclaration owner = declared.owner().orElse(null);
                 String name = withoutDollar(declared.name());
                 if (owner != null && name != null) {
                     properties.computeIfAbsent(owner, key -> new HashMap<>()).putIfAbsent(name, declared);

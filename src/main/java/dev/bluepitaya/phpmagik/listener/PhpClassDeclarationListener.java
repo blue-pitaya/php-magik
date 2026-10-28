@@ -35,8 +35,8 @@ public final class PhpClassDeclarationListener implements Listener {
 
         List<String> modifiers = new ArrayList<>();
         for (Node child : node.getNamedChildren()) {
-            if (child.isType("abstract_modifier") || child.isType("final_modifier") || child.isType("readonly_modifier")) {
-                modifiers.add(child.getContent());
+            switch (child.getType()) {
+                case "abstract_modifier", "final_modifier", "readonly_modifier" -> modifiers.add(child.getContent());
             }
         }
 

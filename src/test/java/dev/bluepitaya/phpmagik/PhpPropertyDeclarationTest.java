@@ -26,7 +26,7 @@ class PhpPropertyDeclarationTest {
             assertEquals(
                     List.of("Service1", "Service1", "Service1", "Service1"),
                     propertyDeclarations.stream()
-                            .map(property -> property.owner().name())
+                            .map(property -> property.owner().orElseThrow().name())
                             .toList()
             );
         }
@@ -61,7 +61,7 @@ class PhpPropertyDeclarationTest {
                     fixture.symbols()
                             .propertyDeclarations()
                             .stream()
-                            .map(property -> property.name() + " " + property.owner().name())
+                            .map(property -> property.name() + " " + property.owner().orElseThrow().name())
                             .toList()
             );
         }

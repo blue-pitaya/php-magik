@@ -143,8 +143,8 @@ public final class PhpTypeInferer {
             return null;
         }
         for (PhpPropertyDeclaration property : symbols.propertyDeclarations()) {
-            if (property.owner() == owningClass && member.equals(withoutDollar(property.name()))) {
-                return property.type();
+            if (property.owner().orElse(null) == owningClass && member.equals(withoutDollar(property.name()))) {
+                return property.type().orElse(null);
             }
         }
         return null;

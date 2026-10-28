@@ -84,8 +84,8 @@ public final class CompletionHandler {
 
         for (PhpPropertyDeclaration property : workspace.symbols().propertyDeclarations()) {
             String name = property.name();
-            if (property.owner() == owningClass && name != null) {
-                items.add(item(name.substring(1), KIND_FIELD, detail(property.type())));
+            if (property.owner().orElse(null) == owningClass) {
+                items.add(item(name.substring(1), KIND_FIELD, detail(property.type().orElse(null))));
             }
         }
         for (PhpMethodDeclaration method : workspace.symbols().methodDeclarations()) {
