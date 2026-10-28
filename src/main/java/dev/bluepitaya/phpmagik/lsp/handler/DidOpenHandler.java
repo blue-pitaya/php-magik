@@ -6,6 +6,7 @@ import dev.bluepitaya.phpmagik.lsp.dto.*;
 import org.jspecify.annotations.NullMarked;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 @NullMarked
 public final class DidOpenHandler {
@@ -26,12 +27,12 @@ public final class DidOpenHandler {
         byte[] content = text.getBytes(StandardCharsets.UTF_8);
         log.log("didOpen: " + uri + " (" + content.length + " bytes)");
 
-        PhpFile file = app.findFile(uri);
-        if (file == null) {
+        Optional<PhpFile> file = app.findFile(uri);
+        if (file.isEmpty()) {
             log.log("didOpen: " + uri + " not in index, skipping reparse");
             return;
         }
 
-        app.reparse(file, content);
+        app.reparse(file.get(), content);
     }
 }

@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.AppException;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.Workspace;
 import dev.bluepitaya.phpmagik.lsp.Json;
@@ -51,10 +50,7 @@ public final class CompletionHandler {
 
         log.log("completion: " + uri + " " + line + ":" + col);
 
-        PhpFile file = workspace.findFile(uri);
-        if (file == null) {
-            throw new AppException("file not found: " + uri);
-        }
+        PhpFile file = workspace.findFileOrThrow(uri);
 
         String text = file.contentLine(line);
         if (text == null) {

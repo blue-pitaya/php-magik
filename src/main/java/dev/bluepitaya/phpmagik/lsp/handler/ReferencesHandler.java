@@ -1,6 +1,5 @@
 package dev.bluepitaya.phpmagik.lsp.handler;
 
-import dev.bluepitaya.phpmagik.AppException;
 import dev.bluepitaya.phpmagik.PhpFile;
 import dev.bluepitaya.phpmagik.SymbolFinder;
 import dev.bluepitaya.phpmagik.Workspace;
@@ -54,10 +53,7 @@ public final class ReferencesHandler {
 
         log.log("references: " + uri + " " + line + ":" + col);
 
-        PhpFile file = workspace.findFile(uri);
-        if (file == null) {
-            throw new AppException("file not found: " + uri);
-        }
+        PhpFile file = workspace.findFileOrThrow(uri);
 
         PhpSymbol definition = definitionAt(file, line, col);
         if (definition == null) {

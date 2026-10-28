@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public final class Workspace {
@@ -34,12 +35,14 @@ public final class Workspace {
         return symbols;
     }
 
-    //TODO: null
-    public PhpFile findFile(String uri) {
+    public Optional<PhpFile> findFile(String uri) {
         return files.stream()
                 .filter(x -> x.uri().equals(uri))
-                .findFirst()
-                .orElse(null);
+                .findFirst();
+    }
+
+    public PhpFile findFileOrThrow(String uri) {
+        return findFile(uri).orElseThrow(() -> new AppException("file not found: " + uri));
     }
 
     public void index(Path root) throws IOException {
